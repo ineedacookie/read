@@ -11,7 +11,7 @@ class CustomUserCreationForm(UserCreationForm):
 
     class Meta(UserCreationForm):
         model = CustomUser
-        fields = ('username', 'email', 'first_name', 'last_name', 'password1', 'password2')
+        fields = ('username', 'email', 'first_name', 'last_initial', 'password1', 'password2')
 
 
 class CustomUserChangeForm(UserChangeForm):
@@ -43,9 +43,9 @@ class UserForm(ModelForm):
     class Meta:
         model = CustomUser
         fields = (
+            'username',
             'first_name',
-            'middle_name',
-            'last_name',
+            'last_initial',
             'email',
         )
 
@@ -56,7 +56,7 @@ class RegisterUserForm(ModelForm):
         model = CustomUser
         fields = (
             'first_name',
-            'last_name',
+            'last_initial',
             'username',
             'email'
         )
@@ -73,8 +73,7 @@ class InviteUsersForm(ModelForm):
         model = CustomUser
         fields = (
             'first_name',
-            'last_name',
-            'middle_name',
+            'last_initial',
             'username',
             'email',
             'user_type',
@@ -94,7 +93,7 @@ class InviteUsersForm(ModelForm):
 class InviteCombinedForm(ModelForm, AdminPasswordChangeForm):
     class Meta:
         model = CustomUser
-        fields = ('username', 'first_name', 'middle_name', 'last_name')
+        fields = ('username', 'first_name', 'last_initial')
 
     def __init__(self, *args, **kwargs):
         user = kwargs.pop('user', None)

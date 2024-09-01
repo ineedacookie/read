@@ -27,22 +27,6 @@ class School(models.Model):
 class CustomUser(AbstractUser):
     """
     Custom user model extending AbstractUser with additional fields.
-
-    Attributes:
-        school (School): The school the user belongs to.
-        user_type (str): The type of user (e.g., teacher, student, parent, administrator).
-        username (str): The unique username of the user.
-        email (str): The unique email of the user.
-        change_email (str): An email placeholder used during the email change process.
-        first_name (str): The first name of the user.
-        middle_name (str): The middle name of the user.
-        last_name (str): The last name of the user.
-        verified (bool): Indicates if the user's email is verified.
-        created_date (date): The date when the user record was created.
-        updated_date (date): The date when the user record was last updated.
-        full_name (str): The full name of the user in the format "last_name, first_name middle_name".
-        active (bool): Indicates if the user is active.
-        marked_for_deletion (date): A date when the user is marked for deletion.
     """
     USER_TYPE_CHOICES = (
         ('teacher', 'Teacher'),
@@ -51,48 +35,41 @@ class CustomUser(AbstractUser):
         ('administrator', 'Administrator'),
     )
 
-    school = models.ForeignKey(School, on_delete=models.SET_NULL, null=True, blank=True)
+    school = models.ForeignKey('School', on_delete=models.SET_NULL, null=True, blank=True)
     user_type = models.CharField(max_length=20, choices=USER_TYPE_CHOICES)
-    username = models.CharField(_('Username'), unique=True, max_length=50)
     email = models.EmailField(_('Email'), unique=True)
-    change_email = models.EmailField(null=True, blank=True, default=None)
+    change_email = models.EmailField(null=True, blank=True)
     first_name = models.CharField(_('First Name'), max_length=50, blank=True, null=True)
-    middle_name = models.CharField(_('Middle Name'), max_length=50, blank=True, null=True)
-    last_name = models.CharField(_('Last Name'), max_length=100, blank=True, null=True)
+    last_initial = models.CharField(_('Last Initial'), max_length=1, blank=True, null=True)
     verified = models.BooleanField(default=False, blank=True)
     created_date = models.DateField(_("Created Date"), auto_now_add=True, blank=True, null=True)
     updated_date = models.DateField(_("Updated Date"), auto_now=True, blank=True, null=True)
     full_name = models.CharField(_('Full Name'), max_length=210, blank=True, null=True, default=None)
     active = models.BooleanField(_('Active'), blank=True, null=True, default=True)
-    marked_for_deletion = models.DateField(null=True,
-                                           blank=True)  # added this to allow for a 30 day grace period before deleting the user perminately.
+    marked_for_deletion = models.DateField(null=True, blank=True)
 
-    USERNAME_FIELD = 'username'
-    REQUIRED_FIELDS = [username]
+    USERNAME_FIELD = 'email'
+    REQUIRED_FIELDS = ['username', 'first_name', 'last_initial']
 
     objects = CustomUserManager()
 
     def __str__(self):
-        return self.username
+        return self.email
 
     def save(self, *args, **kwargs):
-        """
-        Overrides the save method to update the full name before saving the user.
-        """
         self.update_full_name()
         super().save(*args, **kwargs)
 
     def update_full_name(self):
-        """
-        Stores the full name as last_name, first_name middle_name.
-        """
-        if self.first_name and self.last_name:
-            text = self.last_name + ', ' + self.first_name
-            if self.middle_name:
-                text += ' ' + self.middle_name
+        if self.first_name and self.last_initial:
+            text = self.first_name + ' ' + self.last_initial + '.'
         else:
             text = ''
         self.full_name = text.upper()
+
+    @classmethod
+    def get_by_natural_key(cls, username_or_email):
+        return cls.objects.filter(models.Q(username=username_or_email) | models.Q(email=username_or_email)).first()
 
 
 class Classroom(models.Model):

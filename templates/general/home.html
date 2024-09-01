@@ -2,4 +2,91 @@
 {% load static %}
 {% block title %}read | Home{% endblock %}
 {% block content %}
+<script>
+    function fetchUsers(page = 1, userType = '', searchQuery = '', sortField = 'id', sortOrder = 'asc') {
+        var xhr = new XMLHttpRequest();
+        xhr.open('GET', `{% url "user_list" %}?page=${page}&user_type=${userType}&search=${searchQuery}&sort_field=${sortField}&sort_order=${sortOrder}`, true);
+        xhr.setRequestHeader('X-Requested-With', 'XMLHttpRequest');
+        xhr.onreadystatechange = function () {
+            if (xhr.readyState == 4 && xhr.status == 200) {
+                var data = JSON.parse(xhr.responseText);
+                var users = data.users;
+                var tableBody = document.getElementById('user-table-body');
+                tableBody.innerHTML = '';
+                for (var i = 0; i < users.length; i++) {
+                    var row = `<tr>
+                        <td>${users[i].id}</td>
+                        <td>${users[i].first_name}</td>
+                        <td>${users[i].last_name}</td>
+                        <td>${users[i].email}</td>
+                    </tr>`;
+                    tableBody.innerHTML += row;
+                }
+                document.getElementById('pagination').innerHTML = `
+                    <button class="btn btn-sm btn-falcon-default me-1" type="button" title="Previous" ${data.has_previous ? '' : 'disabled'} onclick="fetchUsers(${data.page_number - 1}, '${userType}', '${searchQuery}', '${sortField}', '${sortOrder}')">
+                        <span class="fas fa-chevron-left"></span>
+                    </button>
+                    <button class="btn btn-sm btn-falcon-default ms-1" type="button" title="Next" ${data.has_next ? '' : 'disabled'} onclick="fetchUsers(${data.page_number + 1}, '${userType}', '${searchQuery}', '${sortField}', '${sortOrder}')">
+                        <span class="fas fa-chevron-right"></span>
+                    </button>
+                `;
+                advanceAjaxTableInit();  // Reinitialize List.js for sorting and filtering
+            }
+        };
+        xhr.send();
+    }
+
+    document.addEventListener('DOMContentLoaded', function () {
+        document.getElementById('filter-form').addEventListener('submit', function (e) {
+            e.preventDefault();
+            var userType = document.getElementById('user-type').value;
+            var searchQuery = document.getElementById('search-query').value;
+            fetchUsers(1, userType, searchQuery);
+        });
+
+        document.querySelectorAll('[data-sort]').forEach(function(header) {
+            header.addEventListener('click', function() {
+                var sortField = this.getAttribute('data-sort');
+                var currentSortOrder = this.getAttribute('data-sort-order') || 'asc';
+                var newSortOrder = currentSortOrder === 'asc' ? 'desc' : 'asc';
+                this.setAttribute('data-sort-order', newSortOrder);
+                fetchUsers(1, '', '', sortField, newSortOrder);
+            });
+        });
+
+        fetchUsers();  // Initial load
+    });
+</script>
+<form id="filter-form">
+    <select id="user-type" name="user_type">
+        <option value="">All Types</option>
+        <option value="student">Student</option>
+        <option value="teacher">Teacher</option>
+        <option value="parent">Parent</option>
+        <!-- Add more types as needed -->
+    </select>
+    <input type="text" id="search-query" name="search" placeholder="Search by email...">
+    <button type="submit">Filter</button>
+</form>
+
+<div class="table-list" id="advanceAjaxTable">
+    <div class="table-responsive scrollbar mb-3">
+        <table class="table table-sm table-striped fs-10 mb-0 overflow-hidden">
+            <thead class="bg-200">
+                <tr>
+                    <th class="text-900 sort pe-1 align-middle white-space-nowrap" data-sort="id" data-sort-order="asc">ID</th>
+                    <th class="text-900 sort pe-1 align-middle white-space-nowrap" data-sort="first_name" data-sort-order="asc">First Name</th>
+                    <th class="text-900 sort pe-1 align-middle white-space-nowrap" data-sort="last_name" data-sort-order="asc">Last Name</th>
+                    <th class="text-900 sort pe-1 align-middle white-space-nowrap" data-sort="email" data-sort-order="asc">Email</th>
+                </tr>
+            </thead>
+            <tbody id="user-table-body" class="list">
+                <!-- Rows will be dynamically inserted here -->
+            </tbody>
+        </table>
+    </div>
+    <div id="pagination" class="d-flex justify-content-between mt-2">
+        <!-- Pagination buttons will be inserted here -->
+    </div>
+</div>
 {% endblock %}
