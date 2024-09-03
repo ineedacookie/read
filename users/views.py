@@ -82,10 +82,11 @@ def user_list(request):
     # Search functionality
     search_query = request.GET.get('search', '')
     if search_query:
-        queryset = queryset.filter(Q(email__icontains=search_query) | Q(full_name__icontains=search_query))
+        queryset = queryset.filter(Q(email__icontains=search_query) | Q(first_name__icontains=search_query) | Q(
+            last_name__icontains=search_query))
 
     # Sorting functionality
-    sort_field = request.GET.get('sort_field', 'first_name')
+    sort_field = request.GET.get('sort_field', 'id')
     sort_order = request.GET.get('sort_order', 'asc')
     if sort_order == 'desc':
         sort_field = f'-{sort_field}'
@@ -97,7 +98,7 @@ def user_list(request):
     page_obj = paginator.get_page(page_number)
 
     # If AJAX request, return JSON response
-    if request.headers.get('x-requested-with') == 'XMLHttpRequest':
+    if request.headers.get('X-Requested-With') == 'XMLHttpRequest':
         users_list = list(page_obj.object_list.values('id', 'first_name', 'last_name', 'email'))
         return JsonResponse({
             'users': users_list,
@@ -108,7 +109,6 @@ def user_list(request):
         })
 
     return render(request, 'general/home.html', {'page_obj': page_obj})
-
 
 def register_account(request):
     """This view allows a new user to register for an account not linked to any company."""
