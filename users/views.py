@@ -9,8 +9,9 @@ from django.utils.encoding import force_str
 from django.utils.http import urlsafe_base64_decode
 from django.db.models import Q
 
-from .forms import OverriddenPasswordChangeForm, OverriddenAdminPasswordChangeForm, RegisterUserForm, InviteCombinedForm
-from .models import CustomUser
+from .forms import OverriddenPasswordChangeForm, OverriddenAdminPasswordChangeForm, RegisterUserForm, \
+    InviteCombinedForm, InviteStudentsForm, InviteUsersForm
+from .models import CustomUser, School
 from .tokens import account_activation_token
 from .utils import get_selectable_employees, send_email_with_link
 
@@ -27,6 +28,11 @@ from django.contrib.auth.hashers import make_password
 
 
 def create_custom_users(request):
+    from django.utils.crypto import get_random_string
+
+    # Create schools
+    schools = [School.objects.create(name=f'School {i}') for i in range(1, 4)]
+
     # Define custom users data
     users_data = [
                      {'username': f'teacher_{i}', 'email': f'teacher_{i}@example.com', 'user_type': 'teacher'} for i in
@@ -42,14 +48,16 @@ def create_custom_users(request):
                      range(10)
                  ]
 
-    # Create users
-    for user_data in users_data:
-        CustomUser.objects.create(
-            username=user_data['username'],
-            email=user_data['email'],
-            user_type=user_data['user_type'],
-            password=make_password('defaultpassword')  # Default password for initial creation
-        )
+    # Create users and assign to schools
+    for i, school in enumerate(schools):
+        for j, user_data in enumerate(users_data):
+            CustomUser.objects.create(
+                username=str(i) + "_" + user_data['username'],
+                email=str(i) + "_" + user_data['email'],
+                user_type=user_data['user_type'],
+                password=make_password('temp'),  # Default password for initial creation
+                school=school
+            )
 
     # Return a response
     return render(request, 'general/home.html', {'message': 'Custom users created successfully'})
@@ -66,21 +74,23 @@ def home(request):
         return redirect('/io_admin')
     else:
         page = 'general/home.html'
-        page_arguments = {}
+        user_type = 'student'
+        if user_type == 'student':
+            invite_form = InviteStudentsForm()
+        else:
+            invite_form = InviteUsersForm()
+        page_arguments = {'user_type': user_type, 'invite_form': invite_form}
         return render(request, page, page_arguments)  # fill the {} with arguments
 
 
 @login_required
 def user_list(request):
-    queryset = CustomUser.objects.all()  # TODO filter this using the information from the user
-
-    # Filter by user type
-    user_type = request.GET.get('user_type')
-    if user_type:
-        queryset = queryset.filter(user_type=user_type)
+    user_type = request.GET.get('user_type', 'student')
+    queryset = CustomUser.objects.filter(school=request.user.school, user_type=user_type)
 
     # Search functionality
     search_query = request.GET.get('search', '')
+
     if search_query:
         queryset = queryset.filter(Q(email__icontains=search_query) | Q(first_name__icontains=search_query) | Q(
             last_name__icontains=search_query))
@@ -107,8 +117,12 @@ def user_list(request):
             'page_number': page_obj.number,
             'num_pages': page_obj.paginator.num_pages,
         })
+    if user_type == 'student':
+        invite_form = InviteStudentsForm()
+    else:
+        invite_form = InviteUsersForm()
 
-    return render(request, 'general/home.html', {'page_obj': page_obj})
+    return render(request, 'general/home.html', {'page_obj': page_obj, 'page_type': user_type, 'invite_form': invite_form})
 
 def register_account(request):
     """This view allows a new user to register for an account not linked to any company."""
@@ -160,6 +174,28 @@ def activate_account(request, uidb64, token):
             form = OverriddenAdminPasswordChangeForm(user)
         page_arguments['form'] = form
     return render(request, page, page_arguments)
+
+
+@login_required
+def invite_user(request):
+    """
+    Attached to the add button. It will receive either a InviteStudentsform or InviteUsersForm.
+    :param request: 
+    :return: 
+    """
+    if request.method == 'POST':
+        post_dict = request.POST.dict()
+        user_type = post_dict['user_type']
+        post_dict['school'] = request.user.school.id
+        if user_type == 'student':
+            form = InviteStudentsForm(post_dict)
+        else:
+            form = InviteUsersForm(post_dict)
+        if form.is_valid():
+            form.save()
+            return JsonResponse({'success': True}, status=200)
+        else:
+            return JsonResponse({'form_errors': form.errors}, status=200)
 
 
 def invited_account(request, uidb64, token):

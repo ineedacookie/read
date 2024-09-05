@@ -14,6 +14,7 @@ urlpatterns += [
     path('landing/', views.landing_page, name="landing_page"),
     path('register/', views.register_account, name="register"),
     path('users/', views.user_list, name="user_list"),
+    path('invite_user/', views.invite_user, name="invite_user"),
     # path('bad/dont/leave/', views.create_custom_users, name='create_custom')
     # path('dashboard/', views.dashboard, name="dashboard"),
     # path('admin/company_settings/', views.company_settings, name="company_settings"),

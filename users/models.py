@@ -21,7 +21,10 @@ class School(models.Model):
     updated_date = models.DateField(_("Updated Date"), auto_now=True, blank=True, null=True)
 
     def __str__(self):
-        return str(self.name) + ' #' + str(self.pk)
+        if self.name:
+            return str(self.name) + ' #' + str(self.pk)
+        else:
+            return "#" + str(self.pk)
 
 
 class CustomUser(AbstractUser):
@@ -57,6 +60,8 @@ class CustomUser(AbstractUser):
         return self.email
 
     def save(self, *args, **kwargs):
+        if not self.school:
+            self.school = School.objects.create()
         self.update_full_name()
         super().save(*args, **kwargs)
 

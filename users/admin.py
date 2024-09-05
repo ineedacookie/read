@@ -23,10 +23,10 @@ class CustomUserAdmin(UserAdmin):
     model = CustomUser
 
     list_display = ('username', 'email', 'school', 'is_active', 'created_date')
-    list_filter = ('username', SchoolFilter, 'is_active', 'created_date', 'is_staff')
+    list_filter = ('username', SchoolFilter, 'is_active', 'created_date', 'is_staff', 'user_type')
     fieldsets = (
         (None, {'fields': (
-            'school', 'email', 'password', 'first_name', 'middle_name', 'last_name', 'change_email', 'timezone',
+            'school', 'user_type', 'email', 'password', 'first_name', 'last_initial', 'change_email',
             'verified')}),
         ('Permissions', {'fields': ('is_active', 'is_staff')}),
     )
@@ -34,7 +34,7 @@ class CustomUserAdmin(UserAdmin):
         (None, {
             'classes': ('wide',),
             'fields': (
-                'school', 'email', 'first_name', 'middle_name', 'last_name', 'timezone',
+                'school', 'user_type', 'email', 'first_name', 'last_initial',
                 'verified', 'password1', 'password2', 'is_staff', 'is_active')}
          ),
     )
