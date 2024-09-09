@@ -1,5 +1,7 @@
 import logging
+import json
 
+from django.views.decorators.http import require_POST
 from django.contrib.auth import login, update_session_auth_hash
 from django.contrib.auth.decorators import login_required
 from django.shortcuts import render, redirect
@@ -8,10 +10,11 @@ from django.http import JsonResponse
 from django.utils.encoding import force_str
 from django.utils.http import urlsafe_base64_decode
 from django.db.models import Q
+from django.http import Http404, HttpResponseBadRequest
 
-from .forms import OverriddenPasswordChangeForm, OverriddenAdminPasswordChangeForm, RegisterUserForm, \
+from .forms import OverriddenPasswordChangeForm, ClassroomForm, OverriddenAdminPasswordChangeForm, RegisterUserForm, \
     InviteCombinedForm, InviteStudentsForm, InviteUsersForm
-from .models import CustomUser, School
+from .models import CustomUser, School, Classroom
 from .tokens import account_activation_token
 from .utils import get_selectable_employees, send_email_with_link
 
@@ -64,7 +67,7 @@ def create_custom_users(request):
 
 
 @login_required
-def home(request):
+def home(request, **kwargs):
     """Main page that is the root of the website"""
     """check that the user is logged in. if not send them to the log in page."""
     # if not request.user.password:
@@ -74,7 +77,29 @@ def home(request):
         return redirect('/io_admin')
     else:
         page = 'general/home.html'
-        user_type = 'student'
+        user_type = kwargs.get('user_type', 'student')
+        if user_type not in ['student', 'teacher', 'parent', 'administrator']:
+            # Forward the user to a 404 page
+            raise Http404("Page not found")
+        if user_type == 'student':
+            invite_form = InviteStudentsForm()
+        else:
+            invite_form = InviteUsersForm()
+        page_arguments = {'user_type': user_type, 'invite_form': invite_form}
+        return render(request, page, page_arguments)  # fill the {} with arguments
+
+
+@login_required
+def user_list_page(request, **kwargs):
+    """Checks whether the user is part of the staff or a customer"""
+    if request.user.is_staff:
+        return redirect('/io_admin')
+    else:
+        page = 'general/user_list.html'
+        user_type = kwargs.get('user_type', 'student')
+        if user_type not in ['student', 'teacher', 'parent', 'administrator']:
+            # Forward the user to a 404 page
+            raise Http404("Page not found")
         if user_type == 'student':
             invite_form = InviteStudentsForm()
         else:
@@ -122,7 +147,7 @@ def user_list(request):
     else:
         invite_form = InviteUsersForm()
 
-    return render(request, 'general/home.html', {'page_obj': page_obj, 'page_type': user_type, 'invite_form': invite_form})
+    return render(request, 'general/user_list.html', {'page_obj': page_obj, 'page_type': user_type, 'invite_form': invite_form})
 
 def register_account(request):
     """This view allows a new user to register for an account not linked to any company."""
@@ -187,16 +212,39 @@ def invite_user(request):
         post_dict = request.POST.dict()
         user_type = post_dict['user_type']
         post_dict['school'] = request.user.school.id
+        if not post_dict.get('username'):
+            post_dict['username'] = post_dict['email']
         if user_type == 'student':
             form = InviteStudentsForm(post_dict)
         else:
             form = InviteUsersForm(post_dict)
+
         if form.is_valid():
             form.save()
             return JsonResponse({'success': True}, status=200)
         else:
             return JsonResponse({'form_errors': form.errors}, status=200)
 
+
+@login_required
+@require_POST
+def delete_users(request):
+    """
+    Deletes multiple CustomUsers based on the IDs provided in the POST request.
+    The request must contain a JSON body with a list of user IDs to be deleted.
+    """
+    try:
+        data = json.loads(request.body)
+        user_ids = data.get('user_ids', [])
+
+        if not isinstance(user_ids, list):
+            return JsonResponse({'error': 'Invalid data format. Expected a list of user IDs.'}, status=400)
+
+        CustomUser.objects.filter(id__in=user_ids, school=request.user.school).delete()
+        return JsonResponse({'success': True}, status=200)
+
+    except json.JSONDecodeError:
+        return JsonResponse({'error': 'Invalid JSON format.'}, status=400)
 
 def invited_account(request, uidb64, token):
     """This page is for validating an email and getting the initial info and password set for a user."""
@@ -221,6 +269,59 @@ def invited_account(request, uidb64, token):
             form = InviteCombinedForm(user)
         page_arguments['form'] = form
     return render(request, page, page_arguments)
+
+
+@login_required
+def classrooms_view(request):
+    if request.method == "GET":
+        if 'students' in request.path:
+            # Handle GET request for students list
+            students = CustomUser.objects.filter(school=request.user.school, user_type='student')
+            data = [{"id": student.id, "name": student.full_name or student.email} for student in students]
+            return JsonResponse(data, safe=False)
+        elif 'teachers' in request.path:
+            # Handle GET request for students list
+            teachers = CustomUser.objects.filter(school=request.user.school, user_type='teacher')
+            data = [{"id": teacher.id, "name": teacher.full_name or teacher.email} for teacher in teachers]
+            return JsonResponse(data, safe=False)
+        else:
+            # Handle GET request for classrooms list
+            classrooms = Classroom.objects.all()
+            data = [{"id": classroom.id, "name": classroom.name} for classroom in classrooms]
+            return JsonResponse(data, safe=False)
+    elif request.method == "POST":
+        # Handle POST request to create a classroom
+        try:
+            input_dict = request.POST.dict()
+            input_dict['school'] = request.user.school.id
+            input_dict['students'] = json.loads(input_dict.get('students', '[]'))
+            input_dict['teachers'] = json.loads(input_dict.get('teachers', '[]'))
+            if request.user.user_type == 'teacher':
+                input_dict['teachers'] = [request.user.id]
+            form = ClassroomForm(input_dict)
+            if form.is_valid():
+                form.save()
+                return JsonResponse({"success": True}, status=201)
+            return JsonResponse({"errors": form.errors}, status=400)
+        except json.JSONDecodeError:
+            return HttpResponseBadRequest("Invalid JSON payload")
+
+    elif request.method == "DELETE":
+        # Handle DELETE request to delete classrooms
+        try:
+            data = json.loads(request.body)
+            ids = data.get('ids', [])
+            Classroom.objects.filter(id__in=ids).delete()
+            return JsonResponse({"success": True}, status=204)
+        except json.JSONDecodeError:
+            return HttpResponseBadRequest("Invalid JSON payload")
+
+    # Default response for unsupported methods
+    return JsonResponse({"error": "Method not allowed"}, status=405)
+
+@login_required
+def render_classroom_list_view(request):
+    return render(request, 'general/classroom_list.html')
 
 
 def handler404(request, *args, **argv):

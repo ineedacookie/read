@@ -1,5 +1,5 @@
 from django.contrib.auth.forms import UserCreationForm, UserChangeForm, AdminPasswordChangeForm, PasswordChangeForm
-from django.forms import EmailField, ModelForm, BooleanField, CharField, PasswordInput
+from django.forms import EmailField, ModelForm, BooleanField, CharField, PasswordInput, CheckboxSelectMultiple
 
 from .models import CustomUser, School, Classroom, StudentParentRelation, ReadingGroup
 from .utils import send_email_with_link
@@ -188,14 +188,18 @@ class InviteCombinedForm(ModelForm, AdminPasswordChangeForm):
 class ClassroomForm(ModelForm):
     class Meta:
         model = Classroom
-        fields = ['name', 'teacher', 'students']
+        fields = ['school', 'name', 'teachers', 'students']
+        widgets = {
+            'teachers': CheckboxSelectMultiple,
+            'students': CheckboxSelectMultiple,
+        }
 
 class ReadingGroupForm(ModelForm):
     class Meta:
         model = ReadingGroup
-        fields = ['name', 'managers', 'students']
+        fields = ['school', 'name', 'managers', 'students']
 
 class StudentParentRelationForm(ModelForm):
     class Meta:
         model = StudentParentRelation
-        fields = ['student', 'parent']
+        fields = ['school', 'student', 'parent']

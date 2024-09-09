@@ -6,7 +6,7 @@ urlpatterns = [
     re_path(r'^activate/(?P<uidb64>[0-9A-Za-z_\-]+)/(?P<token>[0-9A-Za-z]{1,13}-[0-9A-Za-z]{1,40})/$', views.activate_account,
             name='activate'),
     re_path(r'^invited/(?P<uidb64>[0-9A-Za-z_\-]+)/(?P<token>[0-9A-Za-z]{1,13}-[0-9A-Za-z]{1,40})/$', views.invited_account,
-            name='activate'),
+            name='invited'),
 ]
 
 urlpatterns += [
@@ -15,7 +15,12 @@ urlpatterns += [
     path('register/', views.register_account, name="register"),
     path('users/', views.user_list, name="user_list"),
     path('invite_user/', views.invite_user, name="invite_user"),
-    # path('bad/dont/leave/', views.create_custom_users, name='create_custom')
+    path('delete_user/', views.delete_users, name="delete_users"),
+    path('classrooms/', views.render_classroom_list_view, name='classrooms'),
+    path('api/classrooms/', views.classrooms_view, name='api_classrooms'),
+    path('api/students/', views.classrooms_view, name='api_students'),
+    path('api/teachers/', views.classrooms_view, name='api_teachers'),
+    # path('bad/dont/leave/', views.create_custom_users, name='create_custom'),
     # path('dashboard/', views.dashboard, name="dashboard"),
     # path('admin/company_settings/', views.company_settings, name="company_settings"),
     # path('admin/create_employee/', views.create_employee, name="create_employee"),
@@ -25,4 +30,5 @@ urlpatterns += [
     # path('admin/change_employee_password/<int:employee_id>/', views.admin_change_password, name='change_employee_password'),
     # path('account_settings/', views.edit_account_settings, name='account_settings'),
     # path('change_password/', views.change_password, name='change_password'),
+    path('<str:user_type>/', views.user_list_page, name='user_list_page'),
 ]

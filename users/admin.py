@@ -53,9 +53,9 @@ class SchoolAdmin(admin.ModelAdmin):
 
 
 class ClassroomAdmin(admin.ModelAdmin):
-    list_display = ('name', 'teacher', 'created_date', 'updated_date')
-    autocomplete_fields = ('teacher', 'students')
-    search_fields = ('name', 'teacher__username')
+    list_display = ('school', 'name', 'created_date', 'updated_date')
+    autocomplete_fields = ('school', )
+    search_fields = ('name', 'teachers__username')
     ordering = ('name',)
 
 

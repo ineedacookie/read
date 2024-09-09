@@ -83,15 +83,16 @@ class Classroom(models.Model):
 
     Attributes:
         name (str): The name of the classroom.
-        teacher (CustomUser): The teacher assigned to the classroom.
+        teachers (list[CustomUser]): The teachers assigned to the classroom.
         students (list[CustomUser]): The students assigned to the classroom.
         created_date (date): The date when the classroom record was created.
         updated_date (date): The date when the classroom record was last updated.
     """
+    school = models.ForeignKey('School', on_delete=models.SET_NULL, null=True, blank=True)
     name = models.CharField(max_length=255, help_text="Classroom Name")
-    teacher = models.ForeignKey(CustomUser, on_delete=models.SET_NULL, null=True, blank=True,
-                                limit_choices_to={'user_type': 'teacher'})
-    students = models.ManyToManyField(CustomUser, related_name='classrooms',
+    teachers = models.ManyToManyField(CustomUser, blank=True, related_name='teachers_classrooms',
+                                      limit_choices_to={'user_type': 'teacher'})
+    students = models.ManyToManyField(CustomUser, related_name='students_classrooms',
                                       limit_choices_to={'user_type': 'student'})
     created_date = models.DateField(_("Created Date"), auto_now_add=True, blank=True)
     updated_date = models.DateField(_("Updated Date"), auto_now=True, blank=True, null=True)
@@ -111,6 +112,7 @@ class ReadingGroup(models.Model):
         created_date (date): The date when the reading group record was created.
         updated_date (date): The date when the reading group record was last updated.
     """
+    school = models.ForeignKey('School', on_delete=models.SET_NULL, null=True, blank=True)
     name = models.CharField(max_length=255, help_text="Reading Group Name")
     managers = models.ManyToManyField(CustomUser, related_name='managed_reading_groups',
                                       limit_choices_to=models.Q(user_type='teacher') | models.Q(
@@ -134,6 +136,7 @@ class StudentParentRelation(models.Model):
         created_date (date): The date when the relation record was created.
         updated_date (date): The date when the relation record was last updated.
     """
+    school = models.ForeignKey('School', on_delete=models.SET_NULL, null=True, blank=True)
     student = models.ForeignKey(CustomUser, on_delete=models.CASCADE, related_name='parents',
                                 limit_choices_to={'user_type': 'student'})
     parent = models.ForeignKey(CustomUser, on_delete=models.CASCADE, related_name='children',
