@@ -41,6 +41,7 @@ class CustomUser(AbstractUser):
     school = models.ForeignKey('School', on_delete=models.SET_NULL, null=True, blank=True)
     user_type = models.CharField(max_length=20, choices=USER_TYPE_CHOICES)
     email = models.EmailField(_('Email'), unique=True)
+    students = models.ManyToManyField('CustomUser', blank=True)
     change_email = models.EmailField(null=True, blank=True)
     first_name = models.CharField(_('First Name'), max_length=50, blank=True, null=True)
     last_initial = models.CharField(_('Last Initial'), max_length=1, blank=True, null=True)

@@ -1,19 +1,19 @@
 {% extends "general/nav_template.html" %}
 {% load static %}
-{% block title %}read | Classroom(s){% endblock %}
+{% block title %}read | Reading Group(s){% endblock %}
 {% block content %}
 <div class="container mt-5">
-    <h2 class="mb-4">Classrooms Management</h2>
+    <h2 class="mb-4">Reading Groups Management</h2>
 
     <div class="card">
         <div class="card-header border-bottom border-200 px-0">
             <div class="row flex-between-center gy-2 px-x1">
                 <div class="col-auto pe-0">
-                    <h6 class="mb-0">Classrooms</h6>
+                    <h6 class="mb-0">Reading Groups</h6>
                 </div>
                 <div class="col-auto d-flex">
-                    <button id="btn-add-classroom" class="btn btn-sm btn-success me-2" data-bs-toggle="modal"
-                            data-bs-target="#addEditClassroomModal">Add Classroom
+                    <button id="btn-add-reading-group" class="btn btn-sm btn-success me-2" data-bs-toggle="modal"
+                            data-bs-target="#addEditReadingGroupModal">Add Reading Group
                     </button>
                     <div id="bulk-actions" class="mr-2 d-flex align-items-center d-none">
                         <select class="form-select form-select-sm" aria-label="Bulk actions">
@@ -29,20 +29,20 @@
         </div>
         <div class="card-body p-0">
             <div class="table-responsive scrollbar">
-                <table class="table table-sm mb-0 fs-10 table-view-classrooms" id="table-classroom-body">
+                <table class="table table-sm mb-0 fs-10 table-view-reading-groups" id="table-reading-group-body">
                     <thead class="bg-body-tertiary">
                     <tr>
                         <th class="py-2 fs-9 pe-2" style="width: 28px;">
                             <div class="form-check d-flex align-items-center">
-                                <input class="form-check-input" id="checkbox-bulk-table-classrooms-select"
+                                <input class="form-check-input" id="checkbox-bulk-table-reading-groups-select"
                                        type="checkbox"
-                                       data-bulk-select='{"body":"table-classroom-body","actions":"table-classroom-actions","replacedElement":"table-classroom-replace-element"}'/>
+                                       data-bulk-select='{"body":"table-reading-group-body","actions":"table-reading-group-actions","replacedElement":"table-reading-group-replace-element"}'/>
                             </div>
                         </th>
                         <th class="text-800 sort align-middle ps-2">Name</th>
                     </tr>
                     </thead>
-                    <tbody class="list" id="classrooms-table-body">
+                    <tbody class="list" id="reading-groups-table-body">
                     <!-- Rows will be populated via AJAX -->
                     </tbody>
                 </table>
@@ -50,32 +50,32 @@
         </div>
     </div>
 
-    <!-- Add/Edit Classroom Modal -->
-    <div class="modal fade" id="addEditClassroomModal" tabindex="-1" aria-labelledby="addEditClassroomLabel"
+    <!-- Add/Edit Reading Group Modal -->
+    <div class="modal fade" id="addEditReadingGroupModal" tabindex="-1" aria-labelledby="addEditReadingGroupLabel"
          aria-hidden="true">
         <div class="modal-dialog">
             <div class="modal-content">
                 <div class="modal-header">
-                    <h5 class="modal-title" id="form-title">Add Classroom</h5>
+                    <h5 class="modal-title" id="form-title">Add Reading Group</h5>
                     <button type="button" class="btn-close" data-bs-dismiss="modal" aria-label="Close"></button>
                 </div>
                 <div class="modal-body">
-                    <form id="classroom-form">
+                    <form id="reading-group-form">
                         {% csrf_token %}
                         <div class="form-group">
-                            <label for="classroom-name">Classroom Name</label>
-                            <input type="text" class="form-control" id="classroom-name" name="name" required>
+                            <label for="reading-group-name">Reading Group Name</label>
+                            <input type="text" class="form-control" id="reading-group-name" name="name" required>
                         </div>
                         <div class="form-group">
-                            <label for="classroom-teachers">{% if user.user_type == 'teacher' %}Additional {% endif %}Teachers</label>
-                            <select multiple class="form-control" id="classroom-teachers" name="teachers"
-                                    style="width: 100%;">
+                            <label for="reading-group-teachers">{% if user.user_type == 'teacher' %}Additional {% endif %}Teachers</label>
+                            <select multiple class="form-control" id="reading-group-teachers" name="managers"
+                                    style="width: 100%;" required>
                                 <!-- Options will be populated dynamically -->
                             </select>
                         </div>
                         <div class="form-group">
-                            <label for="classroom-students">Students</label>
-                            <select multiple class="form-control" id="classroom-students" name="students"
+                            <label for="reading-group-students">Students</label>
+                            <select multiple class="form-control" id="reading-group-students" name="students"
                                     style="width: 100%;">
                                 <!-- Options will be populated dynamically -->
                             </select>
@@ -85,7 +85,8 @@
                 <div class="modal-footer">
                     <button type="button" class="btn btn-secondary" id="btn-cancel" data-bs-dismiss="modal">Cancel
                     </button>
-                    <button type="submit" class="btn btn-primary" id="btn-save-classroom">Save Classroom</button>
+                    <button type="submit" class="btn btn-primary" id="btn-save-reading-group">Save Reading Group
+                    </button>
                 </div>
             </div>
         </div>
@@ -104,7 +105,7 @@
                 success: function(data) {
                     allStudents = data;
                     allStudents.forEach(student => {
-                        $('#classroom-students').append(
+                        $('#reading-group-students').append(
                             `<option value="${student.id}">${student.name}</option>`
                         );
                     });
@@ -120,7 +121,7 @@
                 success: function(data) {
                     allTeachers = data;
                     allTeachers.forEach(teacher => {
-                        $('#classroom-teachers').append(
+                        $('#reading-group-teachers').append(
                             `<option value="${teacher.id}">${teacher.name}</option>`
                         );
                     });
@@ -133,7 +134,7 @@
                 return item.text;
             }
 
-            const selectedStudents = $('#classroom-students').select2('data').map(student => student.id);
+            const selectedStudents = $('#reading-group-students').select2('data').map(student => student.id);
             if (selectedStudents.includes(item.id)) {
                 return null;
             }
@@ -142,20 +143,20 @@
         }
 
         function initializeSelect2() {
-            $('#classroom-students').select2({
+            $('#reading-group-students').select2({
                 placeholder: 'Select students',
                 allowClear: true,
                 width: 'resolve', // Resolve the width of the container to fit the element
-                dropdownParent: $('#addEditClassroomModal'), // Ensure dropdown displays in front of the modal
+                dropdownParent: $('#addEditReadingGroupModal'), // Ensure dropdown displays in front of the modal
                 closeOnSelect: false, // Keep dropdown open when selecting items
                 templateResult: templateRender
             });
 
-            $('#classroom-teachers').select2({
+            $('#reading-group-teachers').select2({
                 placeholder: 'Select teachers',
                 allowClear: true,
                 width: 'resolve', // Resolve the width of the container to fit the element
-                dropdownParent: $('#addEditClassroomModal'), // Ensure dropdown displays in front of the modal
+                dropdownParent: $('#addEditReadingGroupModal'), // Ensure dropdown displays in front of the modal
                 closeOnSelect: false, // Keep dropdown open when selecting items
                 templateResult: templateRender
             });
@@ -163,24 +164,24 @@
 
         $.when(fetchStudents(), fetchTeachers()).then(() => {
             initializeSelect2();
-            fetchClassrooms();
+            fetchReadingGroups();
         });
 
-        function fetchClassrooms() {
+        function fetchReadingGroups() {
             $.ajax({
-                url: '{% url "api_classrooms" %}',
+                url: '{% url "api_reading_groups" %}',
                 method: 'GET',
                 success: function(data) {
-                    $('#classrooms-table-body').empty();
-                    data.forEach(classroom => {
-                        $('#classrooms-table-body').append(
+                    $('#reading-groups-table-body').empty();
+                    data.forEach(readingGroup => {
+                        $('#reading-groups-table-body').append(
                             `<tr>
                                 <td class="align-middle fs-9 py-3">
                                   <div class="form-check mb-0">
-                                    <input class="form-check-input" type="checkbox" data-id="${classroom.id}" data-bulk-select-row="data-bulk-select-row" />
+                                    <input class="form-check-input" type="checkbox" data-id="${readingGroup.id}" data-bulk-select-row="data-bulk-select-row" />
                                   </div>
                                 </td>
-                                <td class="align-middle">${classroom.name}</td>
+                                <td class="align-middle">${readingGroup.name}</td>
                             </tr>`
                         );
                     });
@@ -189,29 +190,29 @@
             });
         }
 
-        // Handle form submission to save classroom
-        $('#classroom-form').on('submit', function(e) {
+        // Handle form submission to save reading group
+        $('#reading-group-form').on('submit', function(e) {
             e.preventDefault();
-            var form = document.getElementById('classroom-form');
+            var form = document.getElementById('reading-group-form');
             var formData = new FormData(form);
-            var students = $('#classroom-students').val();
-            var teachers = $('#classroom-teachers').val();
+            var students = $('#reading-group-students').val();
+            var teachers = $('#reading-group-teachers').val();
             formData.set('students', JSON.stringify(students));
-            formData.set('teachers', JSON.stringify(teachers));
+            formData.set('managers', JSON.stringify(teachers));
             var xhr = new XMLHttpRequest();
             const csrfToken = document.querySelector('[name=csrfmiddlewaretoken]').value;
-            xhr.open('POST', '{% url "api_classrooms" %}', true);
+            xhr.open('POST', '{% url "api_reading_groups" %}', true);
             xhr.setRequestHeader('X-Requested-With', 'XMLHttpRequest');
             xhr.setRequestHeader('X-CSRFToken', csrfToken);
             xhr.onreadystatechange = function () {
                 if (xhr.readyState === 4 && xhr.status === 200) {
                     var data = JSON.parse(xhr.responseText);
                     if (data.success) {
-                        $('#addEditClassroomModal').modal('hide');
+                        $('#addEditReadingGroupModal').modal('hide');
                         form.reset();
-                        $('#classroom-students').val(null).trigger('change'); // Reset the select2
-                        $('#classroom-teachers').val(null).trigger('change'); // Reset the select2
-                        fetchClassrooms();
+                        $('#reading-group-students').val(null).trigger('change'); // Reset the select2
+                        $('#reading-group-teachers').val(null).trigger('change'); // Reset the select2
+                        fetchReadingGroups();
                     } else {
                         $('#form_errors').html(data.form_errors);
                     }
@@ -220,31 +221,31 @@
             xhr.send(formData);
         });
 
-        // Handle delete selected classrooms
+        // Handle delete selected reading groups
         $('#btn-bulk-actions').on('click', function() {
             let selected_value = $('select[aria-label="Bulk actions"]').val()
             if (selected_value == 'Delete'){
-                const selectedClassrooms = $('input[data-bulk-select-row]:checked').map(function() {
+                const selectedReadingGroups = $('input[data-bulk-select-row]:checked').map(function() {
                     return $(this).data('id');
                 }).get();
                 const csrfToken = document.querySelector('[name=csrfmiddlewaretoken]').value;
                 $.ajax({
-                    url: '{% url "api_classrooms" %}',
+                    url: '{% url "api_reading_groups" %}',
                     method: 'DELETE',
-                    data: JSON.stringify({ids: selectedClassrooms}),
+                    data: JSON.stringify({ids: selectedReadingGroups}),
                     contentType: 'application/json',
                     headers: {
                         'X-CSRFToken': csrfToken
                     },
                     success: function() {
-                        fetchClassrooms();
+                        fetchReadingGroups();
                     }
                 });
             }
         });
 
         // Handle select all
-        $('#checkbox-bulk-table-classrooms-select').on('click', function() {
+        $('#checkbox-bulk-table-reading-groups-select').on('click', function() {
             $('input[data-bulk-select-row]').prop('checked', this.checked);
             handleCheckboxChange();
         });
@@ -252,7 +253,7 @@
         // Handle checkbox change for toggle bulk actions
         function handleCheckboxChange() {
             const allCheckboxes = $('input[data-bulk-select-row]');
-            const selectAllCheckbox = $('#checkbox-bulk-table-classrooms-select');
+            const selectAllCheckbox = $('#checkbox-bulk-table-reading-groups-select');
             const checkedCheckboxes = $('input[data-bulk-select-row]:checked');
             const bulkActions = $('#bulk-actions');
             const addButton = $('#btn-add-classroom');
@@ -270,17 +271,17 @@
             }
         }
 
-        // Handle add classroom button
-        $('#btn-add-classroom').on('click', function() {
-            $('#classroom-name').val('');
-            $('#classroom-teachers').val(null).trigger('change');
-            $('#classroom-students').val(null).trigger('change'); // Reset the select2 selection
-            $('#form-title').text('Add Classroom');
+        // Handle add reading group button
+        $('#btn-add-reading-group').on('click', function() {
+            $('#reading-group-name').val('');
+            $('#reading-group-teachers').val(null).trigger('change');
+            $('#reading-group-students').val(null).trigger('change'); // Reset the select2 selection
+            $('#form-title').text('Add Reading Group');
         });
 
-        // Handle save classroom button
-        $('#btn-save-classroom').on('click', function() {
-            $('#classroom-form').submit();
+        // Handle save reading group button
+        $('#btn-save-reading-group').on('click', function() {
+            $('#reading-group-form').submit();
         });
 
         // Initialize checkboxes event
@@ -289,15 +290,15 @@
         });
 
         // Trigger change event to update options dynamically
-        $('#classroom-students').on('select2:select select2:unselect', function() {
-            $('#classroom-students').select2('close');
-            $('#classroom-students').select2('open');
+        $('#reading-group-students').on('select2:select select2:unselect', function() {
+            $('#reading-group-students').select2('close');
+            $('#reading-group-students').select2('open');
         });
 
         // Trigger change event to update options dynamically for teachers
-        $('#classroom-teachers').on('select2:select select2:unselect', function() {
-            $('#classroom-teachers').select2('close');
-            $('#classroom-teachers').select2('open');
+        $('#reading-group-teachers').on('select2:select select2:unselect', function() {
+            $('#reading-group-teachers').select2('close');
+            $('#reading-group-teachers').select2('open');
         });;
     });
 </script>

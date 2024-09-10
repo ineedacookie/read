@@ -1,0 +1,102 @@
+{% extends "general/nav_template.html" %}
+{% load static %}
+{% block title %}Manage Forms{% endblock %}
+{% block content %}
+<div class="container mt-5">
+    <h2 class="mb-4">Forms Management</h2>
+
+    <div class="card">
+        <div class="card-header border-bottom border-200 px-0">
+            <div class="row flex-between-center gy-2 px-x1">
+                <div class="col-auto pe-0">
+                    <h6 class="mb-0">Forms</h6>
+                </div>
+            </div>
+        </div>
+        {{ form.errors }}
+        <form id="dynamic-form" method="post">
+            {% csrf_token %}
+            <div class="card-body p-0">
+                <div class="table-responsive scrollbar">
+                    <table class="table table-sm mb-0 fs-10 table-view-forms" id="table-form-body">
+                        <thead class="bg-body-tertiary">
+                        <tr>
+                            <th class="text-800 sort align-middle ps-2">Field</th>
+                            <th class="text-800 sort align-middle ps-2">Value</th>
+                        </tr>
+                        </thead>
+                        <tbody class="list" id="form-table-body">
+                        <!-- This will display all the form fields dynamically -->
+                        {% for field in form %}
+                        <tr>
+                            <td class="align-middle">{{ field.label_tag }}</td>
+                            <td class="align-middle">
+                                {{ field }}
+                                {% if field.errors %}
+                                <div class="text-danger">{{ field.errors }}</div>
+                                {% endif %}
+                            </td>
+                        </tr>
+                        {% endfor %}
+                        </tbody>
+                    </table>
+                </div>
+            </div>
+            <div class="card-footer d-flex justify-content-between">
+                <button type="button" class="btn btn-danger" id="btn-delete-record">Delete</button>
+                <button type="submit" class="btn btn-primary" id="btn-save-form">Save</button>
+            </div>
+        </form>
+    </div>
+</div>
+
+<script>
+    $(document).ready(function() {
+        $('#dynamic-form').on('submit', function(e) {
+            e.preventDefault();
+            const form = new FormData(this);
+            const csrfToken = document.querySelector('[name=csrfmiddlewaretoken]').value;
+            form.append('form_type', 'dynamic_form'); // Add form type for dynamic handling 
+
+            $.ajax({
+                url: this.action,
+                method: 'POST',
+                data: form,
+                processData: false,
+                contentType: false,
+                headers: {
+                    'X-CSRFToken': csrfToken
+                },
+                success: function(response) {
+                    if (response.success) {
+                        window.location.reload();
+                    } else {
+                        $('#form-errors').html(response.form_errors);
+                    }
+                }
+            });
+        });
+
+        $('#btn-delete-record').on('click', function() {
+            if (confirm('Are you sure you want to delete this record?')) {
+                const csrfToken = document.querySelector('[name=csrfmiddlewaretoken]').value;
+                
+                $.ajax({
+                    url: this.action,  // Replace with actual delete URL
+                    method: 'DELETE',
+                    data: {
+                        csrfmiddlewaretoken: csrfToken,
+                        delete: true
+                    },
+                    success: function() {
+                        window.location.href = '{ prev_url }'; // Redirect to the previous page
+                    }
+                });
+            }
+        });
+
+        // Initialize Select2 for any select fields
+        $('select').select2();
+    });
+</script>
+{% endblock %}

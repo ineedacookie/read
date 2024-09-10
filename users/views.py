@@ -13,8 +13,8 @@ from django.db.models import Q
 from django.http import Http404, HttpResponseBadRequest
 
 from .forms import OverriddenPasswordChangeForm, ClassroomForm, OverriddenAdminPasswordChangeForm, RegisterUserForm, \
-    InviteCombinedForm, InviteStudentsForm, InviteUsersForm
-from .models import CustomUser, School, Classroom
+    InviteCombinedForm, InviteStudentsForm, InviteUsersForm, ReadingGroupForm, CustomStudentForm
+from .models import CustomUser, School, Classroom, ReadingGroup
 from .tokens import account_activation_token
 from .utils import get_selectable_employees, send_email_with_link
 
@@ -272,7 +272,7 @@ def invited_account(request, uidb64, token):
 
 
 @login_required
-def classrooms_view(request):
+def fetch_user_type(request):
     if request.method == "GET":
         if 'students' in request.path:
             # Handle GET request for students list
@@ -284,11 +284,17 @@ def classrooms_view(request):
             teachers = CustomUser.objects.filter(school=request.user.school, user_type='teacher')
             data = [{"id": teacher.id, "name": teacher.full_name or teacher.email} for teacher in teachers]
             return JsonResponse(data, safe=False)
-        else:
-            # Handle GET request for classrooms list
-            classrooms = Classroom.objects.all()
-            data = [{"id": classroom.id, "name": classroom.name} for classroom in classrooms]
-            return JsonResponse(data, safe=False)
+
+    return JsonResponse({"error": "Method not allowed"}, status=405)
+
+
+@login_required
+def classrooms_view(request):
+    if request.method == "GET":
+        # Handle GET request for classrooms list
+        classrooms = Classroom.objects.filter(school=request.user.school)
+        data = [{"id": classroom.id, "name": classroom.name} for classroom in classrooms]
+        return JsonResponse(data, safe=False)
     elif request.method == "POST":
         # Handle POST request to create a classroom
         try:
@@ -296,12 +302,12 @@ def classrooms_view(request):
             input_dict['school'] = request.user.school.id
             input_dict['students'] = json.loads(input_dict.get('students', '[]'))
             input_dict['teachers'] = json.loads(input_dict.get('teachers', '[]'))
-            if request.user.user_type == 'teacher':
-                input_dict['teachers'] = [request.user.id]
+            if request.user.user_type == 'teacher' and str(request.user.id) not in input_dict['teachers']:
+                input_dict['teachers'].append(str(request.user.id))
             form = ClassroomForm(input_dict)
             if form.is_valid():
                 form.save()
-                return JsonResponse({"success": True}, status=201)
+                return JsonResponse({"success": True}, status=200)
             return JsonResponse({"errors": form.errors}, status=400)
         except json.JSONDecodeError:
             return HttpResponseBadRequest("Invalid JSON payload")
@@ -311,7 +317,7 @@ def classrooms_view(request):
         try:
             data = json.loads(request.body)
             ids = data.get('ids', [])
-            Classroom.objects.filter(id__in=ids).delete()
+            Classroom.objects.filter(school=request.user.school, id__in=ids).delete()
             return JsonResponse({"success": True}, status=204)
         except json.JSONDecodeError:
             return HttpResponseBadRequest("Invalid JSON payload")
@@ -322,6 +328,88 @@ def classrooms_view(request):
 @login_required
 def render_classroom_list_view(request):
     return render(request, 'general/classroom_list.html')
+
+
+@login_required
+def groups_view(request):
+    if request.method == "GET":
+        # Handle GET request for groups list
+        groups = ReadingGroup.objects.filter(school=request.user.school)
+        data = [{"id": group.id, "name": group.name} for group in groups]
+        return JsonResponse(data, safe=False)
+    elif request.method == "POST":
+        # Handle POST request to create a group
+        try:
+            input_dict = request.POST.dict()
+            input_dict['school'] = request.user.school.id
+            input_dict['students'] = json.loads(input_dict.get('students', '[]'))
+            input_dict['managers'] = json.loads(input_dict.get('managers', '[]'))
+            if request.user.user_type == 'teacher' and str(request.user.id) not in input_dict['managers']:
+                input_dict['managers'].append(str(request.user.id))
+            form = ReadingGroupForm(input_dict)
+            if form.is_valid():
+                form.save()
+                return JsonResponse({"success": True}, status=200)
+            return JsonResponse({"errors": form.errors}, status=400)
+        except json.JSONDecodeError:
+            return HttpResponseBadRequest("Invalid JSON payload")
+
+    elif request.method == "DELETE":
+        # Handle DELETE request to delete groups
+        try:
+            data = json.loads(request.body)
+            ids = data.get('ids', [])
+            ReadingGroup.objects.filter(school=request.user.school, id__in=ids).delete()
+            return JsonResponse({"success": True}, status=204)
+        except json.JSONDecodeError:
+            return HttpResponseBadRequest("Invalid JSON payload")
+
+    # Default response for unsupported methods
+    return JsonResponse({"error": "Method not allowed"}, status=405)
+
+@login_required
+def render_group_list_view(request):
+    return render(request, 'general/reading_group_list.html')
+
+
+@login_required
+def edit_record(request, id):
+    form = None
+    form_name = ''
+    prev_url = ''
+    if 'student' in request.path:
+        try:
+            student_obj = CustomUser.objects.get(school=request.user.school, id=id, user_type='student')
+        except CustomUser.DoesNotExist:
+            return handler404(request)
+
+        if request.method == 'POST':
+            form = CustomStudentForm(logged_in_user=request.user, instance=student_obj, data=request.POST)
+            if form.is_valid():
+                form.save()
+                return JsonResponse({'success': True}, status=200)
+            else:
+                return JsonResponse({'errors': form.errors}, status=400)
+        elif request.method == 'DELETE':
+            try:
+                item = student_obj
+                item.delete()
+                return JsonResponse({"success": True}, status=204)
+            except CustomUser.DoesNotExist:
+                return JsonResponse({"error": "Record not found."}, status=404)
+        else:
+            form = CustomStudentForm(logged_in_user=request.user, instance=student_obj)
+        form_name = 'Student'
+        prev_url = '/student/'
+    page_arguments = {'form': form, 'id': id, 'prev_url': prev_url, 'form_name': form_name}
+    return render(request, 'general/record.html', page_arguments)
+
+@login_required
+def delete_record(request, id):
+    if 'student' in request.path:
+        item = CustomUser.objects.filter(school=request.user.school, id=id)
+        item.delete()
+    return JsonResponse({"success": True}, status=204)
 
 
 def handler404(request, *args, **argv):

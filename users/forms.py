@@ -1,5 +1,5 @@
 from django.contrib.auth.forms import UserCreationForm, UserChangeForm, AdminPasswordChangeForm, PasswordChangeForm
-from django.forms import EmailField, ModelForm, BooleanField, CharField, PasswordInput, CheckboxSelectMultiple
+from django.forms import SelectMultiple, EmailField, ModelForm, BooleanField, CharField, PasswordInput, CheckboxSelectMultiple, ModelMultipleChoiceField
 
 from .models import CustomUser, School, Classroom, StudentParentRelation, ReadingGroup
 from .utils import send_email_with_link
@@ -198,8 +198,102 @@ class ReadingGroupForm(ModelForm):
     class Meta:
         model = ReadingGroup
         fields = ['school', 'name', 'managers', 'students']
+        widgets = {
+            'managers': CheckboxSelectMultiple,
+            'students': CheckboxSelectMultiple,
+        }
 
 class StudentParentRelationForm(ModelForm):
     class Meta:
         model = StudentParentRelation
         fields = ['school', 'student', 'parent']
+
+
+class CustomStudentForm(ModelForm):
+    class Meta:
+        model = CustomUser
+        fields = ['username', 'first_name', 'last_initial', 'email']
+
+    classrooms = ModelMultipleChoiceField(
+        queryset=Classroom.objects.none(),
+        widget=SelectMultiple,
+        required=False
+    )
+
+    reading_groups = ModelMultipleChoiceField(
+        queryset=ReadingGroup.objects.none(),
+        widget=SelectMultiple,
+        required=False
+    )
+
+    parents = ModelMultipleChoiceField(
+        queryset=CustomUser.objects.none(),
+        widget=SelectMultiple,
+        required=False
+    )
+
+    def __init__(self, *args, **kwargs):
+        logged_in_user = kwargs.pop('logged_in_user', None)
+        super().__init__(*args, **kwargs)
+
+        if self.instance and self.instance.school:
+            school = self.instance.school
+
+            self.fields['classrooms'].queryset = Classroom.objects.filter(school=school)
+            self.fields['reading_groups'].queryset = ReadingGroup.objects.filter(school=school)
+            self.fields['parents'].queryset = CustomUser.objects.filter(school=school, user_type='parent')
+
+
+            if self.instance and self.instance.pk:
+                self.fields['classrooms'].initial = Classroom.objects.filter(school=school, students=self.instance)
+                self.fields['reading_groups'].initial = ReadingGroup.objects.filter(school=school, students=self.instance)
+                self.fields['parents'].initial = CustomUser.objects.filter(school=school, students=self.instance)
+
+            if logged_in_user and logged_in_user.user_type == 'teacher':
+                self.fields['classrooms'].queryset = self.fields['classrooms'].queryset.filter(teachers=logged_in_user)
+                self.fields['reading_groups'].queryset = self.fields['reading_groups'].queryset.filter(
+                    managers=logged_in_user)
+
+        for name in self.fields:
+            self.fields[name].widget.attrs["class"] = "form-control"
+
+    def clean(self):
+        cleaned_data = super().clean()
+        cleaned_data['user_type'] = 'student'
+        return cleaned_data
+
+    def save(self, commit=True):
+        instance = super().save(commit=False)
+
+        if commit:
+
+            instance.save()
+            self.save_m2m()
+
+            school = instance.school
+
+            # Update Classroom's students field
+            current_classrooms = set(self.cleaned_data['classrooms'])
+            original_classrooms = set(Classroom.objects.filter(school=school, students=self.instance))
+            for classroom in current_classrooms - original_classrooms:
+                classroom.students.add(instance)
+            for classroom in original_classrooms - current_classrooms:
+                classroom.students.remove(instance)
+
+            # Update ReadingGroup's students field
+            current_reading_groups = set(self.cleaned_data['reading_groups'])
+            original_reading_groups = set(ReadingGroup.objects.filter(school=school, students=self.instance))
+            for reading_group in current_reading_groups - original_reading_groups:
+                reading_group.students.add(instance)
+            for reading_group in original_reading_groups - current_reading_groups:
+                reading_group.students.remove(instance)
+
+            # Update Parent's students field
+            current_parents = set(self.cleaned_data['parents'])
+            original_parents = set(CustomUser.objects.filter(school=school, students=self.instance))
+            for parent in current_parents - original_parents:
+                parent.students.add(instance)
+            for parent in original_parents - current_parents:
+                parent.students.remove(instance)
+
+        return instance
