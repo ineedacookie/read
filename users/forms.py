@@ -44,16 +44,22 @@ class CustomUserChangeForm(UserChangeForm):
 class OverriddenAdminPasswordChangeForm(AdminPasswordChangeForm):
     def __init__(self, *args, **kwargs):
         super(OverriddenAdminPasswordChangeForm, self).__init__(*args, **kwargs)
-
-        for name in ["password1", "password2"]:
+        if 'usable_password' in self.fields:
+            self.fields.pop('usable_password')
+        for name in self.fields:
             self.fields[name].widget.attrs["class"] = "form-control"
+
+    def clean(self):
+        cleaned_data = super().clean()
+        cleaned_data['usable_password'] = True
+        return cleaned_data
 
 
 class OverriddenPasswordChangeForm(PasswordChangeForm):
     def __init__(self, *args, **kwargs):
         super(OverriddenPasswordChangeForm, self).__init__(*args, **kwargs)
 
-        for name in ["old_password", "new_password1", "new_password2"]:
+        for name in self.fields:
             self.fields[name].widget.attrs["class"] = "form-control"
 
 
@@ -109,6 +115,52 @@ class InviteUsersForm(ModelForm):
 
         for name in self.fields:
             self.fields[name].widget.attrs["class"] = "form-control"
+
+    def save(self, commit=False):
+        instance = super().save(commit=True)
+
+        if not commit:
+            # Send invitation email after saving the user
+            send_email_with_link(instance, type='invitation')
+
+        return instance
+
+
+class InviteParentForm(ModelForm):
+    class Meta:
+        model = CustomUser
+        fields = (
+            'first_name',
+            'last_initial',
+            'username',
+            'email',
+            'user_type',
+            'school',
+            'students'
+        )
+
+    students = ModelMultipleChoiceField(
+        queryset=CustomUser.objects.none(),
+        widget=SelectMultiple,
+        required=False
+    )
+
+    def __init__(self, *args, **kwargs):
+        logged_in_user = kwargs.pop('logged_in_user', None)
+        super().__init__(*args, **kwargs)
+
+        if logged_in_user and logged_in_user.school:
+            school = logged_in_user.school
+
+            self.fields['students'].queryset = CustomUser.objects.filter(school=school, user_type='student')
+
+        for name in self.fields:
+            self.fields[name].widget.attrs["class"] = "form-control"
+
+    def clean(self):
+        cleaned_data = super().clean()
+        cleaned_data['user_type'] = 'parent'
+        return cleaned_data
 
     def save(self, commit=False):
         instance = super().save(commit=True)
@@ -243,10 +295,10 @@ class CustomStudentForm(ModelForm):
             self.fields['reading_groups'].queryset = ReadingGroup.objects.filter(school=school)
             self.fields['parents'].queryset = CustomUser.objects.filter(school=school, user_type='parent')
 
-
             if self.instance and self.instance.pk:
                 self.fields['classrooms'].initial = Classroom.objects.filter(school=school, students=self.instance)
-                self.fields['reading_groups'].initial = ReadingGroup.objects.filter(school=school, students=self.instance)
+                self.fields['reading_groups'].initial = ReadingGroup.objects.filter(school=school,
+                                                                                    students=self.instance)
                 self.fields['parents'].initial = CustomUser.objects.filter(school=school, students=self.instance)
 
             if logged_in_user and logged_in_user.user_type == 'teacher':
@@ -295,5 +347,259 @@ class CustomStudentForm(ModelForm):
                 parent.students.add(instance)
             for parent in original_parents - current_parents:
                 parent.students.remove(instance)
+
+        return instance
+
+
+class CustomTeacherForm(ModelForm):
+    class Meta:
+        model = CustomUser
+        fields = ['username', 'first_name', 'last_initial', 'email']
+
+    classrooms = ModelMultipleChoiceField(
+        queryset=Classroom.objects.none(),
+        widget=SelectMultiple,
+        required=False
+    )
+
+    reading_groups = ModelMultipleChoiceField(
+        queryset=ReadingGroup.objects.none(),
+        widget=SelectMultiple,
+        required=False
+    )
+
+    def __init__(self, *args, **kwargs):
+        logged_in_user = kwargs.pop('logged_in_user', None)
+        super().__init__(*args, **kwargs)
+
+        if self.instance and self.instance.school:
+            school = self.instance.school
+
+            self.fields['classrooms'].queryset = Classroom.objects.filter(school=school)
+            self.fields['reading_groups'].queryset = ReadingGroup.objects.filter(school=school)
+
+            if self.instance and self.instance.pk:
+                self.fields['classrooms'].initial = Classroom.objects.filter(school=school, teachers=self.instance)
+                self.fields['reading_groups'].initial = ReadingGroup.objects.filter(school=school,
+                                                                                    managers=self.instance)
+
+            if logged_in_user and logged_in_user.user_type == 'teacher':
+                self.fields['classrooms'].queryset = self.fields['classrooms'].queryset.filter(teachers=logged_in_user)
+                self.fields['reading_groups'].queryset = self.fields['reading_groups'].queryset.filter(
+                    managers=logged_in_user)
+
+        for name in self.fields:
+            self.fields[name].widget.attrs["class"] = "form-control"
+
+    def clean(self):
+        cleaned_data = super().clean()
+        cleaned_data['user_type'] = 'teacher'
+        return cleaned_data
+
+    def save(self, commit=True):
+        instance = super().save(commit=False)
+
+        if commit:
+            instance.save()
+            self.save_m2m()
+
+            school = instance.school
+
+            # Update Classroom's teachers field
+            current_classrooms = set(self.cleaned_data['classrooms'])
+            original_classrooms = set(Classroom.objects.filter(school=school, teachers=self.instance))
+            for classroom in current_classrooms - original_classrooms:
+                classroom.teachers.add(instance)
+            for classroom in original_classrooms - current_classrooms:
+                classroom.teachers.remove(instance)
+
+            # Update ReadingGroup's managers field
+            current_reading_groups = set(self.cleaned_data['reading_groups'])
+            original_reading_groups = set(ReadingGroup.objects.filter(school=school, managers=self.instance))
+            for reading_group in current_reading_groups - original_reading_groups:
+                reading_group.managers.add(instance)
+            for reading_group in original_reading_groups - current_reading_groups:
+                reading_group.managers.remove(instance)
+
+        return instance
+
+
+class CustomAdministratorForm(ModelForm):
+    class Meta:
+        model = CustomUser
+        fields = ['username', 'first_name', 'last_initial', 'email']
+
+    reading_groups = ModelMultipleChoiceField(
+        queryset=ReadingGroup.objects.none(),
+        widget=SelectMultiple,
+        required=False
+    )
+
+    def __init__(self, *args, **kwargs):
+        logged_in_user = kwargs.pop('logged_in_user', None)
+        super().__init__(*args, **kwargs)
+
+        if self.instance and self.instance.school:
+            school = self.instance.school
+
+            self.fields['reading_groups'].queryset = ReadingGroup.objects.filter(school=school)
+
+            if self.instance and self.instance.pk:
+                self.fields['reading_groups'].initial = ReadingGroup.objects.filter(school=school,
+                                                                                    managers=self.instance)
+
+        for name in self.fields:
+            self.fields[name].widget.attrs["class"] = "form-control"
+
+    def clean(self):
+        cleaned_data = super().clean()
+        cleaned_data['user_type'] = 'administrator'
+        return cleaned_data
+
+    def save(self, commit=True):
+        instance = super().save(commit=False)
+
+        if commit:
+            instance.save()
+            self.save_m2m()
+
+            school = instance.school
+
+            # Update ReadingGroup's managers field
+            current_reading_groups = set(self.cleaned_data['reading_groups'])
+            original_reading_groups = set(ReadingGroup.objects.filter(school=school, managers=self.instance))
+            for reading_group in current_reading_groups - original_reading_groups:
+                reading_group.managers.add(instance)
+            for reading_group in original_reading_groups - current_reading_groups:
+                reading_group.managers.remove(instance)
+
+        return instance
+
+
+class CustomParentForm(ModelForm):
+    class Meta:
+        model = CustomUser
+        fields = ['username', 'first_name', 'last_initial', 'email', 'students']
+
+    students = ModelMultipleChoiceField(
+        queryset=CustomUser.objects.none(),
+        widget=SelectMultiple,
+        required=False
+    )
+
+    def __init__(self, *args, **kwargs):
+        logged_in_user = kwargs.pop('logged_in_user', None)
+        super().__init__(*args, **kwargs)
+
+        if self.instance and self.instance.school:
+            school = self.instance.school
+
+            self.fields['students'].queryset = CustomUser.objects.filter(school=school, user_type='student')
+
+            if self.instance and self.instance.pk:
+                self.fields['students'].initial = self.instance.students.all()
+
+        for name in self.fields:
+            self.fields[name].widget.attrs["class"] = "form-control"
+
+    def clean(self):
+        cleaned_data = super().clean()
+        cleaned_data['user_type'] = 'parent'
+        return cleaned_data
+
+    def save(self, commit=True):
+        instance = super().save(commit=False)
+
+        if commit:
+            instance.save()
+            self.save_m2m()
+
+        return instance
+
+
+class CustomClassroomForm(ModelForm):
+    class Meta:
+        model = Classroom
+        fields = ['name', 'teachers', 'students']
+
+    students = ModelMultipleChoiceField(
+        queryset=CustomUser.objects.none(),
+        widget=SelectMultiple,
+        required=False
+    )
+
+    teachers = ModelMultipleChoiceField(
+        queryset=CustomUser.objects.none(),
+        widget=SelectMultiple,
+        required=False
+    )
+
+    def __init__(self, *args, **kwargs):
+        logged_in_user = kwargs.pop('logged_in_user', None)
+        super().__init__(*args, **kwargs)
+
+        if self.instance and self.instance.school:
+            school = self.instance.school
+
+            self.fields['students'].queryset = CustomUser.objects.filter(school=school, user_type='student')
+            self.fields['teachers'].queryset = CustomUser.objects.filter(school=school, user_type='teacher')
+
+            if self.instance and self.instance.pk:
+                self.fields['students'].initial = self.instance.students.all()
+                self.fields['teachers'].initial = self.instance.teachers.all()
+
+        for name in self.fields:
+            self.fields[name].widget.attrs["class"] = "form-control"
+
+    def save(self, commit=True):
+        instance = super().save(commit=False)
+
+        if commit:
+            instance.save()
+            self.save_m2m()
+
+        return instance
+
+
+class CustomReadingGroupForm(ModelForm):
+    class Meta:
+        model = ReadingGroup
+        fields = ['name', 'managers', 'students']
+
+    students = ModelMultipleChoiceField(
+        queryset=CustomUser.objects.none(),
+        widget=SelectMultiple,
+        required=False
+    )
+
+    managers = ModelMultipleChoiceField(
+        queryset=CustomUser.objects.none(),
+        widget=SelectMultiple,
+        required=False
+    )
+
+    def __init__(self, *args, **kwargs):
+        logged_in_user = kwargs.pop('logged_in_user', None)
+        super().__init__(*args, **kwargs)
+
+        if self.instance and self.instance.school:
+            school = self.instance.school
+
+            self.fields['students'].queryset = CustomUser.objects.filter(school=school, user_type='student')
+            self.fields['managers'].queryset = CustomUser.objects.filter(school=school, user_type='teacher')
+
+            if self.instance and self.instance.pk:
+                self.fields['students'].initial = self.instance.students.all()
+                self.fields['managers'].initial = self.instance.managers.all()
+
+        for name in self.fields:
+            self.fields[name].widget.attrs["class"] = "form-control"
+
+    def save(self, commit=True):
+        instance = super().save(commit=False)
+
+        if commit:
+            instance.save()
+            self.save_m2m()
 
         return instance

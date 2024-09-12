@@ -129,13 +129,26 @@
             });
         }
 
-        function templateRender(item) {
+        function templateRenderStudents(item) {
             if (!item.id) {
                 return item.text;
             }
 
             const selectedStudents = $('#reading-group-students').select2('data').map(student => student.id);
             if (selectedStudents.includes(item.id)) {
+                return null;
+            }
+
+            return item.text;
+        }
+
+        function templateRenderTeachers(item) {
+            if (!item.id) {
+                return item.text;
+            }
+
+            const selectedTeachers = $('#reading-group-teachers').select2('data').map(teacher => teacher.id);
+            if (selectedTeachers.includes(item.id)) {
                 return null;
             }
 
@@ -149,7 +162,7 @@
                 width: 'resolve', // Resolve the width of the container to fit the element
                 dropdownParent: $('#addEditReadingGroupModal'), // Ensure dropdown displays in front of the modal
                 closeOnSelect: false, // Keep dropdown open when selecting items
-                templateResult: templateRender
+                templateResult: templateRenderStudents
             });
 
             $('#reading-group-teachers').select2({
@@ -158,7 +171,7 @@
                 width: 'resolve', // Resolve the width of the container to fit the element
                 dropdownParent: $('#addEditReadingGroupModal'), // Ensure dropdown displays in front of the modal
                 closeOnSelect: false, // Keep dropdown open when selecting items
-                templateResult: templateRender
+                templateResult: templateRenderTeachers
             });
         }
 
@@ -181,7 +194,7 @@
                                     <input class="form-check-input" type="checkbox" data-id="${readingGroup.id}" data-bulk-select-row="data-bulk-select-row" />
                                   </div>
                                 </td>
-                                <td class="align-middle">${readingGroup.name}</td>
+                                <td class="align-middle"><a href="/groups/${readingGroup.id}/">${readingGroup.name}</a></td>
                             </tr>`
                         );
                     });

@@ -1,6 +1,7 @@
 import logging
 import json
 
+from django.contrib.auth.forms import PasswordChangeForm, AdminPasswordChangeForm
 from django.views.decorators.http import require_POST
 from django.contrib.auth import login, update_session_auth_hash
 from django.contrib.auth.decorators import login_required
@@ -13,7 +14,8 @@ from django.db.models import Q
 from django.http import Http404, HttpResponseBadRequest
 
 from .forms import OverriddenPasswordChangeForm, ClassroomForm, OverriddenAdminPasswordChangeForm, RegisterUserForm, \
-    InviteCombinedForm, InviteStudentsForm, InviteUsersForm, ReadingGroupForm, CustomStudentForm
+    InviteCombinedForm, InviteStudentsForm, InviteParentForm, InviteUsersForm, ReadingGroupForm, CustomStudentForm, CustomTeacherForm, \
+    CustomAdministratorForm, CustomParentForm, CustomClassroomForm, CustomReadingGroupForm
 from .models import CustomUser, School, Classroom, ReadingGroup
 from .tokens import account_activation_token
 from .utils import get_selectable_employees, send_email_with_link
@@ -83,6 +85,8 @@ def home(request, **kwargs):
             raise Http404("Page not found")
         if user_type == 'student':
             invite_form = InviteStudentsForm()
+        elif user_type == 'parent':
+            invite_form = InviteParentForm(logged_in_user=request.user)
         else:
             invite_form = InviteUsersForm()
         page_arguments = {'user_type': user_type, 'invite_form': invite_form}
@@ -102,6 +106,8 @@ def user_list_page(request, **kwargs):
             raise Http404("Page not found")
         if user_type == 'student':
             invite_form = InviteStudentsForm()
+        elif user_type == 'parent':
+            invite_form = InviteParentForm(logged_in_user=request.user)
         else:
             invite_form = InviteUsersForm()
         page_arguments = {'user_type': user_type, 'invite_form': invite_form}
@@ -144,6 +150,8 @@ def user_list(request):
         })
     if user_type == 'student':
         invite_form = InviteStudentsForm()
+    elif user_type == 'parent':
+        invite_form = InviteParentForm(logged_in_user=request.user)
     else:
         invite_form = InviteUsersForm()
 
@@ -209,13 +217,15 @@ def invite_user(request):
     :return: 
     """
     if request.method == 'POST':
-        post_dict = request.POST.dict()
-        user_type = post_dict['user_type']
+        post_dict = request.POST.copy()
+        user_type = post_dict.get('user_type')
         post_dict['school'] = request.user.school.id
         if not post_dict.get('username'):
-            post_dict['username'] = post_dict['email']
+            post_dict['username'] = post_dict.get('email')
         if user_type == 'student':
             form = InviteStudentsForm(post_dict)
+        elif user_type == 'parent':
+            form = InviteParentForm(post_dict, logged_in_user=request.user)
         else:
             form = InviteUsersForm(post_dict)
 
@@ -223,7 +233,7 @@ def invite_user(request):
             form.save()
             return JsonResponse({'success': True}, status=200)
         else:
-            return JsonResponse({'form_errors': form.errors}, status=200)
+            return JsonResponse({'form_errors': form.errors}, status=400)
 
 
 @login_required
@@ -372,44 +382,94 @@ def render_group_list_view(request):
     return render(request, 'general/reading_group_list.html')
 
 
+FORM_DICT = {
+    'student': {'form': CustomStudentForm, 'obj_type': CustomUser},
+    'teacher': {'form': CustomTeacherForm, 'obj_type': CustomUser},
+    'parent': {'form': CustomParentForm, 'obj_type': CustomUser},
+    'administrator': {'form': CustomAdministratorForm, 'obj_type': CustomUser},
+    'classrooms': {'form': CustomClassroomForm, 'obj_type': Classroom},
+    'groups': {'form': CustomReadingGroupForm, 'obj_type': ReadingGroup},
+}
+
+
 @login_required
 def edit_record(request, id):
     form = None
     form_name = ''
     prev_url = ''
-    if 'student' in request.path:
-        try:
-            student_obj = CustomUser.objects.get(school=request.user.school, id=id, user_type='student')
-        except CustomUser.DoesNotExist:
-            return handler404(request)
-
-        if request.method == 'POST':
-            form = CustomStudentForm(logged_in_user=request.user, instance=student_obj, data=request.POST)
-            if form.is_valid():
-                form.save()
-                return JsonResponse({'success': True}, status=200)
-            else:
-                return JsonResponse({'errors': form.errors}, status=400)
-        elif request.method == 'DELETE':
+    change_password_form = None
+    for r_type in FORM_DICT:
+        if r_type in request.path:
+            form_obj = FORM_DICT[r_type]['form']
+            obj_type = FORM_DICT[r_type]['obj_type']
+            form_name = r_type.capitalize()
+            prev_url = '/{}/'.format(r_type)
             try:
-                item = student_obj
-                item.delete()
-                return JsonResponse({"success": True}, status=204)
-            except CustomUser.DoesNotExist:
-                return JsonResponse({"error": "Record not found."}, status=404)
-        else:
-            form = CustomStudentForm(logged_in_user=request.user, instance=student_obj)
-        form_name = 'Student'
-        prev_url = '/student/'
-    page_arguments = {'form': form, 'id': id, 'prev_url': prev_url, 'form_name': form_name}
+                if obj_type == CustomUser:
+                    obj = obj_type.objects.get(school=request.user.school, id=id, user_type=r_type)
+                else:
+                    obj = obj_type.objects.get(school=request.user.school, id=id)
+            except obj_type.DoesNotExist:
+                return handler404(request)
+            if request.method == 'POST':
+                form = form_obj(logged_in_user=request.user, instance=obj, data=request.POST)
+                if form.is_valid():
+                    form.save()
+                    return JsonResponse({'success': True}, status=200)
+                else:
+                    return JsonResponse({'errors': form.errors}, status=400)
+            elif request.method == 'DELETE':
+                try:
+                    obj.delete()
+                    return JsonResponse({"success": True}, status=204)
+                except obj_type.DoesNotExist:
+                    return JsonResponse({"error": "Record not found."}, status=404)
+            else:
+                if obj_type == CustomUser:
+                    if request.user == obj:
+                        # add the password form for changing their own password.
+                        change_password_form = OverriddenPasswordChangeForm(request.user)
+                    else:
+                        logged_in_type = request.user.user_type
+                        obj_user_type = obj.user_type
+                        if logged_in_type == 'administrator':
+                            change_password_form = OverriddenAdminPasswordChangeForm(obj)
+                        elif logged_in_type == 'teacher' and obj_user_type in ['student', 'parent']:
+                            change_password_form = OverriddenAdminPasswordChangeForm(obj)
+                form = form_obj(logged_in_user=request.user, instance=obj)
+
+    page_arguments = {'form': form, 'id': id, 'prev_url': prev_url, 'form_name': form_name, 'change_password_form': change_password_form}
     return render(request, 'general/record.html', page_arguments)
 
-@login_required
-def delete_record(request, id):
-    if 'student' in request.path:
-        item = CustomUser.objects.filter(school=request.user.school, id=id)
-        item.delete()
-    return JsonResponse({"success": True}, status=204)
+
+def password_change_view(request, id):
+    form = None
+    if request.method == 'POST':
+        if request.user.id != int(id):
+            try:
+                obj = CustomUser.objects.get(school=request.user.school, id=id)
+            except CustomUser.DoesNotExist:
+                return handler404(request)
+
+            logged_in_type = request.user.user_type
+            obj_user_type = obj.user_type
+            if logged_in_type == 'administrator':
+                form = OverriddenAdminPasswordChangeForm(obj, request.POST)
+            elif logged_in_type == 'teacher' and obj_user_type in ['student', 'parent']:
+                form = OverriddenAdminPasswordChangeForm(obj, request.POST)
+        else:
+            # the user is changing their own password
+            form = OverriddenPasswordChangeForm(request.user, request.POST)
+
+    if form is not None:
+        if form.is_valid():
+            form.save()
+            return JsonResponse({'success': True}, status=200)
+        else:
+            return JsonResponse({'errors': form.errors}, status=400)
+
+    return handler404(request)
+
 
 
 def handler404(request, *args, **argv):

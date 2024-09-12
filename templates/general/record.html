@@ -11,6 +11,14 @@
                 <div class="col-auto pe-0">
                     <h6 class="mb-0">Forms</h6>
                 </div>
+                {% if change_password_form %}
+                <div class="col-auto">
+                    <button type="button" class="btn btn-secondary" data-bs-toggle="modal"
+                            data-bs-target="#changePasswordModal">
+                        Change Password
+                    </button>
+                </div>
+                {% endif %}
             </div>
         </div>
         {{ form.errors }}
@@ -50,53 +58,129 @@
     </div>
 </div>
 
-<script>
-    $(document).ready(function() {
-        $('#dynamic-form').on('submit', function(e) {
-            e.preventDefault();
-            const form = new FormData(this);
-            const csrfToken = document.querySelector('[name=csrfmiddlewaretoken]').value;
-            form.append('form_type', 'dynamic_form'); // Add form type for dynamic handling 
+<!-- Modal -->
+<div class="modal fade" id="changePasswordModal" tabindex="-1" aria-labelledby="changePasswordLabel" aria-hidden="true">
+    <div class="modal-dialog">
+        <div class="modal-content">
+            <div class="modal-header">
+                <h5 class="modal-title" id="changePasswordLabel">Change Password</h5>
+                <button type="button" class="btn-close" data-bs-dismiss="modal" aria-label="Close"></button>
+            </div>
+            <div class="modal-body">
+                <form id="change-password-form" method="post">
+                    {% csrf_token %}
+                    {{ change_password_form.as_p }}
+                </form>
+            </div>
+            <div class="modal-footer">
+                <button type="button" class="btn btn-secondary" data-bs-dismiss="modal" id="btn-cancel-change-password">
+                    Cancel
+                </button>
+                <button type="button" class="btn btn-primary" id="btn-save-change-password">Save</button>
+            </div>
+        </div>
+    </div>
+</div>
 
-            $.ajax({
-                url: this.action,
-                method: 'POST',
-                data: form,
-                processData: false,
-                contentType: false,
-                headers: {
-                    'X-CSRFToken': csrfToken
-                },
-                success: function(response) {
-                    if (response.success) {
-                        window.location.reload();
-                    } else {
-                        $('#form-errors').html(response.form_errors);
-                    }
+<script>$(document).ready(function() {
+    $('#dynamic-form').on('submit', function(e) {
+        e.preventDefault();
+        const form = new FormData(this);
+        const csrfToken = document.querySelector('[name=csrfmiddlewaretoken]').value;
+        form.append('form_type', 'dynamic_form'); // Add form type for dynamic handling 
+
+        $.ajax({
+            url: this.action,
+            method: 'POST',
+            data: form,
+            processData: false,
+            contentType: false,
+            headers: {
+                'X-CSRFToken': csrfToken
+            },
+            success: function(response) {
+                if (response.success) {
+                    window.location.reload();
+                } else {
+                    $('#form-errors').html(response.form_errors);
                 }
-            });
-        });
-
-        $('#btn-delete-record').on('click', function() {
-            if (confirm('Are you sure you want to delete this record?')) {
-                const csrfToken = document.querySelector('[name=csrfmiddlewaretoken]').value;
-                
-                $.ajax({
-                    url: this.action,  // Replace with actual delete URL
-                    method: 'DELETE',
-                    data: {
-                        csrfmiddlewaretoken: csrfToken,
-                        delete: true
-                    },
-                    success: function() {
-                        window.location.href = '{ prev_url }'; // Redirect to the previous page
-                    }
-                });
             }
         });
-
-        // Initialize Select2 for any select fields
-        $('select').select2();
     });
-</script>
+
+    $('#btn-delete-record').on('click', function() {
+        if (confirm('Are you sure you want to delete this record?')) {
+            const csrfToken = document.querySelector('[name=csrfmiddlewaretoken]').value;
+            
+            $.ajax({
+                url: this.action,  // Replace with actual delete URL
+                method: 'DELETE',
+                data: {
+                    csrfmiddlewaretoken: csrfToken,
+                    delete: true
+                },
+                success: function() {
+                    window.location.href = '{ prev_url }'; // Redirect to the previous page
+                }
+            });
+        }
+    });
+    
+    function templateRender(item, selectElement) {
+        if (!item.id) {
+            return item.text;
+        }
+
+        const selectedIds = $(selectElement).select2('data').map(option => option.id);
+        if (selectedIds.includes(item.id)) {
+            return null;
+        }
+
+        return item.text;
+    }
+
+    // Initialize Select2 for any select fields
+    $('select').each(function() {
+        $(this).select2({
+            placeholder: '',
+            allowClear: true,
+            width: 'resolve', // Resolve the width of the container to fit the element
+            closeOnSelect: false, // Keep dropdown open when selecting items
+            templateResult: (item) => templateRender(item, this)
+        }).on('select2:select', function (e) {
+            $(e.target).select2('close').select2('open');
+        });
+    });
+
+    $('#btn-save-change-password').on('click', function() {
+        const changePasswordForm = $('#change-password-form')[0];
+        const form = new FormData(changePasswordForm);
+        const csrfToken = document.querySelector('[name=csrfmiddlewaretoken]').value;
+
+        $.ajax({
+            url: '/api/password_change/{{ id }}',
+            method: 'POST',
+            data: form,
+            processData: false,
+            contentType: false,
+            headers: {
+                'X-CSRFToken': csrfToken
+            },
+            success: function(response) {
+                if (response.success) {
+                    $('#change-password-form')[0].reset();
+                    $('#changePasswordModal').modal('hide');
+                } else {
+                    $('#change-password-form').prepend('<div class="text-danger">'+response.form_errors+'</div>');
+                }
+            }
+        });
+    });
+
+    $('#btn-cancel-change-password').on('click', function() {
+        $('#change-password-form')[0].reset();
+        $('#changePasswordModal').modal('hide');
+    });
+
+});</script>
 {% endblock %}

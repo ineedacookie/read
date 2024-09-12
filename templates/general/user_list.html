@@ -2,8 +2,7 @@
 {% load static %}
 {% block title %}read | {{ user_type }}(s){% endblock %}
 {% block content %}
-<script>
-    function fetchUsers(page = 1, userType = '', searchQuery = '', sortField = 'id', sortOrder = 'asc') {
+<script>function fetchUsers(page = 1, userType = '', searchQuery = '', sortField = 'id', sortOrder = 'asc') {
         var xhr = new XMLHttpRequest();
         xhr.open('GET', `{% url "user_list" %}?page=${page}&user_type={{ user_type }}&search=${searchQuery}&sort_field=${sortField}&sort_order=${sortOrder}`, true);
         xhr.setRequestHeader('X-Requested-With', 'XMLHttpRequest');
@@ -21,7 +20,7 @@
                           </div>
                         </td>
                         <td class="align-middle">${users[i].id}</td>
-                        <td class="align-middle">${users[i].first_name}</td>
+                        <td class="align-middle"><a href="/{{ user_type }}/${users[i].id}/">${users[i].first_name}</a></td>
                         <td class="align-middle">${users[i].last_name}</td>
                         <td class="align-middle">${users[i].email}</td>
                       </tr>`;
@@ -108,27 +107,30 @@
 
     function handleFormSubmit(e) {
         e.preventDefault();
-        var form = document.getElementById('invite-form');
-        var formData = new FormData(form);
-        var xhr = new XMLHttpRequest();
+        var form = new FormData(document.getElementById('invite-form'));
         const csrfToken = document.querySelector('[name=csrfmiddlewaretoken]').value;
-        xhr.open('POST', `{% url "invite_user" %}`, true);
-        xhr.setRequestHeader('X-Requested-With', 'XMLHttpRequest');
-        xhr.setRequestHeader('X-CSRFToken', csrfToken);
-        xhr.onreadystatechange = function () {
-            if (xhr.readyState === 4 && xhr.status === 200) {
-                var data = JSON.parse(xhr.responseText);
-                if (data.success) {
+        form.append('form_type', 'invite_form');
+
+        $.ajax({
+            url: '{% url "invite_user" %}',
+            method: 'POST',
+            data: form,
+            processData: false,
+            contentType: false,
+            headers: {
+                'X-CSRFToken': csrfToken
+            },
+            success: function(response) {
+                if (response.success) {
                     $('#inviteModal').modal('hide');
                     document.getElementById('form_errors').innerHTML = '';
-                    form.reset();
+                    document.getElementById('invite-form').reset();
                     fetchUsers();
                 } else {
-                    document.getElementById('form_errors').innerHTML = data.form_errors;
+                    document.getElementById('form_errors').innerHTML = response.form_errors;
                 }
             }
-        }
-        xhr.send(formData);
+        });
     }
 
     document.addEventListener('DOMContentLoaded', function () {
@@ -152,10 +154,9 @@
         });
 
         document.getElementById('invite-form').addEventListener('submit', handleFormSubmit);
-
+        
         fetchUsers();  // Initial load
-    });
-</script>
+    });</script>
 <div class="card">
     <div class="card-header border-bottom border-200 px-0">
         <div class="row flex-between-center gy-2 px-x1">
@@ -188,7 +189,6 @@
                     </div>
                 </div>
             </div>
-
         </div>
     </div>
     <div class="card-body p-0">
@@ -259,6 +259,12 @@
                             {{ invite_form.password}}
                             {{ invite_form.password.errors }}
                         </div>
+                        {% elif user_type == "parent" %}
+                        <div class="mb-3">
+                            {{ invite_form.students.label_tag }}
+                            {{ invite_form.students }}
+                            {{ invite_form.students.errors }}
+                        </div>
                         {% endif %}
                     </div>
                     <button type="submit" class="btn btn-primary">Send Invite</button>
@@ -267,4 +273,32 @@
         </div>
     </div>
 </div>
+<script>
+    function templateRender(item, selectElement) {
+        if (!item.id) {
+            return item.text;
+        }
+
+        const selectedIds = $(selectElement).select2('data').map(option => option.id);
+        if (selectedIds.includes(item.id)) {
+            return null;
+        }
+
+        return item.text;
+    }
+
+    // Initialize Select2 for any select fields
+        $('select').each(function() {
+            $(this).select2({
+                placeholder: '',
+                allowClear: true,
+                width: 'resolve', // Resolve the width of the container to fit the element
+                dropdownParent: $('#inviteModal'), // Ensure dropdown displays in front of the modal
+                closeOnSelect: false, // Keep dropdown open when selecting items
+                templateResult: (item) => templateRender(item, this)
+            }).on('select2:select', function (e) {
+                $(e.target).select2('close').select2('open');
+            });
+        });
+</script>
 {% endblock %}
