@@ -5,6 +5,11 @@
 <div class="container mt-5">
     <h2 class="mb-4">Forms Management</h2>
 
+
+    {% if form_name == "Student" %}
+    {% include "reading_logs/widgets/reading_log_calendar.html" %}
+    {% endif %}
+
     <div class="card">
         <div class="card-header border-bottom border-200 px-0">
             <div class="row flex-between-center gy-2 px-x1">

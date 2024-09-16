@@ -1,0 +1,331 @@
+<div class="card overflow-hidden">
+    <div class="card-header">
+        <script>$(document).ready(function(){
+                var reading_log_calendar = null;
+                
+                var Selectors = {
+                    ACTIVE: '.active',
+                    ADD_EVENT_FORM: '#addEventForm',
+                    ADD_EVENT_MODAL: '#addEventModal',
+                    CALENDAR: '#appCalendar',
+                    CALENDAR_TITLE: '.calendar-title',
+                    DATA_CALENDAR_VIEW: '[data-fc-view]',
+                    DATA_EVENT: '[data-event]',
+                    DATA_VIEW_TITLE: '[data-view-title]',
+                    EVENT_START_DATE: '#addEventModal [name="date"]',
+                    EVENT_TITLE: '#addEventModal [name="title"]',
+                    EVENT_DESCRIPTION: '#addEventModal [name="comments"]',
+                    EVENT_AUTHOR: '#addEventModal [name="author"]',
+                    EVENT_PAGES: '#addEventModal [name="pages"]',
+                    EVENT_MINUTES: '#addEventModal [name="minutes"]',
+                    EVENT_RATING: '#addEventModal [name="rating"]',
+                    CSRF_INPUT: '[name="csrfmiddlewaretoken"]',
+                    INPUT_TITLE: '[name="title"]',
+                    DELETE_BTN: '#delete_event_button'
+                };
+
+                var Events = {
+                    CLICK: 'click',
+                    SHOWN_BS_MODAL: 'shown.bs.modal',
+                    SUBMIT: 'submit'
+                };
+
+                var DataKeys = {
+                    EVENT: 'event',
+                    FC_VIEW: 'fc-view'
+                };
+
+                var ClassNames = {
+                    ACTIVE: 'active'
+                };
+
+                function updateTitle(title) {
+                    document.querySelector(Selectors.CALENDAR_TITLE).textContent = title;
+                }
+
+                $('#addEventForm').on('submit', function(e){
+                    e.preventDefault();
+                    var $form = $(this);
+                    $.ajax({
+                        url: "{% url 'manage_log' %}",
+                        type: 'POST',
+                        headers: { 'X-CSRFToken': document.querySelector(Selectors.CSRF_INPUT).value },
+                        data: $form.serialize() + '&student={{ id }}',
+                        success: function(data) {
+                            if (data.status === 'success') {
+                                $('#addEventModal').modal('hide');
+                                var log = {
+                                    id: data.log_id,
+                                    title: $('#entryTitle').val(),
+                                    start: $('#entryDate').val(),
+                                    extendedProps: {
+                                        author: $('#entryAuthor').val(),
+                                        pages: $('#entryPages').val(),
+                                        minutes: $('#entryMinutes').val(),
+                                        rating: $('#entryRating').val(),
+                                        comments: $('#entryComments').val(),
+                                    }
+                                };
+                                var details = [];
+                                if (log.extendedProps.minutes) details.push(log.extendedProps.minutes + ' minutes');
+                                if (log.extendedProps.pages) details.push(log.extendedProps.pages + ' pages');
+                                log.title += details.length ? ' (' + details.join(', ') + ')' : '';
+                                reading_log_calendar.addEvent(log);
+                            } else {
+                                alert(data.errors);
+                            }
+                        }
+                    });
+                });
+                
+                $('#delete_event_button').on('click', function(e) {
+                    e.preventDefault();
+                    var logId = $(this).data('id');
+                    $.ajax({
+                        url: "{% url 'manage_log' %}",
+                        type: 'POST',
+                        headers: { 'X-CSRFToken': document.querySelector(Selectors.CSRF_INPUT).value },
+                        data: { 'id': logId, 'student': {{ id }}, 'del': true },
+                        success: function(data) {
+                            if (data.status === 'success') {
+                                var event = reading_log_calendar.getEventById(logId);
+                                if (event) {
+                                    event.remove();
+                                }
+                                $('#addEventModal').modal('hide');
+                            } else {
+                                alert(data.message);
+                            }
+                        }
+                    });
+                });
+                
+                $('#addEventModal').on('hidden.bs.modal', function(){
+                    var event_form = document.getElementById('addEventForm');
+                    event_form.reset();
+                    event_form.querySelector('.modal-title').innerText = "Add Entry";
+                    var del_btn = document.getElementById('delete_event_button');
+                    del_btn.classList.add('hidden');
+                });
+                
+                reading_log_calendar = new FullCalendar.Calendar(document.getElementById('appCalendar'), {
+                    headerToolbar: false,
+                    dayMaxEvents: 3,
+                    height: 800,
+                    stickyHeaderDates: false,
+                    displayEventEnd: true,
+                    events: {
+                        url: "{% url 'get_logs' %}",
+                        method: 'GET',
+                        extraParams: {
+                          user_id: '{{ id }}'
+                        },
+                        success: function(data) {
+                            if (data.status === 'success') {
+                                reading_log_calendar.getEvents().forEach(function(event) {
+                                    event.remove();
+                                });
+                                data.logs.forEach(log => {
+                                    var title = log.title;
+                                    var details = [];
+                                    if (log.minutes) details.push(log.minutes + ' mins');
+                                    if (log.pages) details.push(log.pages + ' pgs');
+
+                                    title += details.length ? '\n(' + details.join(', ') + ')' : '';
+
+                                    reading_log_calendar.addEvent({
+                                        id: log.id,
+                                        start: log.date,
+                                        title: title,
+                                        extendedProps: {
+                                            title: log.title,
+                                            author: log.author,
+                                            pages: log.pages,
+                                            minutes: log.minutes,
+                                            rating: log.rating,
+                                            comments: log.comments,
+                                        }
+                                    });
+                                });
+                            } else {
+                                alert(data.message);
+                            }
+                        },
+                        failure: function() {
+                          alert('There was an error while fetching logs, please refresh in a minute and try again.');
+                        }
+                      },
+                    eventClick: function(info) {
+                        var modal = new bootstrap.Modal(document.getElementById('addEventModal'));
+                        modal.show();
+                        document.querySelector(Selectors.EVENT_START_DATE).value = info.event.startStr;
+                        document.querySelector(Selectors.EVENT_TITLE).value = info.event.extendedProps.title || '';
+                        document.querySelector(Selectors.EVENT_AUTHOR).value = info.event.extendedProps.author || '';
+                        document.querySelector(Selectors.EVENT_PAGES).value = info.event.extendedProps.pages || '';
+                        document.querySelector(Selectors.EVENT_MINUTES).value = info.event.extendedProps.minutes || '';
+                        document.querySelector(Selectors.EVENT_RATING).value = info.event.extendedProps.rating || '';
+                        document.querySelector(Selectors.EVENT_DESCRIPTION).value = info.event.extendedProps.comments || '';
+                        $('#delete_event_button').data('id', info.event.id).removeClass('hidden');
+                    },
+                    dateClick: function(info) {
+                        var modal = new bootstrap.Modal(document.getElementById('addEventModal'));
+                        var event_form = document.querySelector(Selectors.ADD_EVENT_FORM);
+                        event_form.reset();
+                        document.querySelector(Selectors.EVENT_START_DATE).value = info.dateStr;
+                        modal.show();
+                        selected_event_id = null;
+                    },
+                    eventDrop: function(event){
+                        var temp_data = {
+                          start: event.event.startStr,
+                          log_id: event.event.id,
+                          csrfmiddlewaretoken: document.querySelector(Selectors.CSRF_INPUT).getAttribute('value'),
+                          student: '{{ id }}',
+                        }
+                        $.ajax({
+                        type:'PUT',
+                        url:addEventForm.getAttribute('url'),
+                        headers: { 'X-CSRFToken': document.querySelector(Selectors.CSRF_INPUT).value },
+                        data: temp_data,
+                        success:function(response){
+                            if(response.errors){
+                                console.log(response.errors)
+                            }
+                        }
+                      })
+                      },
+                });
+                updateTitle(reading_log_calendar.currentData.viewTitle)
+                reading_log_calendar.render();
+                
+                document.querySelectorAll(Selectors.DATA_EVENT).forEach(function (button) {
+                    button.addEventListener(Events.CLICK, function (e) {
+                        var el = e.currentTarget;
+                        var type = el.getAttribute('data-event');
+                        switch (type) {
+                            case 'prev':
+                                reading_log_calendar.prev();
+                                updateTitle(reading_log_calendar.view.title);
+                                break;
+                            case 'next':
+                                reading_log_calendar.next();
+                                updateTitle(reading_log_calendar.view.title);
+                                break;
+                            case 'today':
+                                reading_log_calendar.today();
+                                updateTitle(reading_log_calendar.view.title);
+                                break;
+                            default:
+                                reading_log_calendar.today();
+                                updateTitle(reading_log_calendar.view.title);
+                                break;
+                        }
+                    });
+                });
+                
+                document.querySelectorAll(Selectors.DATA_CALENDAR_VIEW).forEach(function (link) {
+                    link.addEventListener(Events.CLICK, function (e) {
+                        e.preventDefault();
+                        var el = e.currentTarget;
+                        el.parentElement.querySelector(Selectors.ACTIVE).classList.remove(ClassNames.ACTIVE);
+                        el.classList.add(ClassNames.ACTIVE);
+                        document.querySelector(Selectors.DATA_VIEW_TITLE).textContent = el.textContent;
+                        reading_log_calendar.changeView(el.getAttribute('data-fc-view'));
+                        updateTitle(reading_log_calendar.view.title);
+                    });
+                });
+            });</script>
+        <div class="row gx-0 align-items-center">
+            <div class="col-auto d-flex justify-content-end order-md-1">
+                <button class="btn icon-item icon-item-sm shadow-none p-0 me-1 ms-md-2" data-bs-toggle="tooltip"
+                        data-event="prev"
+                        title="Previous" type="button"><span class="fas fa-arrow-left"></span></button>
+                <button class="btn icon-item icon-item-sm shadow-none p-0 me-1 me-lg-2" data-bs-toggle="tooltip"
+                        data-event="next"
+                        title="Next" type="button"><span class="fas fa-arrow-right"></span></button>
+            </div>
+            <div class="col-auto col-md-auto order-md-2">
+                <h4 class="mb-0 fs-0 fs-sm-1 fs-lg-2 calendar-title"></h4>
+            </div>
+            <div class="col col-md-auto d-flex justify-content-end order-md-3">
+                <button class="btn btn-falcon-primary btn-sm" data-event="today" type="button">Today</button>
+            </div>
+            <div class="col-md-auto d-md-none">
+                <hr/>
+            </div>
+            <div class="col-auto d-flex order-md-0">
+                <button class="btn btn-primary btn-sm" data-bs-target="#addEventModal" data-bs-toggle="modal"
+                        type="button"><span class="fas fa-plus me-2"></span>Add Entry
+                </button>
+            </div>
+            <div class="col d-flex justify-content-end order-md-2">
+                <div class="dropdown font-sans-serif me-md-2">
+                    <button aria-expanded="false"
+                            aria-haspopup="true"
+                            class="btn btn-falcon-default text-600 btn-sm dropdown-toggle dropdown-caret-none"
+                            data-boundary="viewport" data-bs-toggle="dropdown"
+                            id="email-filter" type="button"><span
+                            data-view-title="data-view-title">Month View</span><span
+                            class="fas fa-sort ms-2 fs--1"></span></button>
+                    <div aria-labelledby="email-filter" class="dropdown-menu dropdown-menu-end border py-2"><a
+                            class="active dropdown-item d-flex justify-content-between" data-fc-view="dayGridMonth"
+                            href="#!">Month View<span class="icon-check"><span class="fas fa-check"
+                                                                               data-fa-transform="down-4 shrink-4"></span></span></a><a
+                            class="dropdown-item d-flex justify-content-between" data-fc-view="dayGridWeek" href="#!">Week
+                        View<span class="icon-check"><span class="fas fa-check"
+                                                           data-fa-transform="down-4 shrink-4"></span></span></a>
+                    </div>
+                </div>
+            </div>
+        </div>
+    </div>
+    <div class="card-body p-0 scrollbar">
+        <div class="calendar-outline" id="appCalendar"></div>
+    </div>
+</div>
+<div class="modal fade" id="addEventModal" tabindex="-1">
+    <div class="modal-dialog">
+        <div class="modal-content border">
+            <form autocomplete="off" id="addEventForm" url="{% url 'manage_log' %}">
+                {% csrf_token %}
+                {{ log_form.errors }}
+                <div class="modal-header px-card bg-light border-bottom-0">
+                    <h5 class="modal-title">Add Log</h5>
+                    <button aria-label="Close" class="btn-close me-n1" data-bs-dismiss="modal" type="button"></button>
+                </div>
+                <div class="modal-body p-card">
+                    <div class="table-responsive scrollbar">
+                        <table class="table table-sm mb-0 fs-10 table-view-forms" id="table-form-body">
+                            <thead class="bg-body-tertiary">
+                            <tr>
+                                <th class="text-800 sort align-middle ps-2">Field</th>
+                                <th class="text-800 sort align-middle ps-2">Value</th>
+                            </tr>
+                            </thead>
+                            <tbody class="list" id="form-table-body">
+                            <!-- This will display all the form fields dynamically -->
+                            {% for field in log_form %}
+                            {% if field.name not in "schoolstudent" %}
+                            <tr>
+                                <td class="align-middle">{{ field.label_tag }}</td>
+                                <td class="align-middle">
+                                    {{ field }}
+                                    {% if field.errors %}
+                                    <div class="text-danger">{{ field.errors }}</div>
+                                    {% endif %}
+                                </td>
+                            </tr>
+                            {% endif %}
+                            {% endfor %}
+                            </tbody>
+                        </table>
+                    </div>
+                </div>
+                <div class="modal-footer d-flex justify-content-end align-items-center bg-light border-0">
+                    <a id="delete_event_button" class="btn px-4 hidden" data-url="{% url 'manage_log' %}">Delete</a>
+                    <button class="btn btn-primary px-4" type="submit">Save</button>
+                </div>
+            </form>
+        </div>
+    </div>
+</div>

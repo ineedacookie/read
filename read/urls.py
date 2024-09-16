@@ -39,6 +39,7 @@ urlpatterns += [
 # Add user create app
 urlpatterns += [
     path('', include('users.urls')),
+    path('reading_logs/', include('reading_logs.urls')),
 ]
 
 if settings.DEBUG:

@@ -37,6 +37,7 @@ INSTALLED_APPS = [
     'django.contrib.staticfiles',
 
     'users',  # 2024-08-28 DG
+    'reading_logs', #2024-09-13 DG
 
     'admin_auto_filters',
 ]

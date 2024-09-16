@@ -16,6 +16,7 @@ from django.http import Http404, HttpResponseBadRequest
 from .forms import OverriddenPasswordChangeForm, ClassroomForm, OverriddenAdminPasswordChangeForm, RegisterUserForm, \
     InviteCombinedForm, InviteStudentsForm, InviteParentForm, InviteUsersForm, ReadingGroupForm, CustomStudentForm, CustomTeacherForm, \
     CustomAdministratorForm, CustomParentForm, CustomClassroomForm, CustomReadingGroupForm
+from reading_logs.forms import LogForm
 from .models import CustomUser, School, Classroom, ReadingGroup
 from .tokens import account_activation_token
 from .utils import get_selectable_employees, send_email_with_link
@@ -395,6 +396,7 @@ FORM_DICT = {
 @login_required
 def edit_record(request, id):
     form = None
+    log_form = None
     form_name = ''
     prev_url = ''
     change_password_form = None
@@ -436,9 +438,11 @@ def edit_record(request, id):
                             change_password_form = OverriddenAdminPasswordChangeForm(obj)
                         elif logged_in_type == 'teacher' and obj_user_type in ['student', 'parent']:
                             change_password_form = OverriddenAdminPasswordChangeForm(obj)
+                        if obj_user_type == 'student':
+                            log_form = LogForm()
                 form = form_obj(logged_in_user=request.user, instance=obj)
 
-    page_arguments = {'form': form, 'id': id, 'prev_url': prev_url, 'form_name': form_name, 'change_password_form': change_password_form}
+    page_arguments = {'form': form, 'id': id, 'prev_url': prev_url, 'form_name': form_name, 'change_password_form': change_password_form, 'log_form': log_form}
     return render(request, 'general/record.html', page_arguments)
 
 
