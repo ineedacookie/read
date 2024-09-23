@@ -6,7 +6,7 @@ from django.http import JsonResponse
 from django.contrib.auth.decorators import login_required
 from django.views.decorators.http import require_http_methods
 
-from users.models import CustomUser
+from users.models import CustomUser, Classroom, ReadingGroup
 
 from datetime import datetime
 
@@ -19,24 +19,46 @@ def get_logs_by_date_range(request):
     except (ValueError, TypeError):
         return JsonResponse({'status': 'error', 'message': 'Invalid date format'})
 
-    user_id = request.GET.get('user_id')
+    obj_id = request.GET.get('id')
+    form_name = request.GET.get('form_name')
 
-    # Validate user
-    try:
-        user = CustomUser.objects.get(id=user_id, user_type="student")
-    except CustomUser.DoesNotExist:
-        return JsonResponse({'status': 'error', 'message': 'User not found'})
+    num_students = 0
 
-    # Fetch logs within the date range for the specified user
-    logs = Log.objects.filter(student=user, date__range=(start_date, end_date))
+    if form_name == 'Student':
+        # Validate user
+        try:
+            user = CustomUser.objects.get(id=obj_id, user_type="student", school=request.user.school)
+        except CustomUser.DoesNotExist:
+            return JsonResponse({'status': 'error', 'message': 'User not found'})
+    
+        # Fetch logs within the date range for the specified user
+        logs = Log.objects.filter(school=request.user.school, student=user, date__range=(start_date, end_date))
 
-    # Serialize logs
-    logs_data = [{'id': log.id, 'date': log.date, 'title': log.title, 'author': log.author, 'pages': log.pages, 'minutes': log.minutes, 'rating': log.rating, 'comments': log.comments} for log in logs]
+        num_students = 1
+        # Serialize logs
+        logs_data = [{'id': log.id, 'date': log.date, 'title': log.title, 'author': log.author, 'pages': log.pages, 'minutes': log.minutes, 'rating': log.rating, 'comments': log.comments} for log in logs]
+    elif form_name in ['Classrooms', 'Groups']:
+        if form_name == 'Classrooms':
+            try:
+                temp_obj = Classroom.objects.get(school=request.user.school, id=obj_id)
+            except Classroom.DoesNotExist:
+                return JsonResponse({'status': 'error', 'message': 'Classroom not found'})
+        else:
+            try:
+                temp_obj = ReadingGroup.objects.get(school=request.user.school, id=obj_id)
+            except ReadingGroup.DoesNotExist:
+                return JsonResponse({'status': 'error', 'message': 'Reading Group not found'})
+        logs = Log.objects.filter(school=request.user.school, student__in=temp_obj.students.all(),
+                                  date__range=(start_date, end_date)).values('id', 'date', 'pages', 'minutes')
+        num_students = temp_obj.students.count()
+
+        logs_data = [{'id': log['id'], 'date': log['date'], 'pages': log['pages'], 'minutes': log['minutes']} for log in logs]
+
 
     if not logs_data:
         logs_data = []
 
-    return JsonResponse({'status': 'success', 'logs': logs_data})
+    return JsonResponse({'status': 'success', 'logs': logs_data, 'num_students': num_students})
 
 @login_required
 def manage_log(request):

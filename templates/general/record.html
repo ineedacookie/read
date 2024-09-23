@@ -28,11 +28,20 @@
                         <a class="nav-link" id="tab-settings" href="#">Settings</a>
                     </li>
                 </ul>
+                {% elif form_name in "ClassroomsGroups" %}
+                <ul class="nav nav-tabs">
+                    <li class="nav-item">
+                        <a class="nav-link active" id="tab-status" href="#">Status</a>
+                    </li>
+                    <li class="nav-item">
+                        <a class="nav-link" id="tab-settings" href="#">Settings</a>
+                    </li>
+                </ul>
                 {% endif %}
             </div>
 
 
-    {% if form_name == "Student" %}
+    {% if form_name in "StudentClassroomsGroups" %}
     {% include "reading_logs/widgets/reading_log_calendar.html" %}
     {% endif %}
 

@@ -76,6 +76,7 @@ $(document).ready(function() {
     var totalPages = 0;
     var totalMinutes = 0;
     var currentViewDays = 0;
+    var numStudents = 0;
 
     var Selectors = {
         ACTIVE: '.active',
@@ -146,6 +147,15 @@ $(document).ready(function() {
         var displayField = displayType === "pages" ? totalPages : totalMinutes;
         $("#totalDisplay").text(displayField);
         $("#avgDisplay").text((displayField / currentViewDays).toFixed(2));
+        $("#avgPerStudentDisplay").text((displayField / currentViewDays / numStudents).toFixed(2));
+        $("#numStudentsDisplay").text(numStudents);
+        if (numStudents > 1) {
+            $("#avgPerStudentDiv").removeClass("d-none");
+            $("#numStudentsDiv").removeClass("d-none");
+        } else {
+            $("#avgPerStudentDiv").addClass("d-none");
+            $("#numStudentsDiv").addClass("d-none");
+        }
     }
 
     function updateTitle(title) {
@@ -268,7 +278,8 @@ $(document).ready(function() {
             url: "{% url 'get_logs' %}",
             method: 'GET',
             extraParams: {
-                user_id: '{{ id }}'
+                id: '{{ id }}',
+                form_name: '{{ form_name }}'
             },
             success: function(data) {
                 if (data.status === 'success') {
@@ -299,6 +310,7 @@ $(document).ready(function() {
                             }
                         });
                     });
+                    numStudents = data.num_students
                     calculateViewDays();
                     const { startDate, endDate } = get_start_and_end();
                     var logs = reading_log_calendar.getEvents().map(event => {
@@ -441,10 +453,8 @@ $(document).ready(function() {
         updateStats();
     });
 
-    {% if form_name == "Student" %}
         // Handle initial tab display
         handleTabSwitch('l_status');
-    {% endif %}
 });</script>
         <div class="row gx-0 align-items-center">
             <div class="col-auto d-flex justify-content-end order-md-1">
@@ -507,6 +517,12 @@ $(document).ready(function() {
                 </div>
                 <div class="ms-3">
                     Average per day: <span id="avgDisplay">0.00</span>
+                </div>
+                <div class="ms-3" id="avgPerStudentDiv">
+                    Average per student: <span id="avgPerStudentDisplay">0.00</span>
+                </div>
+                <div class="ms-3" id="numStudentsDiv">
+                    Number of students: <span id="numStudentsDisplay">0</span>
                 </div>
             </div>
         </div>
