@@ -2,15 +2,77 @@
 {% load static %}
 {% block title %}Manage Forms{% endblock %}
 {% block content %}
+<style>
+    .l_status {
+
+    }
+    .l_calendar {
+
+    }
+    .l_settings {
+        
+    }
+</style>
 <div class="container mt-5">
-    <h2 class="mb-4">Forms Management</h2>
+    <div class="d-flex align-items-center mb-4">
+                <h2>Forms Management</h2>
+                {% if form_name == "Student" %}
+                <ul class="nav nav-tabs">
+                    <li class="nav-item">
+                        <a class="nav-link active" id="tab-status" href="#">Status</a>
+                    </li>
+                    <li class="nav-item">
+                        <a class="nav-link" id="tab-calendar" href="#">Calendar</a>
+                    </li>
+                    <li class="nav-item">
+                        <a class="nav-link" id="tab-settings" href="#">Settings</a>
+                    </li>
+                </ul>
+                {% endif %}
+            </div>
 
 
     {% if form_name == "Student" %}
     {% include "reading_logs/widgets/reading_log_calendar.html" %}
     {% endif %}
 
-    <div class="card">
+    <div class="card l_settings">
+        <div class="container mt-5">
+            <!-- JavaScript to handle tab switching and stylesheet display -->
+            <script>function handleTabSwitch(tabToShow) {
+                    if (tabToShow === 'l_settings') {
+                            $("#calendar_graphs").addClass('d-none');
+                        } else {
+                            $("#calendar_graphs").removeClass('d-none');
+                        }
+                    const stylesheets = ['l_status', 'l_calendar', 'l_settings'];
+                    stylesheets.forEach((sheet) => {
+                        if (sheet === tabToShow) {
+                            $(`.${sheet}`).css('display', 'block');
+                        } else {
+                            $(`.${sheet}`).css('display', 'none');
+                        }
+                    });
+                }
+
+                // Event listeners for tab clicks
+                $('#tab-status').on('click', function() {
+                    handleTabSwitch('l_status');
+                    $('.nav-link').removeClass('active');
+                    $(this).addClass('active');
+                });
+                $('#tab-calendar').on('click', function() {
+                    handleTabSwitch('l_calendar');
+                    $('.nav-link').removeClass('active');
+                    $(this).addClass('active');
+                    reading_log_calendar.updateSize();
+                });
+                $('#tab-settings').on('click', function() {
+                    handleTabSwitch('l_settings');
+                    $('.nav-link').removeClass('active');
+                    $(this).addClass('active');
+                });</script>
+        </div>
         <div class="card-header border-bottom border-200 px-0">
             <div class="row flex-between-center gy-2 px-x1">
                 <div class="col-auto pe-0">

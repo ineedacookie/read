@@ -1,240 +1,451 @@
-<div class="card overflow-hidden">
+<div class="card overflow-hidden" id="calendar_graphs">
     <div class="card-header">
-        <script>$(document).ready(function(){
-                var reading_log_calendar = null;
-                
-                var Selectors = {
-                    ACTIVE: '.active',
-                    ADD_EVENT_FORM: '#addEventForm',
-                    ADD_EVENT_MODAL: '#addEventModal',
-                    CALENDAR: '#appCalendar',
-                    CALENDAR_TITLE: '.calendar-title',
-                    DATA_CALENDAR_VIEW: '[data-fc-view]',
-                    DATA_EVENT: '[data-event]',
-                    DATA_VIEW_TITLE: '[data-view-title]',
-                    EVENT_START_DATE: '#addEventModal [name="date"]',
-                    EVENT_TITLE: '#addEventModal [name="title"]',
-                    EVENT_DESCRIPTION: '#addEventModal [name="comments"]',
-                    EVENT_AUTHOR: '#addEventModal [name="author"]',
-                    EVENT_PAGES: '#addEventModal [name="pages"]',
-                    EVENT_MINUTES: '#addEventModal [name="minutes"]',
-                    EVENT_RATING: '#addEventModal [name="rating"]',
-                    CSRF_INPUT: '[name="csrfmiddlewaretoken"]',
-                    INPUT_TITLE: '[name="title"]',
-                    DELETE_BTN: '#delete_event_button'
-                };
+        <script>var reading_log_calendar = null;
+var chart = null;
 
-                var Events = {
-                    CLICK: 'click',
-                    SHOWN_BS_MODAL: 'shown.bs.modal',
-                    SUBMIT: 'submit'
-                };
+function updateChart(data, displayType) {
+    if (chart == null){
+        return;
+    }
+    var seriesData = [];
+    if (displayType === 'pages') {
+        seriesData.push({
+            name: 'Pages',
+            type: 'bar',
+            data: data.pages
+        });
+    } else if (displayType === 'minutes') {
+        seriesData.push({
+            name: 'Minutes',
+            type: 'bar',
+            data: data.minutes
+        });
+    }
 
-                var DataKeys = {
-                    EVENT: 'event',
-                    FC_VIEW: 'fc-view'
-                };
+    var option = {
+        title: {
+            text: 'Reading Log'
+        },
+        tooltip: {},
+        legend: {
+            data: [displayType === 'pages' ? 'Pages' : 'Minutes']
+        },
+        xAxis: {
+            data: data.dates
+        },
+        yAxis: {},
+        series: seriesData
+    };
+    chart.setOption(option);
+}
 
-                var ClassNames = {
-                    ACTIVE: 'active'
-                };
+function processData(logs, displayType) {
+    var dateMap = {};
+    logs.forEach(log => {
+        if (!dateMap[log.date]) {
+            dateMap[log.date] = { pages: 0, minutes: 0 };
+        }
+        dateMap[log.date].pages += log.pages || 0;
+        dateMap[log.date].minutes += log.minutes || 0;
+    });
 
-                function updateTitle(title) {
-                    document.querySelector(Selectors.CALENDAR_TITLE).textContent = title;
+    var dates = Object.keys(dateMap).sort();
+    var pages = dates.map(date => dateMap[date].pages);
+    var minutes = dates.map(date => dateMap[date].minutes);
+
+    updateChart({ dates: dates, pages: pages, minutes: minutes }, displayType);
+}
+
+function fillMissingDates(startDate, endDate, logs) {
+    let dateSet = new Set(logs.map(log => log.date));
+    let currentDate = new Date(startDate);
+    endDate = new Date(endDate);
+    
+    while (currentDate <= endDate) {
+        let dateStr = currentDate.toISOString().split('T')[0];
+        if (!dateSet.has(dateStr)) {
+            logs.push({ date: dateStr, pages: 0, minutes: 0 });
+        }
+        currentDate.setDate(currentDate.getDate() + 1);
+    }
+
+    return logs;
+}
+
+$(document).ready(function() {
+    var totalPages = 0;
+    var totalMinutes = 0;
+    var currentViewDays = 0;
+
+    var Selectors = {
+        ACTIVE: '.active',
+        ADD_EVENT_FORM: '#addEventForm',
+        ADD_EVENT_MODAL: '#addEventModal',
+        CALENDAR: '#appCalendar',
+        CALENDAR_TITLE: '.calendar-title',
+        DATA_CALENDAR_VIEW: '[data-fc-view]',
+        DATA_EVENT: '[data-event]',
+        DATA_VIEW_TITLE: '[data-view-title]',
+        EVENT_START_DATE: '#addEventModal [name="date"]',
+        EVENT_TITLE: '#addEventModal [name="title"]',
+        EVENT_DESCRIPTION: '#addEventModal [name="comments"]',
+        EVENT_AUTHOR: '#addEventModal [name="author"]',
+        EVENT_PAGES: '#addEventModal [name="pages"]',
+        EVENT_MINUTES: '#addEventModal [name="minutes"]',
+        EVENT_RATING: '#addEventModal [name="rating"]',
+        CSRF_INPUT: '[name="csrfmiddlewaretoken"]',
+        INPUT_TITLE: '[name="title"]',
+        DELETE_BTN: '#delete_event_button'
+    };
+
+    var Events = {
+        CLICK: 'click',
+        SHOWN_BS_MODAL: 'shown.bs.modal',
+        SUBMIT: 'submit'
+    };
+
+    var DataKeys = {
+        EVENT: 'event',
+        FC_VIEW: 'fc-view'
+    };
+
+    var ClassNames = {
+        ACTIVE: 'active'
+    };
+
+    function parseDateRange(input) {
+        // Match different parts of the date string
+        let match = input.match(/(\w+)\s(\d+)\s–\s(\w+)\s(\d+),\s(\d+)/);
+
+        if (!match) {
+            match = input.match(/(\w+)\s(\d+)\s–\s(\d+),\s(\d+)/); // Match short format
+        }
+
+        if (match) {
+            const [, startMonth, startDate, endMonth, endDate, year] = match.length === 6 ? match : [null, match[1], match[2], match[1], match[3], match[4]];
+
+            // Create start date and end date strings
+            const startDateString = `${startMonth} ${startDate}, ${year}`;
+            const endDateString = `${endMonth} ${endDate}, ${year}`;
+
+            // Parse the dates
+            const start = new Date(startDateString);
+            const end = new Date(endDateString);
+
+            return {
+                start,
+                end
+            };
+        } else {
+            throw new Error('Unable to parse date string.');
+        }
+    }
+
+    function updateStats() {
+        var displayType = $('input[name="toggleDisplay"]:checked').val();
+        var displayField = displayType === "pages" ? totalPages : totalMinutes;
+        $("#totalDisplay").text(displayField);
+        $("#avgDisplay").text((displayField / currentViewDays).toFixed(2));
+    }
+
+    function updateTitle(title) {
+        document.querySelector(Selectors.CALENDAR_TITLE).textContent = title;
+    }
+
+    function calculateViewDays() {
+        const currentView = reading_log_calendar.view.type;
+        if (currentView === 'dayGridMonth') {
+            const currentDate = new Date(reading_log_calendar.currentData.viewTitle);
+            const year = currentDate.getFullYear();
+            const month = currentDate.getMonth();
+            currentViewDays = new Date(year, month + 1, 0).getDate();
+        } else {
+            var { start, end } = parseDateRange(reading_log_calendar.currentData.viewTitle);
+            const dateDiff = (end - start) / (1000 * 60 * 60 * 24);
+            currentViewDays = Math.ceil(dateDiff);
+        }
+    }
+
+    function get_start_and_end() {
+        const currentView = reading_log_calendar.view.type;
+        var startDate, endDate;
+        if (currentView === 'dayGridMonth') {
+            const currentDate = new Date(reading_log_calendar.currentData.viewTitle);
+            const year = currentDate.getFullYear();
+            const month = currentDate.getMonth();
+            startDate = new Date(year, month, 1);
+            endDate = new Date(year, month + 1, 0);
+        } else {
+            ({ start: startDate, end: endDate } = parseDateRange(reading_log_calendar.currentData.viewTitle));
+        }
+        return { startDate, endDate };
+    }
+
+    function calculateTotals(logs) {
+        totalPages = 0;
+        totalMinutes = 0;
+        logs.forEach(log => {
+            totalPages += log.pages || 0;
+            totalMinutes += log.minutes || 0;
+        });
+        updateStats();
+    }
+
+    $('#addEventForm').on('submit', function(e) {
+        e.preventDefault();
+        var $form = $(this);
+        $.ajax({
+            url: "{% url 'manage_log' %}",
+            type: 'POST',
+            headers: { 'X-CSRFToken': document.querySelector(Selectors.CSRF_INPUT).value },
+            data: $form.serialize() + '&student={{ id }}',
+            success: function(data) {
+                if (data.status === 'success') {
+                    $('#addEventModal').modal('hide');
+                    var log = {
+                        id: data.log_id,
+                        title: $('#entryTitle').val(),
+                        start: $('#entryDate').val(),
+                        extendedProps: {
+                            author: $('#entryAuthor').val(),
+                            pages: $('#entryPages').val(),
+                            minutes: $('#entryMinutes').val(),
+                            rating: $('#entryRating').val(),
+                            comments: $('#entryComments').val(),
+                        }
+                    };
+                    var details = [];
+                    if (log.extendedProps.minutes) details.push(log.extendedProps.minutes + ' minutes');
+                    if (log.extendedProps.pages) details.push(log.extendedProps.pages + ' pages');
+                    log.title += details.length ? ' (' + details.join(', ') + ')' : '';
+                    reading_log_calendar.addEvent(log);
+                    updateStats();
+                } else {
+                    alert(data.errors);
                 }
+            }
+        });
+    });
 
-                $('#addEventForm').on('submit', function(e){
-                    e.preventDefault();
-                    var $form = $(this);
-                    $.ajax({
-                        url: "{% url 'manage_log' %}",
-                        type: 'POST',
-                        headers: { 'X-CSRFToken': document.querySelector(Selectors.CSRF_INPUT).value },
-                        data: $form.serialize() + '&student={{ id }}',
-                        success: function(data) {
-                            if (data.status === 'success') {
-                                $('#addEventModal').modal('hide');
-                                var log = {
-                                    id: data.log_id,
-                                    title: $('#entryTitle').val(),
-                                    start: $('#entryDate').val(),
-                                    extendedProps: {
-                                        author: $('#entryAuthor').val(),
-                                        pages: $('#entryPages').val(),
-                                        minutes: $('#entryMinutes').val(),
-                                        rating: $('#entryRating').val(),
-                                        comments: $('#entryComments').val(),
-                                    }
-                                };
-                                var details = [];
-                                if (log.extendedProps.minutes) details.push(log.extendedProps.minutes + ' minutes');
-                                if (log.extendedProps.pages) details.push(log.extendedProps.pages + ' pages');
-                                log.title += details.length ? ' (' + details.join(', ') + ')' : '';
-                                reading_log_calendar.addEvent(log);
-                            } else {
-                                alert(data.errors);
-                            }
-                        }
-                    });
-                });
-                
-                $('#delete_event_button').on('click', function(e) {
-                    e.preventDefault();
-                    var logId = $(this).data('id');
-                    $.ajax({
-                        url: "{% url 'manage_log' %}",
-                        type: 'POST',
-                        headers: { 'X-CSRFToken': document.querySelector(Selectors.CSRF_INPUT).value },
-                        data: { 'id': logId, 'student': {{ id }}, 'del': true },
-                        success: function(data) {
-                            if (data.status === 'success') {
-                                var event = reading_log_calendar.getEventById(logId);
-                                if (event) {
-                                    event.remove();
-                                }
-                                $('#addEventModal').modal('hide');
-                            } else {
-                                alert(data.message);
-                            }
-                        }
-                    });
-                });
-                
-                $('#addEventModal').on('hidden.bs.modal', function(){
-                    var event_form = document.getElementById('addEventForm');
-                    event_form.reset();
-                    event_form.querySelector('.modal-title').innerText = "Add Entry";
-                    var del_btn = document.getElementById('delete_event_button');
-                    del_btn.classList.add('hidden');
-                });
-                
-                reading_log_calendar = new FullCalendar.Calendar(document.getElementById('appCalendar'), {
-                    headerToolbar: false,
-                    dayMaxEvents: 3,
-                    height: 800,
-                    stickyHeaderDates: false,
-                    displayEventEnd: true,
-                    events: {
-                        url: "{% url 'get_logs' %}",
-                        method: 'GET',
-                        extraParams: {
-                          user_id: '{{ id }}'
-                        },
-                        success: function(data) {
-                            if (data.status === 'success') {
-                                reading_log_calendar.getEvents().forEach(function(event) {
-                                    event.remove();
-                                });
-                                data.logs.forEach(log => {
-                                    var title = log.title;
-                                    var details = [];
-                                    if (log.minutes) details.push(log.minutes + ' mins');
-                                    if (log.pages) details.push(log.pages + ' pgs');
+    $('#delete_event_button').on('click', function(e) {
+        e.preventDefault();
+        var logId = $(this).data('id');
+        $.ajax({
+            url: "{% url 'manage_log' %}",
+            type: 'POST',
+            headers: { 'X-CSRFToken': document.querySelector(Selectors.CSRF_INPUT).value },
+            data: { 'id': logId, 'student': {{ id }}, 'del': true },
+            success: function(data) {
+                if (data.status === 'success') {
+                    var event = reading_log_calendar.getEventById(logId);
+                    if (event) {
+                        event.remove();
+                    }
+                    $('#addEventModal').modal('hide');
+                    updateStats();
+                } else {
+                    alert(data.message);
+                }
+            }
+        });
+    });
 
-                                    title += details.length ? '\n(' + details.join(', ') + ')' : '';
+    $('#addEventModal').on('hidden.bs.modal', function() {
+        var event_form = document.getElementById('addEventForm');
+        event_form.reset();
+        event_form.querySelector('.modal-title').innerText = "Add Entry";
+        var del_btn = document.getElementById('delete_event_button');
+        del_btn.classList.add('hidden');
+    });
 
-                                    reading_log_calendar.addEvent({
-                                        id: log.id,
-                                        start: log.date,
-                                        title: title,
-                                        extendedProps: {
-                                            title: log.title,
-                                            author: log.author,
-                                            pages: log.pages,
-                                            minutes: log.minutes,
-                                            rating: log.rating,
-                                            comments: log.comments,
-                                        }
-                                    });
-                                });
-                            } else {
-                                alert(data.message);
-                            }
-                        },
-                        failure: function() {
-                          alert('There was an error while fetching logs, please refresh in a minute and try again.');
-                        }
-                      },
-                    eventClick: function(info) {
-                        var modal = new bootstrap.Modal(document.getElementById('addEventModal'));
-                        modal.show();
-                        document.querySelector(Selectors.EVENT_START_DATE).value = info.event.startStr;
-                        document.querySelector(Selectors.EVENT_TITLE).value = info.event.extendedProps.title || '';
-                        document.querySelector(Selectors.EVENT_AUTHOR).value = info.event.extendedProps.author || '';
-                        document.querySelector(Selectors.EVENT_PAGES).value = info.event.extendedProps.pages || '';
-                        document.querySelector(Selectors.EVENT_MINUTES).value = info.event.extendedProps.minutes || '';
-                        document.querySelector(Selectors.EVENT_RATING).value = info.event.extendedProps.rating || '';
-                        document.querySelector(Selectors.EVENT_DESCRIPTION).value = info.event.extendedProps.comments || '';
-                        $('#delete_event_button').data('id', info.event.id).removeClass('hidden');
-                    },
-                    dateClick: function(info) {
-                        var modal = new bootstrap.Modal(document.getElementById('addEventModal'));
-                        var event_form = document.querySelector(Selectors.ADD_EVENT_FORM);
-                        event_form.reset();
-                        document.querySelector(Selectors.EVENT_START_DATE).value = info.dateStr;
-                        modal.show();
-                        selected_event_id = null;
-                    },
-                    eventDrop: function(event){
-                        var temp_data = {
-                          start: event.event.startStr,
-                          log_id: event.event.id,
-                          csrfmiddlewaretoken: document.querySelector(Selectors.CSRF_INPUT).getAttribute('value'),
-                          student: '{{ id }}',
-                        }
-                        $.ajax({
-                        type:'PUT',
-                        url:addEventForm.getAttribute('url'),
-                        headers: { 'X-CSRFToken': document.querySelector(Selectors.CSRF_INPUT).value },
-                        data: temp_data,
-                        success:function(response){
-                            if(response.errors){
-                                console.log(response.errors)
-                            }
-                        }
-                      })
-                      },
-                });
-                updateTitle(reading_log_calendar.currentData.viewTitle)
-                reading_log_calendar.render();
-                
-                document.querySelectorAll(Selectors.DATA_EVENT).forEach(function (button) {
-                    button.addEventListener(Events.CLICK, function (e) {
-                        var el = e.currentTarget;
-                        var type = el.getAttribute('data-event');
-                        switch (type) {
-                            case 'prev':
-                                reading_log_calendar.prev();
-                                updateTitle(reading_log_calendar.view.title);
-                                break;
-                            case 'next':
-                                reading_log_calendar.next();
-                                updateTitle(reading_log_calendar.view.title);
-                                break;
-                            case 'today':
-                                reading_log_calendar.today();
-                                updateTitle(reading_log_calendar.view.title);
-                                break;
-                            default:
-                                reading_log_calendar.today();
-                                updateTitle(reading_log_calendar.view.title);
-                                break;
-                        }
+    reading_log_calendar = new FullCalendar.Calendar(document.getElementById('appCalendar'), {
+        headerToolbar: false,
+        dayMaxEvents: 3,
+        height: 800,
+        stickyHeaderDates: false,
+        displayEventEnd: true,
+        events: {
+            url: "{% url 'get_logs' %}",
+            method: 'GET',
+            extraParams: {
+                user_id: '{{ id }}'
+            },
+            success: function(data) {
+                if (data.status === 'success') {
+                    reading_log_calendar.getEvents().forEach(function(event) {
+                        event.remove();
                     });
-                });
-                
-                document.querySelectorAll(Selectors.DATA_CALENDAR_VIEW).forEach(function (link) {
-                    link.addEventListener(Events.CLICK, function (e) {
-                        e.preventDefault();
-                        var el = e.currentTarget;
-                        el.parentElement.querySelector(Selectors.ACTIVE).classList.remove(ClassNames.ACTIVE);
-                        el.classList.add(ClassNames.ACTIVE);
-                        document.querySelector(Selectors.DATA_VIEW_TITLE).textContent = el.textContent;
-                        reading_log_calendar.changeView(el.getAttribute('data-fc-view'));
-                        updateTitle(reading_log_calendar.view.title);
+                    data.logs.forEach(log => {
+                        var title = log.title;
+                        var details = [];
+                        if (log.minutes) details.push(log.minutes + ' mins');
+                        if (log.pages) details.push(log.pages + ' pgs');
+                        totalPages += log.pages || 0;
+                        totalMinutes += log.minutes || 0;
+
+                        title += details.length ? '\n(' + details.join(', ') + ')' : '';
+
+                        reading_log_calendar.addEvent({
+                            id: log.id,
+                            start: log.date,
+                            title: title,
+                            extendedProps: {
+                                title: log.title,
+                                author: log.author,
+                                pages: log.pages,
+                                minutes: log.minutes,
+                                rating: log.rating,
+                                comments: log.comments,
+                            }
+                        });
                     });
-                });
-            });</script>
+                    calculateViewDays();
+                    const { startDate, endDate } = get_start_and_end();
+                    var logs = reading_log_calendar.getEvents().map(event => {
+                        var eventDate = event.start;
+                        if (eventDate >= startDate && eventDate <= endDate) {
+                            return {
+                                date: event.startStr,
+                                pages: event.extendedProps.pages,
+                                minutes: event.extendedProps.minutes
+                            };
+                        }
+                    }).filter(log => log !== undefined);
+                    logs = fillMissingDates(startDate, endDate, logs); // Fill missing dates
+                    calculateTotals(logs);
+                    var displayType = $('input[name="toggleDisplay"]:checked').val();
+                    updateChartDataForView(displayType);
+                } else {
+                    alert(data.message);
+                }
+            },
+            failure: function() {
+                alert('There was an error while fetching logs, please refresh in a minute and try again.');
+            }
+        },
+        eventClick: function(info) {
+            var modal = new bootstrap.Modal(document.getElementById('addEventModal'));
+            modal.show();
+            document.querySelector(Selectors.EVENT_START_DATE).value = info.event.startStr;
+            document.querySelector(Selectors.EVENT_TITLE).value = info.event.extendedProps.title || '';
+            document.querySelector(Selectors.EVENT_AUTHOR).value = info.event.extendedProps.author || '';
+            document.querySelector(Selectors.EVENT_PAGES).value = info.event.extendedProps.pages || '';
+            document.querySelector(Selectors.EVENT_MINUTES).value = info.event.extendedProps.minutes || '';
+            document.querySelector(Selectors.EVENT_RATING).value = info.event.extendedProps.rating || '';
+            document.querySelector(Selectors.EVENT_DESCRIPTION).value = info.event.extendedProps.comments || '';
+            $('#delete_event_button').data('id', info.event.id).removeClass('hidden');
+        },
+        dateClick: function(info) {
+            var modal = new bootstrap.Modal(document.getElementById('addEventModal'));
+            var event_form = document.querySelector(Selectors.ADD_EVENT_FORM);
+            event_form.reset();
+            document.querySelector(Selectors.EVENT_START_DATE).value = info.dateStr;
+            modal.show();
+            selected_event_id = null;
+        },
+        eventDrop: function(event) {
+            var temp_data = {
+                start: event.event.startStr,
+                log_id: event.event.id,
+                csrfmiddlewaretoken: document.querySelector(Selectors.CSRF_INPUT).getAttribute('value'),
+                student: '{{ id }}',
+            }
+            $.ajax({
+                type: 'PUT',
+                url: addEventForm.getAttribute('url'),
+                headers: { 'X-CSRFToken': document.querySelector(Selectors.CSRF_INPUT).value },
+                data: temp_data,
+                success: function(response) {
+                    if (response.errors) {
+                        console.log(response.errors)
+                    }
+                }
+            })
+        },
+        datesSet: function(info) {
+            updateTitle(info.view.title);
+            calculateViewDays();
+            const { startDate, endDate } = get_start_and_end();
+            var logs = reading_log_calendar.getEvents().map(event => {
+                var eventDate = event.start;
+                if (eventDate >= startDate && eventDate <= endDate) {
+                    return {
+                        date: event.startStr,
+                        pages: event.extendedProps.pages,
+                        minutes: event.extendedProps.minutes
+                    };
+                }
+            }).filter(log => log !== undefined);
+            logs = fillMissingDates(startDate, endDate, logs); // Fill missing dates
+            calculateTotals(logs);
+            var displayType = $('input[name="toggleDisplay"]:checked').val();
+            updateChartDataForView(displayType);
+        }
+    });
+
+    updateTitle(reading_log_calendar.currentData.viewTitle)
+    reading_log_calendar.render();
+
+    document.querySelectorAll(Selectors.DATA_EVENT).forEach(function(button) {
+        button.addEventListener(Events.CLICK, function(e) {
+            var el = e.currentTarget;
+            var type = el.getAttribute('data-event');
+            switch (type) {
+                case 'prev':
+                    reading_log_calendar.prev();
+                    break;
+                case 'next':
+                    reading_log_calendar.next();
+                    break;
+                case 'today':
+                    reading_log_calendar.today();
+                    break;
+                default:
+                    reading_log_calendar.today();
+                    break;
+            }
+        });
+    });
+
+    document.querySelectorAll(Selectors.DATA_CALENDAR_VIEW).forEach(function(link) {
+        link.addEventListener(Events.CLICK, function(e) {
+            e.preventDefault();
+            var el = e.currentTarget;
+            el.parentElement.querySelector(Selectors.ACTIVE).classList.remove(ClassNames.ACTIVE);
+            el.classList.add(ClassNames.ACTIVE);
+            document.querySelector(Selectors.DATA_VIEW_TITLE).textContent = el.textContent;
+            reading_log_calendar.changeView(el.getAttribute('data-fc-view'));
+        });
+    });
+
+    chart = echarts.init(document.getElementById('chartContainer'));
+
+    function updateChartDataForView(displayType) {
+        const { startDate, endDate } = get_start_and_end();
+        var logs = reading_log_calendar.getEvents().map(event => {
+            var eventDate = event.start;
+            if (eventDate >= startDate && eventDate <= endDate) {
+                return {
+                    date: event.startStr,
+                    pages: event.extendedProps.pages,
+                    minutes: event.extendedProps.minutes
+                };
+            }
+        }).filter(log => log !== undefined);
+        logs = fillMissingDates(startDate, endDate, logs); // Fill missing dates
+        processData(logs, displayType);
+    }
+
+    // Toggle display functionality
+    $('input[name="toggleDisplay"]').on('change', function() {
+        updateStats();
+    });
+
+    {% if form_name == "Student" %}
+        // Handle initial tab display
+        handleTabSwitch('l_status');
+    {% endif %}
+});</script>
         <div class="row gx-0 align-items-center">
             <div class="col-auto d-flex justify-content-end order-md-1">
                 <button class="btn icon-item icon-item-sm shadow-none p-0 me-1 ms-md-2" data-bs-toggle="tooltip"
@@ -254,7 +465,8 @@
                 <hr/>
             </div>
             <div class="col-auto d-flex order-md-0">
-                <button class="btn btn-primary btn-sm" data-bs-target="#addEventModal" data-bs-toggle="modal"
+                <button class="btn btn-primary btn-sm l_calendar"
+                        data-bs-target="#addEventModal" data-bs-toggle="modal"
                         type="button"><span class="fas fa-plus me-2"></span>Add Entry
                 </button>
             </div>
@@ -278,54 +490,32 @@
                 </div>
             </div>
         </div>
-    </div>
-    <div class="card-body p-0 scrollbar">
-        <div class="calendar-outline" id="appCalendar"></div>
-    </div>
-</div>
-<div class="modal fade" id="addEventModal" tabindex="-1">
-    <div class="modal-dialog">
-        <div class="modal-content border">
-            <form autocomplete="off" id="addEventForm" url="{% url 'manage_log' %}">
-                {% csrf_token %}
-                {{ log_form.errors }}
-                <div class="modal-header px-card bg-light border-bottom-0">
-                    <h5 class="modal-title">Add Log</h5>
-                    <button aria-label="Close" class="btn-close me-n1" data-bs-dismiss="modal" type="button"></button>
+        <div class="row gx-0 align-items-center mt-3 l_status">
+            <div class="col-auto d-flex align-items-center">
+                <div class="form-check form-check-inline">
+                    <input class="form-check-input" type="radio" name="toggleDisplay" id="togglePages" value="pages"
+                           checked>
+                    <label class="form-check-label" for="togglePages">Pages</label>
                 </div>
-                <div class="modal-body p-card">
-                    <div class="table-responsive scrollbar">
-                        <table class="table table-sm mb-0 fs-10 table-view-forms" id="table-form-body">
-                            <thead class="bg-body-tertiary">
-                            <tr>
-                                <th class="text-800 sort align-middle ps-2">Field</th>
-                                <th class="text-800 sort align-middle ps-2">Value</th>
-                            </tr>
-                            </thead>
-                            <tbody class="list" id="form-table-body">
-                            <!-- This will display all the form fields dynamically -->
-                            {% for field in log_form %}
-                            {% if field.name not in "schoolstudent" %}
-                            <tr>
-                                <td class="align-middle">{{ field.label_tag }}</td>
-                                <td class="align-middle">
-                                    {{ field }}
-                                    {% if field.errors %}
-                                    <div class="text-danger">{{ field.errors }}</div>
-                                    {% endif %}
-                                </td>
-                            </tr>
-                            {% endif %}
-                            {% endfor %}
-                            </tbody>
-                        </table>
-                    </div>
+                <div class="form-check form-check-inline">
+                    <input class="form-check-input" type="radio" name="toggleDisplay" id="toggleMinutes"
+                           value="minutes">
+                    <label class="form-check-label" for="toggleMinutes">Minutes</label>
                 </div>
-                <div class="modal-footer d-flex justify-content-end align-items-center bg-light border-0">
-                    <a id="delete_event_button" class="btn px-4 hidden" data-url="{% url 'manage_log' %}">Delete</a>
-                    <button class="btn btn-primary px-4" type="submit">Save</button>
+                <div class="ms-3">
+                    Total: <span id="totalDisplay">0</span>
                 </div>
-            </form>
+                <div class="ms-3">
+                    Average per day: <span id="avgDisplay">0.00</span>
+                </div>
+            </div>
         </div>
+    </div>
+
+    <div class="card-body p-0 scrollbar">
+        <div class="l_calendar">
+            <div class="calendar-outline" id="appCalendar" style="height: 800px; width:100%;"></div>
+        </div>
+        <div id="chartContainer" class="l_status" style="height: 400px; width: 100%;"></div>
     </div>
 </div>

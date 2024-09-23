@@ -35,6 +35,9 @@ from django.contrib.auth.hashers import make_password
 
 def create_custom_users(request):
     from django.utils.crypto import get_random_string
+    import random
+    from datetime import date, timedelta
+    from reading_logs.models import Log
 
     # Create schools
     schools = [School.objects.create(name=f'School {i}') for i in range(1, 4)]
@@ -45,7 +48,7 @@ def create_custom_users(request):
                      range(3)
                  ] + [
                      {'username': f'student_{i}', 'email': f'student_{i}@example.com', 'user_type': 'student'} for i in
-                     range(20)
+                     range(30)
                  ] + [
                      {'username': f'admin_{i}', 'email': f'admin_{i}@example.com', 'user_type': 'administrator'} for i
                      in range(2)
@@ -54,16 +57,58 @@ def create_custom_users(request):
                      range(10)
                  ]
 
+    all_students = []
+
     # Create users and assign to schools
     for i, school in enumerate(schools):
         for j, user_data in enumerate(users_data):
-            CustomUser.objects.create(
+            user = CustomUser.objects.create(
                 username=str(i) + "_" + user_data['username'],
                 email=str(i) + "_" + user_data['email'],
                 user_type=user_data['user_type'],
                 password=make_password('temp'),  # Default password for initial creation
                 school=school
             )
+            if user_data['user_type'] == 'student':
+                all_students.append(user)
+
+    # Create logs for students
+    def create_logs(user):
+        today = date.today()
+        start_date = today.replace(day=1)
+        end_date = today
+        current_date = start_date
+        while current_date <= end_date:
+            num_logs = random.randint(1, 2)
+            for _ in range(num_logs):
+                Log.objects.create(
+                    school=user.school,
+                    student=user,
+                    pages=random.randint(2, 10),
+                    minutes=random.randint(5, 45),
+                    date=current_date
+                )
+            current_date += timedelta(days=1)
+
+    for student in all_students:
+        create_logs(student)
+
+    # Assign students to classrooms and reading groups
+    unassigned_students = all_students[:]
+    for teacher in CustomUser.objects.filter(user_type='teacher'):
+        # Create classroom and assign students
+        classroom = Classroom.objects.create(name=f"Classroom_{teacher.username}", school=teacher.school)
+        assigned_students = random.sample(unassigned_students, 10)
+        for student in assigned_students:
+            student.classroom_set.add(classroom)
+            unassigned_students.remove(student)
+
+        # Create reading groups and split students
+        reading_group1 = ReadingGroup.objects.create(name=f"Reading_Group_1_{teacher.username}", school=teacher.school)
+        reading_group2 = ReadingGroup.objects.create(name=f"Reading_Group_2_{teacher.username}", school=teacher.school)
+        half = len(assigned_students) // 2
+        reading_group1.students.set(assigned_students[:half])
+        reading_group2.students.set(assigned_students[half:])
 
     # Return a response
     return render(request, 'general/home.html', {'message': 'Custom users created successfully'})

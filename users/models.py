@@ -51,7 +51,6 @@ class CustomUser(AbstractUser):
     full_name = models.CharField(_('Full Name'), max_length=210, blank=True, null=True, default=None)
     active = models.BooleanField(_('Active'), blank=True, null=True, default=True)
     marked_for_deletion = models.DateField(null=True, blank=True)
-
     USERNAME_FIELD = 'email'
     REQUIRED_FIELDS = ['username', 'first_name', 'last_initial']
 
@@ -95,6 +94,7 @@ class Classroom(models.Model):
                                       limit_choices_to={'user_type': 'teacher'})
     students = models.ManyToManyField(CustomUser, related_name='students_classrooms',
                                       limit_choices_to={'user_type': 'student'})
+    created_by = models.ForeignKey(CustomUser, on_delete=models.SET_NULL, null=True, blank=True)
     created_date = models.DateField(_("Created Date"), auto_now_add=True, blank=True)
     updated_date = models.DateField(_("Updated Date"), auto_now=True, blank=True, null=True)
 
@@ -120,6 +120,7 @@ class ReadingGroup(models.Model):
                                           user_type='administrator'), blank=False)
     students = models.ManyToManyField(CustomUser, related_name='reading_groups',
                                       limit_choices_to={'user_type': 'student'})
+    created_by = models.ForeignKey(CustomUser, on_delete=models.SET_NULL, null=True, blank=True)
     created_date = models.DateField(_("Created Date"), auto_now_add=True, blank=True)
     updated_date = models.DateField(_("Updated Date"), auto_now=True, blank=True, null=True)
 
