@@ -117,25 +117,24 @@ def create_custom_users(request):
 @login_required
 def home(request, **kwargs):
     """Main page that is the root of the website"""
-    """check that the user is logged in. if not send them to the log in page."""
-    # if not request.user.password:
-    #     return create_account(request)
     """Checks whether the user is part of the staff or a customer"""
     if request.user.is_staff:
         return redirect('/io_admin')
     else:
-        page = 'general/home.html'
-        user_type = kwargs.get('user_type', 'student')
-        if user_type not in ['student', 'teacher', 'parent', 'administrator']:
-            # Forward the user to a 404 page
-            raise Http404("Page not found")
-        if user_type == 'student':
-            invite_form = InviteStudentsForm()
-        elif user_type == 'parent':
-            invite_form = InviteParentForm(logged_in_user=request.user)
-        else:
-            invite_form = InviteUsersForm()
-        page_arguments = {'user_type': user_type, 'invite_form': invite_form}
+        page_arguments = {}
+        if request.user.user_type == 'teacher':
+            page = 'general/teacher_dash.html'
+            school = request.user.school
+            classrooms = Classroom.objects.filter(school=school, teachers=request.user).order_by('name').values('id',
+                                                                                                                'name')
+            reading_groups = ReadingGroup.objects.filter(school=school, managers=request.user).order_by('name').values(
+                'id', 'name')
+
+            data = {
+                "classrooms": list(classrooms),
+                "reading_groups": list(reading_groups)
+            }
+            page_arguments['data'] = data
         return render(request, page, page_arguments)  # fill the {} with arguments
 
 
@@ -520,6 +519,22 @@ def password_change_view(request, id):
     return handler404(request)
 
 
+@login_required
+def list_classrooms_and_groups(request):
+    """Currently not used"""
+    if request.user.user_type != 'teacher':
+        return JsonResponse({"error": "Unauthorized access"}, status=403)
+
+    school = request.user.school
+    classrooms = Classroom.objects.filter(school=school, teachers=request.user).order_by('name').values('id', 'name')
+    reading_groups = ReadingGroup.objects.filter(school=school, managers=request.user).order_by('name').values('id', 'name')
+
+    data = {
+        "classrooms": list(classrooms),
+        "reading_groups": list(reading_groups)
+    }
+
+    return JsonResponse(data, safe=False)
 
 def handler404(request, *args, **argv):
     page = 'general/404.html'

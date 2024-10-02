@@ -27,6 +27,7 @@
                     tableBody.innerHTML += row;
                 }
                 document.getElementById('pagination').innerHTML = `
+                    <div>
                     <button class="btn btn-sm btn-falcon-default me-1" type="button" title="Previous" ${data.has_previous ? '' : 'disabled'} onclick="fetchUsers(${data.page_number - 1}, '${userType}', '${searchQuery}', '${sortField}', '${sortOrder}')">
                         <span class="fas fa-chevron-left"></span>
                     </button>
@@ -34,6 +35,7 @@
                     <button class="btn btn-sm btn-falcon-default ms-1" type="button" title="Next" ${data.has_next ? '' : 'disabled'} onclick="fetchUsers(${data.page_number + 1}, '${userType}', '${searchQuery}', '${sortField}', '${sortOrder}')">
                         <span class="fas fa-chevron-right"></span>
                     </button>
+                    <div>
                 `;
             }
         };
@@ -213,7 +215,7 @@
                 </tbody>
             </table>
         </div>
-        <div id="pagination" class="d-flex justify-content-between mt-2">
+        <div id="pagination" class="d-flex justify-content-center mt-2">
             <!-- Pagination buttons will be inserted here -->
         </div>
     </div>

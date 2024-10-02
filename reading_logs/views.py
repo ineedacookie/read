@@ -60,6 +60,55 @@ def get_logs_by_date_range(request):
 
     return JsonResponse({'status': 'success', 'logs': logs_data, 'num_students': num_students})
 
+
+@login_required
+def teacher_dashboard_logs(request):
+    if request.method == 'GET':
+        date_range = request.GET.get('date_range')
+        group = request.GET.get('group')
+        group_type, group_id = group.split('_')
+        if group_type == 'class':
+            group_obj = Classroom.objects.get(id=group_id, school=request.user.school)
+        elif group_type == 'group':
+            group_obj = ReadingGroup.objects.get(id=group_id, school=request.user.school)
+        else:
+            return JsonResponse({'status': 'error', 'message': 'Invalid group type'})
+
+        if date_range:
+            try:
+                if ' to ' in date_range:
+                    start_date_str, end_date_str = date_range.split(' to ')
+                    start_date = datetime.strptime(start_date_str, '%b %d, %Y').date()
+                    end_date = datetime.strptime(end_date_str, '%b %d, %Y').date()
+                else:
+                    start_date = datetime.strptime(date_range, '%b %d, %Y').date()
+                    end_date = start_date
+            except ValueError:
+                return JsonResponse({'status': 'error', 'message': 'Invalid date format'})
+        else:
+            return JsonResponse({'status': 'error', 'message': 'Invalid date range'})
+
+        students = group_obj.students.all()
+
+        log_dict = {}
+        for student in students:
+            log_dict[student.id] = {'pages': 0, 'minutes': 0, 'name': student.full_name}
+
+        logs = Log.objects.filter(school=request.user.school, date__range=(start_date, end_date),
+                                  student__in=group_obj.students.all()).values('student__id', 'pages', 'minutes')
+
+        total_pages = total_minutes = 0
+        for log in logs:
+            log_dict[log['student__id']]['pages'] += log['pages']
+            log_dict[log['student__id']]['minutes'] += log['minutes']
+            total_pages += log['pages']
+            total_minutes += log['minutes']
+
+        return JsonResponse({'status': 'success', 'logs': list(log_dict.values()), 'pages': total_pages, 'minutes': total_minutes})
+    else:
+        return JsonResponse({'status': 'error', 'message': 'Invalid request method'})
+
+
 @login_required
 def manage_log(request):
     if request.method == 'POST':

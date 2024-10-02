@@ -156,6 +156,8 @@ $(document).ready(function() {
             $("#avgPerStudentDiv").addClass("d-none");
             $("#numStudentsDiv").addClass("d-none");
         }
+        var displayType = $('input[name="toggleDisplay"]:checked').val();
+         updateChartDataForView(displayType);
     }
 
     function updateTitle(title) {
@@ -502,27 +504,29 @@ $(document).ready(function() {
         </div>
         <div class="row gx-0 align-items-center mt-3 l_status">
             <div class="col-auto d-flex align-items-center">
-                <div class="form-check form-check-inline">
-                    <input class="form-check-input" type="radio" name="toggleDisplay" id="togglePages" value="pages"
-                           checked>
-                    <label class="form-check-label" for="togglePages">Pages</label>
-                </div>
-                <div class="form-check form-check-inline">
-                    <input class="form-check-input" type="radio" name="toggleDisplay" id="toggleMinutes"
-                           value="minutes">
-                    <label class="form-check-label" for="toggleMinutes">Minutes</label>
-                </div>
                 <div class="ms-3">
                     Total: <span id="totalDisplay">0</span>
                 </div>
                 <div class="ms-3">
                     Average per day: <span id="avgDisplay">0.00</span>
                 </div>
-                <div class="ms-3" id="avgPerStudentDiv">
+                <div class="ms-3" id="avgPerStudentDiv d-none">
                     Average per student: <span id="avgPerStudentDisplay">0.00</span>
                 </div>
-                <div class="ms-3" id="numStudentsDiv">
+                <div class="ms-3" id="numStudentsDiv d-none">
                     Number of students: <span id="numStudentsDisplay">0</span>
+                </div>
+                <div class="ms-3 mb-0 form-check form-check-inline ms-auto d-flex justify-content-end">
+                    <div class="form-check form-check-inline">
+                        <input class="form-check-input" type="radio" name="toggleDisplay" id="togglePages" value="pages"
+                               checked>
+                        <label class="form-check-label" for="togglePages">Pages</label>
+                    </div>
+                    <div class="form-check form-check-inline">
+                        <input class="form-check-input" type="radio" name="toggleDisplay" id="toggleMinutes"
+                               value="minutes">
+                        <label class="form-check-label" for="toggleMinutes">Minutes</label>
+                    </div>
                 </div>
             </div>
         </div>

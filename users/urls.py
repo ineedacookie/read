@@ -20,6 +20,7 @@ urlpatterns += [
     path('api/classrooms/', views.classrooms_view, name='api_classrooms'),
     path('groups/', views.render_group_list_view, name='reading_groups'),
     path('api/groups/', views.groups_view, name='api_reading_groups'),
+    path('api/classrooms_and_groups', views.list_classrooms_and_groups, name="api_classrooms_groups"),
     path('api/students/', views.fetch_user_type, name='api_students'),
     path('api/teachers/', views.fetch_user_type, name='api_teachers'),
     path('student/<int:id>/', views.edit_record, name="edit_student"),

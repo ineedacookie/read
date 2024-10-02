@@ -1,0 +1,265 @@
+{% extends "general/nav_template.html" %}
+{% load static %}
+{% block title %}read | Dashboard(s){% endblock %}
+{% block content %}
+
+<div class="row mb-4">
+    <div class="col-md-6 d-flex align-items-center">
+        <button class="btn btn-outline-secondary" id="prev-week">&lt;</button>
+        <input class="form-control datetimepicker" id="dashboard_range" type="text" placeholder="Enter Date Range."
+               data-options='{"mode":"range","dateFormat":"M j, Y","disableMobile":true,"position":"below","predefinedRanges":["this_week", "last_week", "this_month", "last_month"]}'/>
+        <button class="btn btn-outline-secondary mx-2" id="next-week">&gt;</button>
+    </div>
+    <div class="col-md-6">
+        <select class="form-select js-choice" id="Classroom_Group" size="1" name="Classroom_Group"
+                data-options='{"removeItemButton":false,"placeholder":false}'>
+            {% for classroom in data.classrooms %}
+            <option value="class_{{ classroom.id }}">{{ classroom.name }}</option>
+            {% endfor %}
+            {% for reading_group in data.reading_groups %}
+            <option value="group_{{ reading_group.id }}">{{ reading_group.name }}</option>
+            {% endfor %}
+        </select>
+    </div>
+</div>
+
+<div class="row mb-5">
+    <div class="col-md-6">
+        <div id="pages-gauge" style="min-height: 300px;"
+             data-echart-responsive="true"></div>
+    </div>
+    <div class="col-md-6">
+        <div id="minutes-gauge" style="min-height: 300px;"
+             data-echart-responsive="true"></div>
+    </div>
+    <div class="col-md-12 d-none">
+        <div class="echart-gauge-ring-chart-example" style="min-height: 300px;" data-echart-responsive="true"></div>
+    </div>
+</div>
+
+<div class="card">
+    <div class="card-body p-0">
+        <div class="table-responsive scrollbar">
+            <button class="btn btn-sm btn-falcon-default" id="toggle-table" onclick="toggleTable()">Toggle Table
+            </button>
+            <table class="table table-sm mb-0 fs-10 table-view-users" id="table-user-body">
+                <thead class="bg-body-tertiary">
+                <tr>
+                    <th class="text-800 sort align-middle" data-sort="pages_read">Pages Read</th>
+                    <th class="text-800 sort align-middle" data-sort="full_name">Full Name</th>
+                    <th class="text-800 sort align-middle" data-sort="total_pages">Total Pages</th>
+                    <th class="text-800 sort align-middle" data-sort="total_minutes">Total Minutes</th>
+                </tr>
+                </thead>
+                <tbody class="list" id="user-table-body">
+                <!-- Rows will be dynamically inserted here -->
+                </tbody>
+            </table>
+        </div>
+        <div id="pagination" class="d-flex justify-content-center mt-2">
+            <!-- Pagination buttons will be inserted here -->
+        </div>
+    </div>
+</div>
+{% endblock %}
+{% block afterScripts %}<script>document.addEventListener('DOMContentLoaded', function () {
+        // Function to get the current week's date range based on a given date or the current date if not specified
+        function getWeekRange(date = new Date()) {
+            var curr = new Date(date); // use the given date or current date
+            var first = curr.getDate() - curr.getDay(); // First day is the day of the month - day of the week (Sunday)
+            var last = first + 6; // Last day is the first day + 6 (Saturday)
+
+            var firstDay = new Date(curr.setDate(first)).toLocaleString('en-US', { month: 'short', day: 'numeric', year: 'numeric' });
+            var lastDay = new Date(curr.setDate(last)).toLocaleString('en-US', { month: 'short', day: 'numeric', year: 'numeric' });
+
+            return firstDay + ' to ' + lastDay;
+        }
+
+        const dashboard_elem = document.getElementById('dashboard_range');
+        dashboard_elem.addEventListener('change', fetchLogs);
+        document.getElementById('Classroom_Group').addEventListener('change', fetchLogs);
+
+        function adjustWeek(delta) {
+            let dateRangeValue = dashboard_elem.value;
+            let dateRange = dateRangeValue.split(' to ');
+            let startDate = new Date(dateRange[0]);
+            let newDate = new Date(startDate.setDate(startDate.getDate() + delta));
+            dashboard_elem.value = getWeekRange(newDate);
+            fetchLogs();
+        }
+
+        document.getElementById('prev-week').addEventListener('click', function() {
+            adjustWeek(-7);
+        });
+
+        document.getElementById('next-week').addEventListener('click', function() {
+            adjustWeek(7);
+        });
+
+        dashboard_elem.value = getWeekRange();
+    });
+
+    function fetchLogs() {
+        var dateRange = document.getElementById('dashboard_range').value;
+        var groupValue = document.getElementById('Classroom_Group').value;
+        var xhr = new XMLHttpRequest();
+        xhr.open('GET', `{% url "get_logs_by_range_and_group" %}?date_range=${dateRange}&group=${groupValue}`, true);
+        xhr.onreadystatechange = function () {
+            if (xhr.readyState == 4 && xhr.status == 200) {
+                var response = JSON.parse(xhr.responseText);
+                if (response.status === 'success') {
+                    var logs = response.logs;
+                    var total_pages = response.pages;
+                    var total_minutes = response.minutes;
+                    updateCharts(logs, total_pages, total_minutes);
+                    updateTable(logs);
+                } else {
+                    // Handle error
+                }
+            }
+        };
+        xhr.send();
+    }
+
+    function updateCharts(logs, total_pages, total_minutes) {
+
+        // Calculate average pages and minutes per day
+        let dateRangeValue = document.getElementById('dashboard_range').value;
+        let dateRange = dateRangeValue.split(' to ');
+        let start_date = new Date(dateRange[0]);
+        let end_date = new Date(dateRange[1]);
+        let temp_curr = new Date();
+        if (start_date >= temp_curr && end_date >= temp_curr){
+        }
+        else if (end_date >= temp_curr){
+            end_date = temp_curr;
+            }
+
+        let days = (end_date - start_date) / (1000 * 3600 * 24);
+
+        let avg_pages_per_day = Math.round(total_pages / days);
+        let avg_minutes_per_day = Math.round(total_minutes / days);
+
+        // Initialize gauges
+        initializeGauge('pages-gauge', total_pages, avg_pages_per_day);
+        initializeGauge('minutes-gauge', total_minutes, avg_minutes_per_day);
+    }
+
+    function initializeGauge(elementId, total, average) {
+        console.log(total);
+        console.log(average);
+        var gaugeEl = document.getElementById(elementId);
+        if (gaugeEl && window.echarts) {
+            var chart = window.echarts.init(gaugeEl);
+            var options = {
+                series: [{
+                    type: 'gauge',
+                    startAngle: 90,
+                    endAngle: -270,
+                    radius: '85%',
+                    pointer: {
+                        show: false
+                    },
+                    center: ['50%', '50%'],
+                    progress: {
+                        show: true,
+                        overlap: true,
+                        roundCap: true,
+                        clip: false,
+                        itemStyle: {
+                            color: utils.getColor('info')
+                        }
+                    },
+                    axisLine: {
+                        lineStyle: {
+                            width: 8,
+                            color: [[1, utils.getColor('gray-200')]]
+                        }
+                    },
+                    splitLine: {
+                        show: false
+                    },
+                    axisTick: {
+                        show: false
+                    },
+                    axisLabel: {
+                        show: false
+                    },
+                    data: [
+                    { value: total, name: 'Total', title: {
+                          offsetCenter: ['0%', '-35%']
+                        },
+                        detail: {
+                          valueAnimation: true,
+                          offsetCenter: ['0%', '-15%']
+                    }}],
+                    animationDuration: 2000
+                },
+                {
+                    type: 'gauge',
+                    startAngle: 90,
+                    endAngle: -270,
+                    radius: '75%',
+                    pointer: {
+                        show: false
+                    },
+                    center: ['50%', '50%'],
+                    progress: {
+                        show: true,
+                        overlap: true,
+                        roundCap: true,
+                        clip: false,
+                        itemStyle: {
+                            color: utils.getColor('success')
+                        }
+                    },
+                    axisLine: {
+                        lineStyle: {
+                            width: 8,
+                            color: [[1, utils.getColor('gray-200')]]
+                        }
+                    },
+                    splitLine: {
+                        show: false
+                    },
+                    axisTick: {
+                        show: false
+                    },
+                    axisLabel: {
+                        show: false
+                    },
+                    data: [{ value: average, name: 'Average', title: {
+                          offsetCenter: ['0%', '15%']
+                        },
+                        detail: {
+                          valueAnimation: true,
+                          offsetCenter: ['0%', '35%']
+                        }
+                    }],
+                    animationDuration: 2000
+                }]
+            };
+            chart.setOption(options);
+        }
+    }
+
+    function updateTable(logs) {
+        var tableBody = document.getElementById('user-table-body');
+        tableBody.innerHTML = '';
+        logs.forEach(function(log) {
+            var row = `<tr>
+                <td class="align-middle">
+                    <div class="echart-gauge-ring-chart-example" style="min-height: 60px;" data-value="${log.pages}"></div>
+                </td>
+                <td class="align-middle">${log.name}</td>
+                <td class="align-middle">${log.pages}</td>
+                <td class="align-middle">${log.minutes}</td>
+            </tr>`;
+            tableBody.innerHTML += row;
+        });
+    }
+
+    function toggleTable() {
+        var table = document.getElementById('table-user-body');
+        table.style.display = table.style.display === 'none' ? 'table' : 'none';
+    }</script>{% endblock %}
