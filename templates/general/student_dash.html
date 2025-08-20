@@ -1,0 +1,461 @@
+{% extends "general/nav_template.html" %}
+{% load static %}
+{% block title %}read | Student Dashboard{% endblock %}
+{% block content %}
+
+<!-- Quick Log Entry Card -->
+<div class="row mb-4">
+    <div class="col-12">
+        <div class="card border-0 shadow-sm">
+            <div class="card-header bg-primary text-white">
+                <h5 class="mb-0"><i class="fas fa-book-open me-2"></i>Quick Reading Log</h5>
+            </div>
+            <div class="card-body">
+                <form id="quick-log-form">
+                    <div class="row g-3">
+                        <div class="col-md-6">
+                            <label for="log-title" class="form-label">Book Title</label>
+                            <input type="text" class="form-control" id="log-title" placeholder="What did you read?">
+                        </div>
+                        <div class="col-md-6">
+                            <label for="log-author" class="form-label">Author</label>
+                            <input type="text" class="form-control" id="log-author" placeholder="Who wrote it?">
+                        </div>
+                        <div class="col-md-4">
+                            <label for="log-pages" class="form-label">Pages Read</label>
+                            <input type="number" class="form-control" id="log-pages" min="0" placeholder="0">
+                        </div>
+                        <div class="col-md-4">
+                            <label for="log-minutes" class="form-label">Minutes</label>
+                            <input type="number" class="form-control" id="log-minutes" min="0" placeholder="0">
+                        </div>
+                        <div class="col-md-4">
+                            <label for="log-rating" class="form-label">Rating (1-5)</label>
+                            <select class="form-select" id="log-rating">
+                                <option value="">No rating</option>
+                                <option value="1">⭐ 1 - Didn't like it</option>
+                                <option value="2">⭐⭐ 2 - It was okay</option>
+                                <option value="3">⭐⭐⭐ 3 - Good</option>
+                                <option value="4">⭐⭐⭐⭐ 4 - Really good</option>
+                                <option value="5">⭐⭐⭐⭐⭐ 5 - Loved it!</option>
+                            </select>
+                        </div>
+                        <div class="col-12">
+                            <label for="log-comments" class="form-label">Comments (Optional)</label>
+                            <textarea class="form-control" id="log-comments" rows="2" placeholder="What did you think about this book?"></textarea>
+                        </div>
+                        <div class="col-12">
+                            <button type="submit" class="btn btn-primary btn-lg">
+                                <i class="fas fa-save me-2"></i>Save Reading Log
+                            </button>
+                        </div>
+                    </div>
+                </form>
+            </div>
+        </div>
+    </div>
+</div>
+
+<!-- Progress Overview -->
+<div class="row mb-4">
+    <div class="col-md-3">
+        <div class="card text-center bg-info text-white">
+            <div class="card-body">
+                <i class="fas fa-book fa-2x mb-2"></i>
+                <h4 id="total-pages" class="mb-0">-</h4>
+                <small>Pages Read</small>
+            </div>
+        </div>
+    </div>
+    <div class="col-md-3">
+        <div class="card text-center bg-success text-white">
+            <div class="card-body">
+                <i class="fas fa-clock fa-2x mb-2"></i>
+                <h4 id="total-minutes" class="mb-0">-</h4>
+                <small>Minutes Read</small>
+            </div>
+        </div>
+    </div>
+    <div class="col-md-3">
+        <div class="card text-center bg-warning text-white">
+            <div class="card-body">
+                <i class="fas fa-list fa-2x mb-2"></i>
+                <h4 id="total-logs" class="mb-0">-</h4>
+                <small>Books Logged</small>
+            </div>
+        </div>
+    </div>
+    <div class="col-md-3">
+        <div class="card text-center bg-purple text-white">
+            <div class="card-body">
+                <i class="fas fa-star fa-2x mb-2"></i>
+                <h4 id="avg-rating" class="mb-0">-</h4>
+                <small>Avg Rating</small>
+            </div>
+        </div>
+    </div>
+</div>
+
+<!-- Reading Goal Progress -->
+<div class="row mb-4" id="goal-section" style="display: none;">
+    <div class="col-12">
+        <div class="card">
+            <div class="card-header">
+                <h5 class="mb-0"><i class="fas fa-target me-2"></i>Daily Goal Progress</h5>
+            </div>
+            <div class="card-body">
+                <div class="progress mb-2" style="height: 25px;">
+                    <div id="goal-progress" class="progress-bar bg-success" role="progressbar" style="width: 0%"></div>
+                </div>
+                <p class="mb-0" id="goal-text">Loading goal...</p>
+            </div>
+        </div>
+    </div>
+</div>
+
+<!-- Recent Reading Logs -->
+<div class="row">
+    <div class="col-12">
+        <div class="card">
+            <div class="card-header d-flex justify-content-between align-items-center">
+                <h5 class="mb-0"><i class="fas fa-history me-2"></i>Recent Reading</h5>
+                <small class="text-muted" id="date-range">This month</small>
+            </div>
+            <div class="card-body">
+                <div class="table-responsive">
+                    <table class="table table-hover">
+                        <thead>
+                            <tr>
+                                <th>Date</th>
+                                <th>Title</th>
+                                <th>Author</th>
+                                <th>Pages</th>
+                                <th>Minutes</th>
+                                <th>Rating</th>
+                            </tr>
+                        </thead>
+                        <tbody id="recent-logs">
+                            <tr>
+                                <td colspan="6" class="text-center text-muted">Loading your reading history...</td>
+                            </tr>
+                        </tbody>
+                    </table>
+                </div>
+            </div>
+        </div>
+    </div>
+</div>
+
+{% endblock %}
+
+{% block afterScripts %}
+<script>
+document.addEventListener('DOMContentLoaded', function() {
+    // Load initial progress data
+    loadProgressData();
+    
+    // Handle quick log form submission
+    document.getElementById('quick-log-form').addEventListener('submit', function(e) {
+        e.preventDefault();
+        submitQuickLog();
+    });
+});
+
+function submitQuickLog() {
+    const form = document.getElementById('quick-log-form');
+    const submitBtn = form.querySelector('button[type="submit"]');
+    const originalText = submitBtn.innerHTML;
+    
+    // Client-side validation before submission
+    const validationResult = validateReadingLogForm();
+    if (!validationResult.isValid) {
+        showAlert('danger', validationResult.message);
+        return;
+    }
+    
+    // Show loading state
+    submitBtn.innerHTML = '<i class="fas fa-spinner fa-spin me-2"></i>Saving...';
+    submitBtn.disabled = true;
+    
+    // Collect and sanitize form data
+    const logData = {
+        title: sanitizeInput(document.getElementById('log-title').value.trim()),
+        author: sanitizeInput(document.getElementById('log-author').value.trim()),
+        pages: document.getElementById('log-pages').value || null,
+        minutes: document.getElementById('log-minutes').value || null,
+        rating: document.getElementById('log-rating').value || null,
+        comments: sanitizeInput(document.getElementById('log-comments').value.trim())
+    };
+    
+    // Get CSRF token with comprehensive check
+    const csrfToken = getCsrfToken();
+    if (!csrfToken) {
+        showAlert('danger', 'Security token missing. Please refresh the page.');
+        submitBtn.innerHTML = originalText;
+        submitBtn.disabled = false;
+        return;
+    }
+    
+    // Request timeout for better UX
+    const controller = new AbortController();
+    const timeoutId = setTimeout(() => controller.abort(), 30000); // 30 second timeout
+    
+    fetch('{% url "student_quick_log" %}', {
+        method: 'POST',
+        headers: {
+            'Content-Type': 'application/json',
+            'X-CSRFToken': csrfToken
+        },
+        body: JSON.stringify(logData),
+        signal: controller.signal
+    })
+    .then(response => {
+        clearTimeout(timeoutId);
+        
+        // Handle different HTTP status codes
+        if (response.status === 429) {
+            throw new Error('Too many requests. Please wait a moment before trying again.');
+        }
+        if (response.status === 413) {
+            throw new Error('Request too large. Please reduce the amount of text.');
+        }
+        if (response.status === 403) {
+            throw new Error('Access denied. Please refresh and try again.');
+        }
+        if (!response.ok) {
+            throw new Error(`Server error: ${response.status}. Please try again.`);
+        }
+        
+        return response.json();
+    })
+    .then(data => {
+        if (data.status === 'success') {
+            // Show success message with auto-hide
+            showAlert('success', data.message, 3000);
+            
+            // Clear form with visual feedback
+            form.reset();
+            
+            // Reload progress data
+            loadProgressData();
+            
+            // Focus back to first field for continuous logging
+            document.getElementById('log-title').focus();
+            
+        } else {
+            showAlert('danger', data.message || 'Error saving log');
+        }
+    })
+    .catch(error => {
+        clearTimeout(timeoutId);
+        
+        if (error.name === 'AbortError') {
+            showAlert('warning', 'Request timed out. Please check your connection and try again.');
+        } else {
+            showAlert('danger', error.message || 'Network error. Please check your connection and try again.');
+        }
+        console.error('Reading log submission error:', error);
+    })
+    .finally(() => {
+        // Reset button
+        submitBtn.innerHTML = originalText;
+        submitBtn.disabled = false;
+    });
+}
+
+// Comprehensive client-side validation
+function validateReadingLogForm() {
+    const pages = document.getElementById('log-pages').value;
+    const minutes = document.getElementById('log-minutes').value;
+    const rating = document.getElementById('log-rating').value;
+    const title = document.getElementById('log-title').value;
+    const author = document.getElementById('log-author').value;
+    const comments = document.getElementById('log-comments').value;
+    
+    // Validate pages
+    if (pages && pages !== '') {
+        const pagesNum = parseInt(pages);
+        if (isNaN(pagesNum) || pagesNum < 0) {
+            return { isValid: false, message: 'Pages must be a positive number' };
+        }
+        if (pagesNum > 10000) {
+            return { isValid: false, message: 'Pages cannot exceed 10,000' };
+        }
+    }
+    
+    // Validate minutes
+    if (minutes && minutes !== '') {
+        const minutesNum = parseInt(minutes);
+        if (isNaN(minutesNum) || minutesNum < 0) {
+            return { isValid: false, message: 'Minutes must be a positive number' };
+        }
+        if (minutesNum > 1440) {
+            return { isValid: false, message: 'Minutes cannot exceed 24 hours (1440)' };
+        }
+    }
+    
+    // Validate rating
+    if (rating && rating !== '') {
+        const ratingNum = parseFloat(rating);
+        if (isNaN(ratingNum) || ratingNum < 1 || ratingNum > 5) {
+            return { isValid: false, message: 'Rating must be between 1 and 5' };
+        }
+    }
+    
+    // Validate text field lengths
+    if (title && title.length > 255) {
+        return { isValid: false, message: 'Title is too long (maximum 255 characters)' };
+    }
+    if (author && author.length > 255) {
+        return { isValid: false, message: 'Author name is too long (maximum 255 characters)' };
+    }
+    if (comments && comments.length > 2000) {
+        return { isValid: false, message: 'Comments are too long (maximum 2000 characters)' };
+    }
+    
+    return { isValid: true };
+}
+
+// Input sanitization to prevent XSS
+function sanitizeInput(str) {
+    if (!str) return '';
+    const div = document.createElement('div');
+    div.textContent = str;
+    return div.innerHTML;
+}
+
+// CSRF token retrieval with multiple fallbacks
+function getCsrfToken() {
+    // Try multiple methods to get CSRF token
+    const csrfInput = document.querySelector('[name=csrfmiddlewaretoken]');
+    if (csrfInput) return csrfInput.value;
+    
+    const csrfMeta = document.querySelector('meta[name=csrf-token]');
+    if (csrfMeta) return csrfMeta.content;
+    
+    const csrfCookie = getCookie('csrftoken');
+    if (csrfCookie) return csrfCookie;
+    
+    return null;
+}
+
+// Cookie helper function
+function getCookie(name) {
+    let cookieValue = null;
+    if (document.cookie && document.cookie !== '') {
+        const cookies = document.cookie.split(';');
+        for (let i = 0; i < cookies.length; i++) {
+            const cookie = cookies[i].trim();
+            if (cookie.substring(0, name.length + 1) === (name + '=')) {
+                cookieValue = decodeURIComponent(cookie.substring(name.length + 1));
+                break;
+            }
+        }
+    }
+    return cookieValue;
+}
+
+function loadProgressData() {
+    fetch('{% url "student_progress" %}')
+    .then(response => response.json())
+    .then(data => {
+        if (data.status === 'success') {
+            updateProgressDisplay(data);
+        } else {
+            console.error('Error loading progress:', data.message);
+        }
+    })
+    .catch(error => {
+        console.error('Error loading progress:', error);
+    });
+}
+
+function updateProgressDisplay(data) {
+    const stats = data.stats;
+    
+    // Update stat cards
+    document.getElementById('total-pages').textContent = stats.total_pages;
+    document.getElementById('total-minutes').textContent = stats.total_minutes;
+    document.getElementById('total-logs').textContent = stats.total_logs;
+    document.getElementById('avg-rating').textContent = stats.avg_rating ? stats.avg_rating.toFixed(1) : 'N/A';
+    
+    // Update goal progress if exists
+    if (stats.daily_goal.type && stats.daily_goal.value) {
+        const goalSection = document.getElementById('goal-section');
+        const goalProgress = document.getElementById('goal-progress');
+        const goalText = document.getElementById('goal-text');
+        
+        goalSection.style.display = 'block';
+        
+        const today = new Date().toDateString();
+        const todayLogs = data.recent_logs.filter(log => new Date(log.date).toDateString() === today);
+        
+        let todayTotal = 0;
+        if (stats.daily_goal.type === 'pages') {
+            todayTotal = todayLogs.reduce((sum, log) => sum + (log.pages || 0), 0);
+        } else {
+            todayTotal = todayLogs.reduce((sum, log) => sum + (log.minutes || 0), 0);
+        }
+        
+        const progress = Math.min(100, (todayTotal / stats.daily_goal.value) * 100);
+        goalProgress.style.width = progress + '%';
+        goalText.textContent = `${todayTotal} / ${stats.daily_goal.value} ${stats.daily_goal.type} today (${Math.round(progress)}%)`;
+    }
+    
+    // Update recent logs table
+    updateRecentLogs(data.recent_logs);
+    
+    // Update date range display
+    const startDate = new Date(data.date_range.start).toLocaleDateString();
+    const endDate = new Date(data.date_range.end).toLocaleDateString();
+    document.getElementById('date-range').textContent = `${startDate} - ${endDate}`;
+}
+
+function updateRecentLogs(logs) {
+    const tbody = document.getElementById('recent-logs');
+    
+    if (logs.length === 0) {
+        tbody.innerHTML = '<tr><td colspan="6" class="text-center text-muted">No reading logs yet. Start by adding your first entry above!</td></tr>';
+        return;
+    }
+    
+    tbody.innerHTML = logs.map(log => {
+        const rating = log.rating ? '⭐'.repeat(Math.floor(log.rating)) : 'N/A';
+        const date = new Date(log.date).toLocaleDateString();
+        
+        return `
+            <tr>
+                <td>${date}</td>
+                <td>${log.title || 'No title'}</td>
+                <td>${log.author || 'Unknown'}</td>
+                <td>${log.pages || '-'}</td>
+                <td>${log.minutes || '-'}</td>
+                <td>${rating}</td>
+            </tr>
+        `;
+    }).join('');
+}
+
+function showAlert(type, message) {
+    const alertDiv = document.createElement('div');
+    alertDiv.className = `alert alert-${type} alert-dismissible fade show position-fixed`;
+    alertDiv.style.cssText = 'top: 20px; right: 20px; z-index: 1050; min-width: 300px;';
+    alertDiv.innerHTML = `
+        ${message}
+        <button type="button" class="btn-close" data-bs-dismiss="alert"></button>
+    `;
+    
+    document.body.appendChild(alertDiv);
+    
+    // Auto remove after 3 seconds
+    setTimeout(() => {
+        if (alertDiv.parentNode) {
+            alertDiv.remove();
+        }
+    }, 3000);
+}
+</script>
+
+<!-- Add CSRF token for AJAX requests -->
+{% csrf_token %}
+{% endblock %}

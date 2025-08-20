@@ -1,0 +1,289 @@
+{% extends "general/nav_template.html" %}
+{% load static %}
+{% block title %}read | Parent Dashboard{% endblock %}
+{% block content %}
+
+<!-- Header with Date Range Selector -->
+<div class="row mb-4">
+    <div class="col-md-8">
+        <h3><i class="fas fa-chart-line me-2"></i>My Children's Reading Progress</h3>
+        <p class="text-muted">Track your children's reading activities and progress</p>
+    </div>
+    <div class="col-md-4">
+        <label for="date-range-selector" class="form-label">View Period</label>
+        <select class="form-select" id="date-range-selector">
+            <option value="current_month">This Month</option>
+            <option value="last_month">Last Month</option>
+            <option value="current_week">This Week</option>
+            <option value="last_week">Last Week</option>
+        </select>
+    </div>
+</div>
+
+<!-- Summary Cards -->
+<div class="row mb-4" id="summary-cards">
+    <div class="col-md-3">
+        <div class="card text-center bg-primary text-white">
+            <div class="card-body">
+                <i class="fas fa-users fa-2x mb-2"></i>
+                <h4 id="total-children" class="mb-0">-</h4>
+                <small>Children</small>
+            </div>
+        </div>
+    </div>
+    <div class="col-md-3">
+        <div class="card text-center bg-info text-white">
+            <div class="card-body">
+                <i class="fas fa-book fa-2x mb-2"></i>
+                <h4 id="total-books" class="mb-0">-</h4>
+                <small>Books Read</small>
+            </div>
+        </div>
+    </div>
+    <div class="col-md-3">
+        <div class="card text-center bg-success text-white">
+            <div class="card-body">
+                <i class="fas fa-clock fa-2x mb-2"></i>
+                <h4 id="total-minutes" class="mb-0">-</h4>
+                <small>Total Minutes</small>
+            </div>
+        </div>
+    </div>
+    <div class="col-md-3">
+        <div class="card text-center bg-warning text-white">
+            <div class="card-body">
+                <i class="fas fa-file-alt fa-2x mb-2"></i>
+                <h4 id="total-pages" class="mb-0">-</h4>
+                <small>Total Pages</small>
+            </div>
+        </div>
+    </div>
+</div>
+
+<!-- Children Progress Cards -->
+<div class="row" id="children-container">
+    <!-- Children cards will be dynamically inserted here -->
+    <div class="col-12">
+        <div class="card">
+            <div class="card-body text-center">
+                <div class="spinner-border text-primary" role="status">
+                    <span class="visually-hidden">Loading...</span>
+                </div>
+                <p class="mt-3 text-muted">Loading your children's progress...</p>
+            </div>
+        </div>
+    </div>
+</div>
+
+{% endblock %}
+
+{% block afterScripts %}
+<script>
+document.addEventListener('DOMContentLoaded', function() {
+    // Load initial data
+    loadParentDashboard();
+    
+    // Handle date range changes
+    document.getElementById('date-range-selector').addEventListener('change', function() {
+        loadParentDashboard();
+    });
+});
+
+function getDateRange() {
+    const selector = document.getElementById('date-range-selector');
+    const period = selector.value;
+    const today = new Date();
+    let startDate, endDate;
+    
+    switch(period) {
+        case 'current_week':
+            const dayOfWeek = today.getDay();
+            startDate = new Date(today);
+            startDate.setDate(today.getDate() - dayOfWeek);
+            endDate = new Date(today);
+            break;
+        case 'last_week':
+            const lastWeekEnd = new Date(today);
+            lastWeekEnd.setDate(today.getDate() - today.getDay() - 1);
+            startDate = new Date(lastWeekEnd);
+            startDate.setDate(lastWeekEnd.getDate() - 6);
+            endDate = lastWeekEnd;
+            break;
+        case 'last_month':
+            startDate = new Date(today.getFullYear(), today.getMonth() - 1, 1);
+            endDate = new Date(today.getFullYear(), today.getMonth(), 0);
+            break;
+        case 'current_month':
+        default:
+            startDate = new Date(today.getFullYear(), today.getMonth(), 1);
+            endDate = today;
+            break;
+    }
+    
+    return {
+        start: startDate.toISOString().split('T')[0],
+        end: endDate.toISOString().split('T')[0]
+    };
+}
+
+function loadParentDashboard() {
+    const dateRange = getDateRange();
+    const url = `{% url "parent_dashboard" %}?start_date=${dateRange.start}&end_date=${dateRange.end}`;
+    
+    fetch(url)
+    .then(response => response.json())
+    .then(data => {
+        if (data.status === 'success') {
+            updateDashboard(data);
+        } else {
+            showError(data.message || 'Error loading dashboard data');
+        }
+    })
+    .catch(error => {
+        console.error('Error loading dashboard:', error);
+        showError('Network error. Please try again.');
+    });
+}
+
+function updateDashboard(data) {
+    const children = data.children;
+    
+    // Update summary cards
+    updateSummaryCards(children);
+    
+    // Update children cards
+    updateChildrenCards(children, data.date_range);
+}
+
+function updateSummaryCards(children) {
+    const totalChildren = children.length;
+    const totalBooks = children.reduce((sum, child) => sum + child.stats.total_logs, 0);
+    const totalMinutes = children.reduce((sum, child) => sum + child.stats.total_minutes, 0);
+    const totalPages = children.reduce((sum, child) => sum + child.stats.total_pages, 0);
+    
+    document.getElementById('total-children').textContent = totalChildren;
+    document.getElementById('total-books').textContent = totalBooks;
+    document.getElementById('total-minutes').textContent = totalMinutes;
+    document.getElementById('total-pages').textContent = totalPages;
+}
+
+function updateChildrenCards(children, dateRange) {
+    const container = document.getElementById('children-container');
+    
+    if (children.length === 0) {
+        container.innerHTML = `
+            <div class="col-12">
+                <div class="card">
+                    <div class="card-body text-center">
+                        <i class="fas fa-user-plus fa-3x text-muted mb-3"></i>
+                        <h5>No Children Found</h5>
+                        <p class="text-muted">It looks like no children are associated with your account yet.</p>
+                    </div>
+                </div>
+            </div>
+        `;
+        return;
+    }
+    
+    const cardsHtml = children.map(child => createChildCard(child, dateRange)).join('');
+    container.innerHTML = cardsHtml;
+}
+
+function createChildCard(child, dateRange) {
+    const stats = child.stats;
+    const hasActivity = stats.total_logs > 0;
+    
+    return `
+        <div class="col-lg-6 mb-4">
+            <div class="card h-100 ${hasActivity ? 'border-success' : 'border-light'}">
+                <div class="card-header bg-light">
+                    <div class="d-flex justify-content-between align-items-center">
+                        <h5 class="mb-0">
+                            <i class="fas fa-user-graduate me-2 text-primary"></i>
+                            ${child.name || child.email}
+                        </h5>
+                        ${hasActivity ? '<span class="badge bg-success">Active</span>' : '<span class="badge bg-secondary">No Activity</span>'}
+                    </div>
+                </div>
+                <div class="card-body">
+                    ${hasActivity ? createActiveChildBody(stats) : createInactiveChildBody()}
+                    
+                    ${child.recent_logs.length > 0 ? `
+                        <h6 class="mt-3 mb-2">Recent Reading:</h6>
+                        <div class="list-group list-group-flush">
+                            ${child.recent_logs.slice(0, 3).map(log => `
+                                <div class="list-group-item px-0 py-2 border-0 bg-transparent">
+                                    <div class="d-flex justify-content-between align-items-start">
+                                        <div>
+                                            <strong>${log.title || 'Untitled'}</strong>
+                                            ${log.author ? `<br><small class="text-muted">by ${log.author}</small>` : ''}
+                                        </div>
+                                        <small class="text-muted">${new Date(log.date).toLocaleDateString()}</small>
+                                    </div>
+                                    <div class="mt-1">
+                                        ${log.pages ? `<span class="badge bg-info me-1">${log.pages} pages</span>` : ''}
+                                        ${log.minutes ? `<span class="badge bg-success me-1">${log.minutes} mins</span>` : ''}
+                                        ${log.rating ? `<span class="badge bg-warning">${'⭐'.repeat(Math.floor(log.rating))}</span>` : ''}
+                                    </div>
+                                </div>
+                            `).join('')}
+                        </div>
+                    ` : ''}
+                </div>
+            </div>
+        </div>
+    `;
+}
+
+function createActiveChildBody(stats) {
+    return `
+        <div class="row text-center mb-3">
+            <div class="col-6">
+                <div class="border-end">
+                    <h4 class="text-primary mb-1">${stats.total_books}</h4>
+                    <small class="text-muted">Books</small>
+                </div>
+            </div>
+            <div class="col-6">
+                <h4 class="text-success mb-1">${stats.total_pages}</h4>
+                <small class="text-muted">Pages</small>
+            </div>
+        </div>
+        <div class="row text-center">
+            <div class="col-6">
+                <div class="border-end">
+                    <h5 class="text-info mb-1">${stats.total_minutes}</h5>
+                    <small class="text-muted">Minutes</small>
+                </div>
+            </div>
+            <div class="col-6">
+                <h5 class="text-warning mb-1">${stats.avg_rating ? stats.avg_rating.toFixed(1) : 'N/A'}</h5>
+                <small class="text-muted">Avg Rating</small>
+            </div>
+        </div>
+    `;
+}
+
+function createInactiveChildBody() {
+    return `
+        <div class="text-center text-muted py-3">
+            <i class="fas fa-book-open fa-2x mb-2"></i>
+            <p class="mb-0">No reading activity in this period.</p>
+            <small>Encourage them to start logging their reading!</small>
+        </div>
+    `;
+}
+
+function showError(message) {
+    const container = document.getElementById('children-container');
+    container.innerHTML = `
+        <div class="col-12">
+            <div class="alert alert-danger" role="alert">
+                <i class="fas fa-exclamation-triangle me-2"></i>
+                ${message}
+            </div>
+        </div>
+    `;
+}
+</script>
+{% endblock %}

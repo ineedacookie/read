@@ -1,0 +1,225 @@
+{% extends "general/nav_template.html" %}
+{% load static %}
+{% block title %}read | Administrator Dashboard{% endblock %}
+{% block content %}
+
+<!-- Welcome Header -->
+<div class="row mb-4">
+    <div class="col-12">
+        <div class="card bg-gradient-primary text-white">
+            <div class="card-body">
+                <h3><i class="fas fa-user-shield me-2"></i>Administrator Dashboard</h3>
+                <p class="mb-0">Manage your school's reading program and monitor progress across all classrooms.</p>
+            </div>
+        </div>
+    </div>
+</div>
+
+<!-- Quick Actions -->
+<div class="row mb-4">
+    <div class="col-12">
+        <h5 class="mb-3">Quick Actions</h5>
+    </div>
+    <div class="col-md-3 mb-3">
+        <a href="{% url 'user_list_page' 'student' %}" class="card text-decoration-none h-100">
+            <div class="card-body text-center">
+                <i class="fas fa-user-graduate fa-2x text-primary mb-2"></i>
+                <h6>Manage Students</h6>
+                <small class="text-muted">Add, edit, and organize students</small>
+            </div>
+        </a>
+    </div>
+    <div class="col-md-3 mb-3">
+        <a href="{% url 'user_list_page' 'teacher' %}" class="card text-decoration-none h-100">
+            <div class="card-body text-center">
+                <i class="fas fa-chalkboard-teacher fa-2x text-success mb-2"></i>
+                <h6>Manage Teachers</h6>
+                <small class="text-muted">Oversee teaching staff</small>
+            </div>
+        </a>
+    </div>
+    <div class="col-md-3 mb-3">
+        <a href="{% url 'classrooms' %}" class="card text-decoration-none h-100">
+            <div class="card-body text-center">
+                <i class="fas fa-door-open fa-2x text-info mb-2"></i>
+                <h6>Manage Classrooms</h6>
+                <small class="text-muted">Organize classroom structure</small>
+            </div>
+        </a>
+    </div>
+    <div class="col-md-3 mb-3">
+        <a href="{% url 'reading_groups' %}" class="card text-decoration-none h-100">
+            <div class="card-body text-center">
+                <i class="fas fa-users fa-2x text-warning mb-2"></i>
+                <h6>Reading Groups</h6>
+                <small class="text-muted">Manage reading groups</small>
+            </div>
+        </a>
+    </div>
+</div>
+
+<!-- School Overview -->
+<div class="row mb-4">
+    <div class="col-12">
+        <h5 class="mb-3">School Overview</h5>
+    </div>
+    <div class="col-md-3">
+        <div class="card text-center bg-primary text-white">
+            <div class="card-body">
+                <i class="fas fa-user-graduate fa-2x mb-2"></i>
+                <h4 id="total-students" class="mb-0">-</h4>
+                <small>Total Students</small>
+            </div>
+        </div>
+    </div>
+    <div class="col-md-3">
+        <div class="card text-center bg-success text-white">
+            <div class="card-body">
+                <i class="fas fa-chalkboard-teacher fa-2x mb-2"></i>
+                <h4 id="total-teachers" class="mb-0">-</h4>
+                <small>Total Teachers</small>
+            </div>
+        </div>
+    </div>
+    <div class="col-md-3">
+        <div class="card text-center bg-info text-white">
+            <div class="card-body">
+                <i class="fas fa-door-open fa-2x mb-2"></i>
+                <h4 id="total-classrooms" class="mb-0">-</h4>
+                <small>Classrooms</small>
+            </div>
+        </div>
+    </div>
+    <div class="col-md-3">
+        <div class="card text-center bg-warning text-white">
+            <div class="card-body">
+                <i class="fas fa-users fa-2x mb-2"></i>
+                <h4 id="total-groups" class="mb-0">-</h4>
+                <small>Reading Groups</small>
+            </div>
+        </div>
+    </div>
+</div>
+
+<!-- Recent Activity -->
+<div class="row">
+    <div class="col-md-6">
+        <div class="card">
+            <div class="card-header">
+                <h6 class="mb-0"><i class="fas fa-clock me-2"></i>Recent Activity</h6>
+            </div>
+            <div class="card-body">
+                <div class="d-flex align-items-center justify-content-center py-5">
+                    <div class="text-center text-muted">
+                        <i class="fas fa-chart-line fa-3x mb-3"></i>
+                        <p>Activity tracking coming soon...</p>
+                        <small>Monitor user activity and system usage</small>
+                    </div>
+                </div>
+            </div>
+        </div>
+    </div>
+    <div class="col-md-6">
+        <div class="card">
+            <div class="card-header">
+                <h6 class="mb-0"><i class="fas fa-cog me-2"></i>System Settings</h6>
+            </div>
+            <div class="card-body">
+                <div class="list-group list-group-flush">
+                    <a href="/io_admin/" class="list-group-item list-group-item-action">
+                        <i class="fas fa-tools me-2"></i>
+                        Advanced Admin Panel
+                        <small class="d-block text-muted">Full Django admin interface</small>
+                    </a>
+                    <div class="list-group-item">
+                        <i class="fas fa-database me-2"></i>
+                        Database Management
+                        <small class="d-block text-muted">Coming soon...</small>
+                    </div>
+                    <div class="list-group-item">
+                        <i class="fas fa-download me-2"></i>
+                        Export Reports
+                        <small class="d-block text-muted">Coming soon...</small>
+                    </div>
+                </div>
+            </div>
+        </div>
+    </div>
+</div>
+
+{% endblock %}
+
+{% block afterScripts %}
+<script>
+document.addEventListener('DOMContentLoaded', function() {
+    // Load school statistics
+    loadSchoolStats();
+});
+
+function loadSchoolStats() {
+    // For now, we'll use placeholder data
+    // In Phase 2, we'll add real API endpoints for admin statistics
+    
+    // Simulate loading delay
+    setTimeout(() => {
+        document.getElementById('total-students').textContent = '...';
+        document.getElementById('total-teachers').textContent = '...';
+        document.getElementById('total-classrooms').textContent = '...';
+        document.getElementById('total-groups').textContent = '...';
+        
+        // Load actual data via existing APIs
+        loadUserCount('student', 'total-students');
+        loadUserCount('teacher', 'total-teachers');
+        loadClassroomCount();
+        loadGroupCount();
+    }, 100);
+}
+
+function loadUserCount(userType, elementId) {
+    // Use existing user list API to get counts
+    fetch(`/users/?user_type=${userType}`, {
+        headers: {
+            'X-Requested-With': 'XMLHttpRequest'
+        }
+    })
+    .then(response => response.json())
+    .then(data => {
+        if (data.users) {
+            document.getElementById(elementId).textContent = data.users.length;
+        }
+    })
+    .catch(error => {
+        console.error(`Error loading ${userType} count:`, error);
+        document.getElementById(elementId).textContent = 'Error';
+    });
+}
+
+function loadClassroomCount() {
+    fetch('/api/classrooms/')
+    .then(response => response.json())
+    .then(data => {
+        if (Array.isArray(data)) {
+            document.getElementById('total-classrooms').textContent = data.length;
+        }
+    })
+    .catch(error => {
+        console.error('Error loading classroom count:', error);
+        document.getElementById('total-classrooms').textContent = 'Error';
+    });
+}
+
+function loadGroupCount() {
+    fetch('/api/groups/')
+    .then(response => response.json())
+    .then(data => {
+        if (Array.isArray(data)) {
+            document.getElementById('total-groups').textContent = data.length;
+        }
+    })
+    .catch(error => {
+        console.error('Error loading group count:', error);
+        document.getElementById('total-groups').textContent = 'Error';
+    });
+}
+</script>
+{% endblock %}

@@ -135,24 +135,15 @@ class InviteParentForm(ModelForm):
             'username',
             'email',
             'user_type',
-            'school',
-            'students'
+            'school'
         )
 
-    students = ModelMultipleChoiceField(
-        queryset=CustomUser.objects.none(),
-        widget=SelectMultiple,
-        required=False
-    )
+    # Note: Child assignment will be handled separately through StudentParentRelation
+    # This simplifies the invite process and allows for proper relationship management
 
     def __init__(self, *args, **kwargs):
         logged_in_user = kwargs.pop('logged_in_user', None)
         super().__init__(*args, **kwargs)
-
-        if logged_in_user and logged_in_user.school:
-            school = logged_in_user.school
-
-            self.fields['students'].queryset = CustomUser.objects.filter(school=school, user_type='student')
 
         for name in self.fields:
             self.fields[name].widget.attrs["class"] = "form-control"
@@ -479,25 +470,14 @@ class CustomAdministratorForm(ModelForm):
 class CustomParentForm(ModelForm):
     class Meta:
         model = CustomUser
-        fields = ['username', 'first_name', 'last_initial', 'email', 'students']
+        fields = ['username', 'first_name', 'last_initial', 'email']
 
-    students = ModelMultipleChoiceField(
-        queryset=CustomUser.objects.none(),
-        widget=SelectMultiple,
-        required=False
-    )
+    # Children are now managed through StudentParentRelation
+    # This form will need to be updated in Phase 2 to handle child assignment
 
     def __init__(self, *args, **kwargs):
         logged_in_user = kwargs.pop('logged_in_user', None)
         super().__init__(*args, **kwargs)
-
-        if self.instance and self.instance.school:
-            school = self.instance.school
-
-            self.fields['students'].queryset = CustomUser.objects.filter(school=school, user_type='student')
-
-            if self.instance and self.instance.pk:
-                self.fields['students'].initial = self.instance.students.all()
 
         for name in self.fields:
             self.fields[name].widget.attrs["class"] = "form-control"
@@ -512,7 +492,6 @@ class CustomParentForm(ModelForm):
 
         if commit:
             instance.save()
-            self.save_m2m()
 
         return instance
 

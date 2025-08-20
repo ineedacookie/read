@@ -38,10 +38,10 @@ class CustomUser(AbstractUser):
         ('administrator', 'Administrator'),
     )
 
-    school = models.ForeignKey('School', on_delete=models.SET_NULL, null=True, blank=True)
-    user_type = models.CharField(max_length=20, choices=USER_TYPE_CHOICES)
-    email = models.EmailField(_('Email'), unique=True)
-    students = models.ManyToManyField('CustomUser', blank=True)
+    school = models.ForeignKey('School', on_delete=models.SET_NULL, null=True, blank=True, db_index=True)
+    user_type = models.CharField(max_length=20, choices=USER_TYPE_CHOICES, db_index=True)
+    email = models.EmailField(_('Email'), unique=True, db_index=True)
+    # REMOVED: students = models.ManyToManyField('CustomUser', blank=True)  # Use StudentParentRelation instead
     change_email = models.EmailField(null=True, blank=True)
     first_name = models.CharField(_('First Name'), max_length=50, blank=True, null=True)
     last_initial = models.CharField(_('Last Initial'), max_length=1, blank=True, null=True)
@@ -75,6 +75,20 @@ class CustomUser(AbstractUser):
     @classmethod
     def get_by_natural_key(cls, username_or_email):
         return cls.objects.filter(models.Q(username=username_or_email) | models.Q(email=username_or_email)).first()
+    
+    @property
+    def children(self):
+        """Get all children for this parent user through StudentParentRelation"""
+        if self.user_type != 'parent':
+            return CustomUser.objects.none()
+        return CustomUser.objects.filter(parent_relations__parent=self).select_related('school')
+    
+    @property  
+    def parents(self):
+        """Get all parents for this student user through StudentParentRelation"""
+        if self.user_type != 'student':
+            return CustomUser.objects.none()
+        return CustomUser.objects.filter(children_relations__student=self).select_related('school')
 
 
 class Classroom(models.Model):
@@ -131,20 +145,55 @@ class ReadingGroup(models.Model):
 class StudentParentRelation(models.Model):
     """
     Represents a relation between a student and a parent.
+    
+    This is the ONLY way parent-child relationships should be managed.
+    Ensures data integrity and proper school-level isolation.
 
     Attributes:
         student (CustomUser): The student in the relation.
         parent (CustomUser): The parent in the relation.
+        school (School): The school context for this relationship.
         created_date (date): The date when the relation record was created.
         updated_date (date): The date when the relation record was last updated.
     """
-    school = models.ForeignKey('School', on_delete=models.SET_NULL, null=True, blank=True)
-    student = models.ForeignKey(CustomUser, on_delete=models.CASCADE, related_name='parents',
-                                limit_choices_to={'user_type': 'student'})
-    parent = models.ForeignKey(CustomUser, on_delete=models.CASCADE, related_name='children',
-                               limit_choices_to={'user_type': 'parent'})
+    school = models.ForeignKey('School', on_delete=models.CASCADE, db_index=True)  # Required, not nullable
+    student = models.ForeignKey(CustomUser, on_delete=models.CASCADE, related_name='parent_relations',
+                                limit_choices_to={'user_type': 'student'}, db_index=True)
+    parent = models.ForeignKey(CustomUser, on_delete=models.CASCADE, related_name='children_relations',
+                               limit_choices_to={'user_type': 'parent'}, db_index=True)
     created_date = models.DateField(_("Created Date"), auto_now_add=True, blank=True)
     updated_date = models.DateField(_("Updated Date"), auto_now=True, blank=True, null=True)
+    
+    class Meta:
+        unique_together = [['student', 'parent']]  # Prevent duplicate relationships
+        indexes = [
+            models.Index(fields=['school', 'parent']),  # For parent dashboard queries
+            models.Index(fields=['school', 'student']),  # For student lookup queries
+        ]
+    
+    def clean(self):
+        """Validate that parent and student are in the same school"""
+        from django.core.exceptions import ValidationError
+        if self.student.school != self.parent.school:
+            raise ValidationError("Parent and student must be in the same school")
+        if self.school != self.student.school:
+            raise ValidationError("Relationship school must match student school")
+    
+    def save(self, *args, **kwargs):
+        if not self.school:
+            self.school = self.student.school
+        self.clean()
+        super().save(*args, **kwargs)
 
     def __str__(self):
         return f'{self.parent} - {self.student}'
+    
+    @property
+    def children(self):
+        """Access children through the relation - for backward compatibility"""
+        return CustomUser.objects.filter(parent_relations__parent=self.parent)
+    
+    @property  
+    def parents(self):
+        """Access parents through the relation - for backward compatibility"""
+        return CustomUser.objects.filter(children_relations__student=self.student)

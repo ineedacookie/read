@@ -152,3 +152,102 @@ EMAIL_USE_TLS = True
 PASSWORD_RESET_TIMEOUT_DAYS = 7
 
 ENCRYPT_CODE = os.getenv('ENCRYPT_CODE').encode() if os.getenv('ENCRYPT_CODE') else None
+
+# Security Headers - Enterprise grade
+SECURE_BROWSER_XSS_FILTER = True
+SECURE_CONTENT_TYPE_NOSNIFF = True
+X_FRAME_OPTIONS = 'DENY'
+SECURE_HSTS_SECONDS = 31536000  # 1 year
+SECURE_HSTS_INCLUDE_SUBDOMAINS = True
+SECURE_HSTS_PRELOAD = True
+
+# HTTPS Security (enable in production)
+if not DEBUG:
+    SECURE_SSL_REDIRECT = True
+    SESSION_COOKIE_SECURE = True
+    CSRF_COOKIE_SECURE = True
+
+# Session Security
+SESSION_COOKIE_HTTPONLY = True
+SESSION_COOKIE_AGE = 3600  # 1 hour sessions
+SESSION_EXPIRE_AT_BROWSER_CLOSE = True
+SESSION_COOKIE_SAMESITE = 'Lax'
+
+# CSRF Security
+CSRF_COOKIE_HTTPONLY = True
+CSRF_COOKIE_SAMESITE = 'Lax'
+CSRF_FAILURE_VIEW = 'django.views.csrf.csrf_failure'
+
+# Rate Limiting Cache
+CACHES = {
+    'default': {
+        'BACKEND': 'django.core.cache.backends.locmem.LocMemCache',
+        'LOCATION': 'reading-logs-cache',
+        'TIMEOUT': 300,
+        'OPTIONS': {
+            'MAX_ENTRIES': 1000,
+            'CULL_FREQUENCY': 3,
+        }
+    }
+}
+
+# Comprehensive Logging Configuration
+LOGGING = {
+    'version': 1,
+    'disable_existing_loggers': False,
+    'formatters': {
+        'verbose': {
+            'format': '{levelname} {asctime} {module} {process:d} {thread:d} {message}',
+            'style': '{',
+        },
+        'simple': {
+            'format': '{levelname} {message}',
+            'style': '{',
+        },
+        'security': {
+            'format': 'SECURITY {asctime} {levelname} {module} {message}',
+            'style': '{',
+        },
+    },
+    'handlers': {
+        'file': {
+            'level': 'INFO',
+            'class': 'logging.FileHandler',
+            'filename': 'django.log',
+            'formatter': 'verbose',
+        },
+        'security_file': {
+            'level': 'WARNING',
+            'class': 'logging.FileHandler',
+            'filename': 'security.log',
+            'formatter': 'security',
+        },
+        'console': {
+            'level': 'DEBUG',
+            'class': 'logging.StreamHandler',
+            'formatter': 'simple',
+        },
+    },
+    'loggers': {
+        'django': {
+            'handlers': ['file', 'console'],
+            'level': 'INFO',
+            'propagate': True,
+        },
+        'reading_logs.security': {
+            'handlers': ['security_file', 'console'],
+            'level': 'WARNING',
+            'propagate': False,
+        },
+        'users.security': {
+            'handlers': ['security_file', 'console'],
+            'level': 'WARNING',
+            'propagate': False,
+        },
+    },
+}
+
+# Input Validation Limits
+DATA_UPLOAD_MAX_MEMORY_SIZE = 10240  # 10KB max request size
+FILE_UPLOAD_MAX_MEMORY_SIZE = 10240
+DATA_UPLOAD_MAX_NUMBER_FIELDS = 100  # Limit form fields

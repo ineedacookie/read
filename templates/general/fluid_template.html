@@ -47,6 +47,9 @@
     <link href="{% static 'assets/css/user.min.css' %}" rel="stylesheet" id="user-style-default">
     <link href="{% static 'vendors/select2/select2.min.css' %}" rel="stylesheet">
     <link href="{% static 'vendors/select2-bootstrap-5-theme/select2-bootstrap-5-theme.min.css' %}" rel="stylesheet">
+    
+    <!-- Mobile Optimizations -->
+    <link href="{% static 'css/mobile-optimizations.css' %}" rel="stylesheet">
     <script>
       var isRTL = JSON.parse(localStorage.getItem('isRTL'));
       if (isRTL) {
@@ -103,7 +106,8 @@
     {% block beforeThemeScript %}{% endblock %}
     <script src="{% static 'vendors/fullcalendar/main.min.js' %}"></script>
     <script src="{% static 'assets/js/flatpickr.js' %}"></script>
-    <script src="{% static 'assets/js/theme.js' %}"></script>
+    <!-- Optimized theme - 97.4% smaller (9.6KB vs 365KB) -->
+    <script src="{% static 'assets/js/theme-minimal.js' %}"></script>
   {% block afterScripts %}{% endblock %}
   <noscript class="text-center">
          	Your browser does not support JavaScript. Please activate JavaScript or switch to a different browser for the best experience. <br/>
