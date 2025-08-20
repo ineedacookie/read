@@ -60,8 +60,8 @@ class ClassroomAdmin(admin.ModelAdmin):
 
 
 class ReadingGroupAdmin(admin.ModelAdmin):
-    list_display = ('name', 'created_date', 'updated_date')
-    autocomplete_fields = ('managers', 'students')
+    list_display = ('school', 'name', 'created_date', 'updated_date')
+    autocomplete_fields = ('school', 'managers', 'students')
     search_fields = ('name', 'managers__username')
     ordering = ('name',)
 

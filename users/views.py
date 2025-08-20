@@ -1,17 +1,15 @@
-import logging
 import json
+import logging
 
-from django.contrib.auth.forms import PasswordChangeForm, AdminPasswordChangeForm
-from django.views.decorators.http import require_POST
-from django.contrib.auth import login, update_session_auth_hash
+from django.contrib.auth import login
 from django.contrib.auth.decorators import login_required
-from django.shortcuts import render, redirect
 from django.core.paginator import Paginator
-from django.http import JsonResponse
+from django.db.models import Q
+from django.http import Http404, HttpResponseBadRequest, JsonResponse
+from django.shortcuts import render, redirect
 from django.utils.encoding import force_str
 from django.utils.http import urlsafe_base64_decode
-from django.db.models import Q
-from django.http import Http404, HttpResponseBadRequest
+from django.views.decorators.http import require_POST
 
 from .forms import OverriddenPasswordChangeForm, ClassroomForm, OverriddenAdminPasswordChangeForm, RegisterUserForm, \
     InviteCombinedForm, InviteStudentsForm, InviteParentForm, InviteUsersForm, ReadingGroupForm, CustomStudentForm, CustomTeacherForm, \
@@ -30,88 +28,8 @@ def landing_page(request):
     return render(request, page, page_arguments)
 
 
-from django.contrib.auth.hashers import make_password
-
-
-def create_custom_users(request):
-    from django.utils.crypto import get_random_string
-    import random
-    from datetime import date, timedelta
-    from reading_logs.models import Log
-
-    # Create schools
-    schools = [School.objects.create(name=f'School {i}') for i in range(1, 4)]
-
-    # Define custom users data
-    users_data = [
-                     {'username': f'teacher_{i}', 'email': f'teacher_{i}@example.com', 'user_type': 'teacher'} for i in
-                     range(3)
-                 ] + [
-                     {'username': f'student_{i}', 'email': f'student_{i}@example.com', 'user_type': 'student'} for i in
-                     range(30)
-                 ] + [
-                     {'username': f'admin_{i}', 'email': f'admin_{i}@example.com', 'user_type': 'administrator'} for i
-                     in range(2)
-                 ] + [
-                     {'username': f'parent_{i}', 'email': f'parent_{i}@example.com', 'user_type': 'parent'} for i in
-                     range(10)
-                 ]
-
-    all_students = []
-
-    # Create users and assign to schools
-    for i, school in enumerate(schools):
-        for j, user_data in enumerate(users_data):
-            user = CustomUser.objects.create(
-                username=str(i) + "_" + user_data['username'],
-                email=str(i) + "_" + user_data['email'],
-                user_type=user_data['user_type'],
-                password=make_password('temp'),  # Default password for initial creation
-                school=school
-            )
-            if user_data['user_type'] == 'student':
-                all_students.append(user)
-
-    # Create logs for students
-    def create_logs(user):
-        today = date.today()
-        start_date = today.replace(day=1)
-        end_date = today
-        current_date = start_date
-        while current_date <= end_date:
-            num_logs = random.randint(1, 2)
-            for _ in range(num_logs):
-                Log.objects.create(
-                    school=user.school,
-                    student=user,
-                    pages=random.randint(2, 10),
-                    minutes=random.randint(5, 45),
-                    date=current_date
-                )
-            current_date += timedelta(days=1)
-
-    for student in all_students:
-        create_logs(student)
-
-    # Assign students to classrooms and reading groups
-    unassigned_students = all_students[:]
-    for teacher in CustomUser.objects.filter(user_type='teacher'):
-        # Create classroom and assign students
-        classroom = Classroom.objects.create(name=f"Classroom_{teacher.username}", school=teacher.school)
-        assigned_students = random.sample(unassigned_students, 10)
-        for student in assigned_students:
-            student.classroom_set.add(classroom)
-            unassigned_students.remove(student)
-
-        # Create reading groups and split students
-        reading_group1 = ReadingGroup.objects.create(name=f"Reading_Group_1_{teacher.username}", school=teacher.school)
-        reading_group2 = ReadingGroup.objects.create(name=f"Reading_Group_2_{teacher.username}", school=teacher.school)
-        half = len(assigned_students) // 2
-        reading_group1.students.set(assigned_students[:half])
-        reading_group2.students.set(assigned_students[half:])
-
-    # Return a response
-    return render(request, 'general/home.html', {'message': 'Custom users created successfully'})
+# Note: Development utility functions have been removed for security.
+# Use Django management commands for data seeding instead.
 
 
 @login_required
@@ -120,22 +38,31 @@ def home(request, **kwargs):
     """Checks whether the user is part of the staff or a customer"""
     if request.user.is_staff:
         return redirect('/io_admin')
-    else:
-        page_arguments = {}
-        if request.user.user_type == 'teacher':
-            page = 'general/teacher_dash.html'
-            school = request.user.school
-            classrooms = Classroom.objects.filter(school=school, teachers=request.user).order_by('name').values('id',
-                                                                                                                'name')
-            reading_groups = ReadingGroup.objects.filter(school=school, managers=request.user).order_by('name').values(
-                'id', 'name')
+    
+    page_arguments = {}
+    
+    if request.user.user_type == 'teacher':
+        page = 'general/teacher_dash.html'
+        school = request.user.school
+        classrooms = Classroom.objects.filter(school=school, teachers=request.user).order_by('name').values('id', 'name')
+        reading_groups = ReadingGroup.objects.filter(school=school, managers=request.user).order_by('name').values('id', 'name')
 
-            data = {
-                "classrooms": list(classrooms),
-                "reading_groups": list(reading_groups)
-            }
-            page_arguments['data'] = data
-        return render(request, page, page_arguments)  # fill the {} with arguments
+        data = {
+            "classrooms": list(classrooms),
+            "reading_groups": list(reading_groups)
+        }
+        page_arguments['data'] = data
+    elif request.user.user_type == 'student':
+        page = 'general/student_dash.html'
+    elif request.user.user_type == 'parent':
+        page = 'general/parent_dash.html'
+    elif request.user.user_type == 'administrator':
+        page = 'general/admin_dash.html'
+    else:
+        # Fallback for any undefined user types
+        page = 'general/home.html'
+    
+    return render(request, page, page_arguments)
 
 
 @login_required

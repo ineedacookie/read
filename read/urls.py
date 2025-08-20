@@ -20,10 +20,6 @@ from django.conf.urls.static import static
 
 from read import settings
 
-urlpatterns = [
-    path('admin/', admin.site.urls),
-]
-
 admin.site.site_header = 'Imperial Officer'
 admin.site.site_title = 'Officer Site Admin'
 
