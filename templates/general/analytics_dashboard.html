@@ -1,0 +1,550 @@
+{% extends "general/nav_template.html" %}
+{% load static %}
+
+{% block title %}Analytics Dashboard - Advanced Insights{% endblock %}
+
+{% block content %}
+<div class="container-fluid">
+    <!-- Page Header -->
+    <div class="row mb-4">
+        <div class="col-12">
+            <div class="d-flex justify-content-between align-items-center">
+                <div>
+                    <h2><i class="fas fa-chart-line me-2"></i>Advanced Analytics</h2>
+                    <p class="text-muted mb-0">Comprehensive reading insights and performance metrics</p>
+                </div>
+                <div class="d-flex gap-2">
+                    <select id="analytics-scope" class="form-select">
+                        <option value="school">School-wide</option>
+                        <option value="classroom">Classroom</option>
+                        <option value="student">Individual Student</option>
+                    </select>
+                    <input type="text" id="date-range" class="form-control" placeholder="Select date range" style="min-width: 200px;">
+                    <button id="refresh-data" class="btn btn-primary">
+                        <i class="fas fa-sync-alt"></i> Refresh
+                    </button>
+                </div>
+            </div>
+        </div>
+    </div>
+
+    <!-- Quick Stats Cards -->
+    <div class="row mb-4" id="stats-cards">
+        <div class="col-md-3">
+            <div class="card bg-primary text-white h-100">
+                <div class="card-body">
+                    <div class="d-flex justify-content-between">
+                        <div>
+                            <h4 id="total-students" class="mb-0">-</h4>
+                            <small>Active Students</small>
+                        </div>
+                        <div class="align-self-center">
+                            <i class="fas fa-users fa-2x"></i>
+                        </div>
+                    </div>
+                </div>
+            </div>
+        </div>
+        <div class="col-md-3">
+            <div class="card bg-success text-white h-100">
+                <div class="card-body">
+                    <div class="d-flex justify-content-between">
+                        <div>
+                            <h4 id="total-logs" class="mb-0">-</h4>
+                            <small>Reading Logs</small>
+                        </div>
+                        <div class="align-self-center">
+                            <i class="fas fa-book fa-2x"></i>
+                        </div>
+                    </div>
+                </div>
+            </div>
+        </div>
+        <div class="col-md-3">
+            <div class="card bg-warning text-white h-100">
+                <div class="card-body">
+                    <div class="d-flex justify-content-between">
+                        <div>
+                            <h4 id="total-pages" class="mb-0">-</h4>
+                            <small>Pages Read</small>
+                        </div>
+                        <div class="align-self-center">
+                            <i class="fas fa-file-alt fa-2x"></i>
+                        </div>
+                    </div>
+                </div>
+            </div>
+        </div>
+        <div class="col-md-3">
+            <div class="card bg-info text-white h-100">
+                <div class="card-body">
+                    <div class="d-flex justify-content-between">
+                        <div>
+                            <h4 id="avg-rating" class="mb-0">-</h4>
+                            <small>Average Rating</small>
+                        </div>
+                        <div class="align-self-center">
+                            <i class="fas fa-star fa-2x"></i>
+                        </div>
+                    </div>
+                </div>
+            </div>
+        </div>
+    </div>
+
+    <!-- Charts Row -->
+    <div class="row mb-4">
+        <div class="col-md-8">
+            <div class="card h-100">
+                <div class="card-header">
+                    <h5 class="mb-0"><i class="fas fa-chart-area me-2"></i>Reading Trends</h5>
+                </div>
+                <div class="card-body">
+                    <canvas id="reading-trends-chart" height="300"></canvas>
+                </div>
+            </div>
+        </div>
+        <div class="col-md-4">
+            <div class="card h-100">
+                <div class="card-header">
+                    <h5 class="mb-0"><i class="fas fa-chart-pie me-2"></i>Rating Distribution</h5>
+                </div>
+                <div class="card-body">
+                    <canvas id="rating-distribution-chart" height="300"></canvas>
+                </div>
+            </div>
+        </div>
+    </div>
+
+    <!-- Performance Analysis -->
+    <div class="row mb-4">
+        <div class="col-md-6">
+            <div class="card h-100">
+                <div class="card-header">
+                    <h5 class="mb-0"><i class="fas fa-trophy me-2"></i>Top Performers</h5>
+                </div>
+                <div class="card-body">
+                    <div class="table-responsive">
+                        <table class="table table-sm">
+                            <thead>
+                                <tr>
+                                    <th>Rank</th>
+                                    <th>Student</th>
+                                    <th>Pages</th>
+                                    <th>Rating</th>
+                                </tr>
+                            </thead>
+                            <tbody id="top-performers-table">
+                                <tr>
+                                    <td colspan="4" class="text-center text-muted">
+                                        <i class="fas fa-spinner fa-spin"></i> Loading...
+                                    </td>
+                                </tr>
+                            </tbody>
+                        </table>
+                    </div>
+                </div>
+            </div>
+        </div>
+        <div class="col-md-6">
+            <div class="card h-100">
+                <div class="card-header">
+                    <h5 class="mb-0"><i class="fas fa-bullseye me-2"></i>Goal Achievement</h5>
+                </div>
+                <div class="card-body">
+                    <div class="d-flex align-items-center justify-content-center h-100">
+                        <div class="text-center">
+                            <div class="progress-circle mb-3" data-progress="0">
+                                <span class="progress-value">0%</span>
+                            </div>
+                            <h4 id="goal-achievement-rate">0%</h4>
+                            <p class="text-muted mb-0">Goal Achievement Rate</p>
+                        </div>
+                    </div>
+                </div>
+            </div>
+        </div>
+    </div>
+
+    <!-- Export & Actions -->
+    <div class="row">
+        <div class="col-12">
+            <div class="card">
+                <div class="card-header">
+                    <h5 class="mb-0"><i class="fas fa-download me-2"></i>Export & Actions</h5>
+                </div>
+                <div class="card-body">
+                    <div class="row">
+                        <div class="col-md-4">
+                            <button class="btn btn-success w-100" id="export-excel">
+                                <i class="fas fa-file-excel me-2"></i>Export to Excel
+                            </button>
+                        </div>
+                        <div class="col-md-4">
+                            <button class="btn btn-primary w-100" id="generate-report">
+                                <i class="fas fa-file-pdf me-2"></i>Generate PDF Report
+                            </button>
+                        </div>
+                        <div class="col-md-4">
+                            <button class="btn btn-info w-100" id="schedule-report">
+                                <i class="fas fa-calendar me-2"></i>Schedule Report
+                            </button>
+                        </div>
+                    </div>
+                </div>
+            </div>
+        </div>
+    </div>
+</div>
+{% endblock %}
+
+{% block afterScripts %}
+<script src="https://cdn.jsdelivr.net/npm/chart.js"></script>
+<script>
+document.addEventListener('DOMContentLoaded', function() {
+    // Initialize analytics dashboard
+    initializeAnalyticsDashboard();
+    
+    // Event listeners
+    document.getElementById('refresh-data').addEventListener('click', refreshAnalytics);
+    document.getElementById('analytics-scope').addEventListener('change', onScopeChange);
+    document.getElementById('export-excel').addEventListener('click', exportToExcel);
+    document.getElementById('generate-report').addEventListener('click', generatePDFReport);
+    document.getElementById('schedule-report').addEventListener('click', scheduleReport);
+});
+
+function initializeAnalyticsDashboard() {
+    // Initialize date range picker
+    initializeDateRangePicker();
+    
+    // Load initial data
+    loadAnalyticsData();
+    
+    // Initialize charts
+    initializeCharts();
+}
+
+function initializeDateRangePicker() {
+    const dateRangeInput = document.getElementById('date-range');
+    
+    // Using flatpickr for date range selection
+    flatpickr(dateRangeInput, {
+        mode: 'range',
+        dateFormat: 'Y-m-d',
+        defaultDate: [
+            new Date(Date.now() - 30 * 24 * 60 * 60 * 1000), // 30 days ago
+            new Date() // Today
+        ],
+        onChange: function(selectedDates) {
+            if (selectedDates.length === 2) {
+                loadAnalyticsData();
+            }
+        }
+    });
+}
+
+function loadAnalyticsData() {
+    const scope = document.getElementById('analytics-scope').value;
+    const dateRange = document.getElementById('date-range').value;
+    
+    // Parse date range
+    let startDate, endDate;
+    if (dateRange) {
+        const dates = dateRange.split(' to ');
+        startDate = dates[0];
+        endDate = dates[1] || dates[0];
+    }
+    
+    // Show loading state
+    showLoadingState();
+    
+    // Determine API endpoint based on scope
+    let apiUrl = '/reading_logs/api/analytics/school/';
+    if (scope === 'classroom') {
+        // Would need classroom selection UI
+        apiUrl = '/reading_logs/api/analytics/classroom/1/'; // Example
+    }
+    
+    // Build query parameters
+    const params = new URLSearchParams();
+    if (startDate) params.append('start_date', startDate);
+    if (endDate) params.append('end_date', endDate);
+    
+    fetch(`${apiUrl}?${params.toString()}`)
+        .then(response => response.json())
+        .then(data => {
+            if (data.status === 'success') {
+                updateAnalyticsDashboard(data.data);
+            } else {
+                showErrorMessage(data.message || 'Failed to load analytics data');
+            }
+        })
+        .catch(error => {
+            console.error('Analytics error:', error);
+            showErrorMessage('Failed to load analytics data');
+        });
+}
+
+function updateAnalyticsDashboard(data) {
+    // Update stats cards
+    updateStatsCards(data.overview);
+    
+    // Update charts
+    updateReadingTrendsChart(data.trends);
+    updateRatingDistributionChart(data.rating_distribution);
+    
+    // Update top performers table
+    updateTopPerformersTable(data.top_students);
+    
+    // Update goal achievement
+    updateGoalAchievement(data.goal_achievement);
+    
+    // Hide loading state
+    hideLoadingState();
+}
+
+function updateStatsCards(overview) {
+    document.getElementById('total-students').textContent = overview.unique_students || 0;
+    document.getElementById('total-logs').textContent = overview.total_logs || 0;
+    document.getElementById('total-pages').textContent = (overview.total_pages || 0).toLocaleString();
+    document.getElementById('avg-rating').textContent = overview.avg_rating ? parseFloat(overview.avg_rating).toFixed(1) : 'N/A';
+}
+
+function updateTopPerformersTable(topStudents) {
+    const tbody = document.getElementById('top-performers-table');
+    
+    if (!topStudents || topStudents.length === 0) {
+        tbody.innerHTML = '<tr><td colspan="4" class="text-center text-muted">No data available</td></tr>';
+        return;
+    }
+    
+    tbody.innerHTML = topStudents.slice(0, 10).map((student, index) => `
+        <tr>
+            <td>
+                <span class="badge bg-${index < 3 ? 'warning' : 'secondary'}">
+                    ${index + 1}
+                </span>
+            </td>
+            <td>${student.student__first_name} ${student.student__last_initial}</td>
+            <td>${(student.total_pages || 0).toLocaleString()}</td>
+            <td>
+                <div class="d-flex align-items-center">
+                    ${student.avg_rating ? parseFloat(student.avg_rating).toFixed(1) : 'N/A'}
+                    <i class="fas fa-star text-warning ms-1"></i>
+                </div>
+            </td>
+        </tr>
+    `).join('');
+}
+
+function updateGoalAchievement(goalData) {
+    const rate = goalData ? goalData.achievement_rate : 0;
+    document.getElementById('goal-achievement-rate').textContent = `${rate}%`;
+    
+    // Update progress circle
+    const progressCircle = document.querySelector('.progress-circle');
+    const progressValue = progressCircle.querySelector('.progress-value');
+    
+    progressValue.textContent = `${rate}%`;
+    progressCircle.style.background = `conic-gradient(#28a745 ${rate * 3.6}deg, #e9ecef 0deg)`;
+}
+
+let readingTrendsChart;
+let ratingDistributionChart;
+
+function initializeCharts() {
+    // Initialize reading trends chart
+    const trendsCtx = document.getElementById('reading-trends-chart').getContext('2d');
+    readingTrendsChart = new Chart(trendsCtx, {
+        type: 'line',
+        data: {
+            labels: [],
+            datasets: [{
+                label: 'Pages Read',
+                data: [],
+                borderColor: '#007bff',
+                backgroundColor: 'rgba(0, 123, 255, 0.1)',
+                tension: 0.4
+            }, {
+                label: 'Reading Logs',
+                data: [],
+                borderColor: '#28a745',
+                backgroundColor: 'rgba(40, 167, 69, 0.1)',
+                tension: 0.4
+            }]
+        },
+        options: {
+            responsive: true,
+            maintainAspectRatio: false,
+            scales: {
+                y: {
+                    beginAtZero: true
+                }
+            }
+        }
+    });
+    
+    // Initialize rating distribution chart
+    const ratingCtx = document.getElementById('rating-distribution-chart').getContext('2d');
+    ratingDistributionChart = new Chart(ratingCtx, {
+        type: 'doughnut',
+        data: {
+            labels: ['1 Star', '2 Stars', '3 Stars', '4 Stars', '5 Stars'],
+            datasets: [{
+                data: [],
+                backgroundColor: [
+                    '#dc3545',
+                    '#fd7e14',
+                    '#ffc107',
+                    '#20c997',
+                    '#198754'
+                ]
+            }]
+        },
+        options: {
+            responsive: true,
+            maintainAspectRatio: false
+        }
+    });
+}
+
+function updateReadingTrendsChart(trends) {
+    if (!trends || trends.length === 0) return;
+    
+    const labels = trends.map(t => new Date(t.week).toLocaleDateString());
+    const pagesData = trends.map(t => t.pages_sum || 0);
+    const logsData = trends.map(t => t.logs_count || 0);
+    
+    readingTrendsChart.data.labels = labels;
+    readingTrendsChart.data.datasets[0].data = pagesData;
+    readingTrendsChart.data.datasets[1].data = logsData;
+    readingTrendsChart.update();
+}
+
+function updateRatingDistributionChart(ratingData) {
+    if (!ratingData || ratingData.length === 0) return;
+    
+    // Initialize rating counts (1-5 stars)
+    const ratingCounts = [0, 0, 0, 0, 0];
+    
+    ratingData.forEach(item => {
+        const rating = Math.floor(parseFloat(item.rating));
+        if (rating >= 1 && rating <= 5) {
+            ratingCounts[rating - 1] = item.count;
+        }
+    });
+    
+    ratingDistributionChart.data.datasets[0].data = ratingCounts;
+    ratingDistributionChart.update();
+}
+
+function showLoadingState() {
+    // Add loading spinners to cards
+    document.querySelectorAll('#stats-cards h4').forEach(el => {
+        el.innerHTML = '<i class="fas fa-spinner fa-spin"></i>';
+    });
+}
+
+function hideLoadingState() {
+    // Loading state is cleared by updateStatsCards
+}
+
+function showErrorMessage(message) {
+    // Show toast notification
+    showAlert('danger', message);
+    hideLoadingState();
+}
+
+function onScopeChange() {
+    // Reload data when scope changes
+    loadAnalyticsData();
+}
+
+function refreshAnalytics() {
+    const button = document.getElementById('refresh-data');
+    const originalText = button.innerHTML;
+    
+    button.innerHTML = '<i class="fas fa-spinner fa-spin"></i> Loading...';
+    button.disabled = true;
+    
+    loadAnalyticsData();
+    
+    setTimeout(() => {
+        button.innerHTML = originalText;
+        button.disabled = false;
+    }, 2000);
+}
+
+function exportToExcel() {
+    showAlert('info', 'Excel export functionality coming soon!');
+}
+
+function generatePDFReport() {
+    showAlert('info', 'PDF report generation coming soon!');
+}
+
+function scheduleReport() {
+    showAlert('info', 'Report scheduling coming soon!');
+}
+
+// Utility function for alerts
+function showAlert(type, message, duration = 5000) {
+    const alertDiv = document.createElement('div');
+    alertDiv.className = `alert alert-${type} alert-dismissible fade show position-fixed`;
+    alertDiv.style.cssText = 'top: 20px; right: 20px; z-index: 1060; min-width: 300px;';
+    alertDiv.innerHTML = `
+        ${message}
+        <button type="button" class="btn-close" data-bs-dismiss="alert"></button>
+    `;
+    
+    document.body.appendChild(alertDiv);
+    
+    setTimeout(() => {
+        if (alertDiv.parentNode) {
+            alertDiv.remove();
+        }
+    }, duration);
+}
+</script>
+
+<style>
+.progress-circle {
+    width: 100px;
+    height: 100px;
+    border-radius: 50%;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    position: relative;
+    margin: 0 auto;
+    background: conic-gradient(#28a745 0deg, #e9ecef 0deg);
+}
+
+.progress-circle::before {
+    content: '';
+    position: absolute;
+    width: 70px;
+    height: 70px;
+    border-radius: 50%;
+    background: white;
+}
+
+.progress-value {
+    position: relative;
+    z-index: 1;
+    font-weight: bold;
+    color: #333;
+}
+
+.card {
+    box-shadow: 0 0.125rem 0.25rem rgba(0, 0, 0, 0.075);
+    border: 1px solid rgba(0, 0, 0, 0.125);
+}
+
+.table th {
+    border-top: none;
+    font-weight: 600;
+    font-size: 0.875rem;
+}
+</style>
+{% endblock %}

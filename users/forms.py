@@ -288,9 +288,12 @@ class CustomStudentForm(ModelForm):
 
             if self.instance and self.instance.pk:
                 self.fields['classrooms'].initial = Classroom.objects.filter(school=school, students=self.instance)
-                self.fields['reading_groups'].initial = ReadingGroup.objects.filter(school=school,
-                                                                                    students=self.instance)
-                self.fields['parents'].initial = CustomUser.objects.filter(school=school, students=self.instance)
+                self.fields['reading_groups'].initial = ReadingGroup.objects.filter(school=school, students=self.instance)
+                self.fields['parents'].initial = CustomUser.objects.filter(
+                    school=school, 
+                    user_type='parent',
+                    children_relations__student=self.instance
+                )
 
             if logged_in_user and logged_in_user.user_type == 'teacher':
                 self.fields['classrooms'].queryset = self.fields['classrooms'].queryset.filter(teachers=logged_in_user)
@@ -331,13 +334,31 @@ class CustomStudentForm(ModelForm):
             for reading_group in original_reading_groups - current_reading_groups:
                 reading_group.students.remove(instance)
 
-            # Update Parent's students field
+            # Update Parent-Student relationships
             current_parents = set(self.cleaned_data['parents'])
-            original_parents = set(CustomUser.objects.filter(school=school, students=self.instance))
+            original_parents = set(CustomUser.objects.filter(
+                school=school, 
+                user_type='parent',
+                children_relations__student=self.instance
+            ))
+            
+            # Add new parent-student relationships
             for parent in current_parents - original_parents:
-                parent.students.add(instance)
+                from .models import StudentParentRelation
+                StudentParentRelation.objects.get_or_create(
+                    school=school,
+                    student=instance,
+                    parent=parent
+                )
+            
+            # Remove old parent-student relationships
             for parent in original_parents - current_parents:
-                parent.students.remove(instance)
+                from .models import StudentParentRelation
+                StudentParentRelation.objects.filter(
+                    school=school,
+                    student=instance,
+                    parent=parent
+                ).delete()
 
         return instance
 

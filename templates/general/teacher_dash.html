@@ -14,16 +14,85 @@
         <select class="form-select js-choice" id="Classroom_Group" size="1" name="Classroom_Group"
                 data-options='{"removeItemButton":false,"placeholder":false}'>
             {% for classroom in data.classrooms %}
-            <option value="class_{{ classroom.id }}">{{ classroom.name }}</option>
+            <option value="class_{{ classroom.id }}" {% if forloop.first %}selected{% endif %}>{{ classroom.name }}</option>
             {% endfor %}
             {% for reading_group in data.reading_groups %}
-            <option value="group_{{ reading_group.id }}">{{ reading_group.name }}</option>
+            <option value="group_{{ reading_group.id }}" {% if not data.classrooms and forloop.first %}selected{% endif %}>{{ reading_group.name }}</option>
             {% endfor %}
         </select>
     </div>
 </div>
 
-<div class="row mb-5">
+<!-- Group Analytics Cards -->
+<div class="row mb-4">
+    <div class="col-md-3">
+        <div class="card bg-primary text-white h-100">
+            <div class="card-body">
+                <div class="d-flex justify-content-between">
+                    <div>
+                        <h6 class="text-white">Total Pages</h6>
+                        <h2 class="mb-0" id="total-pages-display">-</h2>
+                        <small id="avg-pages-display">- avg per student</small>
+                    </div>
+                    <div class="align-self-center">
+                        <i class="fas fa-book fa-2x text-white"></i>
+                    </div>
+                </div>
+            </div>
+        </div>
+    </div>
+    <div class="col-md-3">
+        <div class="card bg-success text-white h-100">
+            <div class="card-body">
+                <div class="d-flex justify-content-between">
+                    <div>
+                        <h6 class="text-white">Total Minutes</h6>
+                        <h2 class="mb-0" id="total-minutes-display">-</h2>
+                        <small id="avg-minutes-display">- avg per student</small>
+                    </div>
+                    <div class="align-self-center">
+                        <i class="fas fa-clock fa-2x text-white"></i>
+                    </div>
+                </div>
+            </div>
+        </div>
+    </div>
+    <div class="col-md-3">
+        <div class="card bg-warning text-white h-100">
+            <div class="card-body">
+                <div class="d-flex justify-content-between">
+                    <div>
+                        <h6 class="text-white">Goal Achievement</h6>
+                        <h2 class="mb-0" id="goal-achievement-display">-</h2>
+                        <small id="students-with-goals-display">- students with goals</small>
+                    </div>
+                    <div class="align-self-center">
+                        <i class="fas fa-chart-line fa-2x text-white"></i>
+                    </div>
+                </div>
+            </div>
+        </div>
+    </div>
+    <div class="col-md-3">
+        <div class="card bg-danger text-white h-100">
+            <div class="card-body">
+                <div class="d-flex justify-content-between">
+                    <div>
+                        <h6 class="text-white">Need Support</h6>
+                        <h2 class="mb-0" id="struggling-students-display">-</h2>
+                        <small id="total-students-display">- total students</small>
+                    </div>
+                    <div class="align-self-center">
+                        <i class="fas fa-exclamation-triangle fa-2x text-white"></i>
+                    </div>
+                </div>
+            </div>
+        </div>
+    </div>
+</div>
+
+<!-- Charts Row -->
+<div class="row mb-3">
     <div class="col-md-6">
         <div id="pages-gauge" style="min-height: 300px;"
              data-echart-responsive="true"></div>
@@ -38,17 +107,31 @@
 </div>
 
 <div class="card">
-    <div class="card-body p-0">
+    <div class="card-header">
+        <h5 class="mb-0">Student Reading Progress</h5>
+    </div>
+    <div class="card-body">
+        <!-- Loading indicator -->
+        <div id="loading-indicator" class="text-center py-4">
+            <div class="spinner-border text-primary" role="status">
+                <span class="visually-hidden">Loading student data...</span>
+            </div>
+            <p class="mt-2 text-muted">Loading student reading data...</p>
+        </div>
+        
+        <div id="data-content" style="display: none;">
         <div class="table-responsive scrollbar">
-            <button class="btn btn-sm btn-falcon-default" id="toggle-table" onclick="toggleTable()">Toggle Table
+                <button class="btn btn-sm btn-falcon-default mb-3" id="toggle-table" onclick="toggleTable()">Toggle Table
             </button>
             <table class="table table-sm mb-0 fs-10 table-view-users" id="table-user-body">
                 <thead class="bg-body-tertiary">
                 <tr>
-                    <th class="text-800 sort align-middle" data-sort="pages_read">Pages Read</th>
-                    <th class="text-800 sort align-middle" data-sort="full_name">Full Name</th>
-                    <th class="text-800 sort align-middle" data-sort="total_pages">Total Pages</th>
-                    <th class="text-800 sort align-middle" data-sort="total_minutes">Total Minutes</th>
+                        <th class="text-800 sort align-middle" data-sort="status">Status</th>
+                        <th class="text-800 sort align-middle" data-sort="name">Student Name</th>
+                        <th class="text-800 sort align-middle" data-sort="goal_progress">Goal Progress</th>
+                        <th class="text-800 sort align-middle" data-sort="pages">Pages Read</th>
+                        <th class="text-800 sort align-middle" data-sort="minutes">Minutes Read</th>
+                        <th class="text-800 sort align-middle" data-sort="daily_avg">Daily Average</th>
                 </tr>
                 </thead>
                 <tbody class="list" id="user-table-body">
@@ -58,6 +141,7 @@
         </div>
         <div id="pagination" class="d-flex justify-content-center mt-2">
             <!-- Pagination buttons will be inserted here -->
+            </div>
         </div>
     </div>
 </div>
@@ -97,57 +181,200 @@
         });
 
         dashboard_elem.value = getWeekRange();
+        
+        // Load initial data after a brief delay to ensure all elements are initialized
+        setTimeout(function() {
+            console.log('🎯 Dashboard initializing...');
+            console.log('Date range:', dashboard_elem.value);
+            console.log('Selected group:', document.getElementById('Classroom_Group').value);
+            fetchLogs();
+        }, 1000);
+        
+        // Add event listeners for changes
+        document.getElementById('Classroom_Group').addEventListener('change', fetchLogs);
+        document.getElementById('dashboard_range').addEventListener('change', fetchLogs);
     });
 
     function fetchLogs() {
         var dateRange = document.getElementById('dashboard_range').value;
         var groupValue = document.getElementById('Classroom_Group').value;
+        
+        // Don't proceed if required values are missing
+        if (!dateRange || !groupValue) {
+            console.log('Skipping fetchLogs - missing dateRange or groupValue');
+            return;
+        }
+        
+        console.log('Fetching logs for:', {dateRange, groupValue});
+        
+        // Show loading indicator
+        document.getElementById('loading-indicator').style.display = 'block';
+        document.getElementById('data-content').style.display = 'none';
+        
         var xhr = new XMLHttpRequest();
-        xhr.open('GET', `{% url "get_logs_by_range_and_group" %}?date_range=${dateRange}&group=${groupValue}`, true);
+        xhr.open('GET', `{% url "get_logs_by_range_and_group" %}?date_range=${encodeURIComponent(dateRange)}&group=${encodeURIComponent(groupValue)}`, true);
         xhr.onreadystatechange = function () {
-            if (xhr.readyState == 4 && xhr.status == 200) {
+            if (xhr.readyState == 4) {
+                if (xhr.status == 200) {
+                    try {
                 var response = JSON.parse(xhr.responseText);
                 if (response.status === 'success') {
-                    var logs = response.logs;
-                    var total_pages = response.pages;
-                    var total_minutes = response.minutes;
-                    updateCharts(logs, total_pages, total_minutes);
-                    updateTable(logs);
+                            console.log('✅ Dashboard data loaded:', (response.students || []).length, 'students');
+                            
+                            // Hide loading indicator and show data
+                            document.getElementById('loading-indicator').style.display = 'none';
+                            document.getElementById('data-content').style.display = 'block';
+                            
+                            // Ensure table is visible after data loading
+                            var tableElement = document.getElementById('table-user-body');
+                            if (tableElement && tableElement.style.display === 'none') {
+                                tableElement.style.display = 'table';
+                            }
+                            
+                            // Update analytics cards
+                            updateAnalyticsCards(response.group_totals || {});
+                            
+                            // Update charts with enhanced data
+                            updateCharts(response.students || [], response.group_totals || {});
+                            
+                            // Update table with enhanced student data
+                            updateStudentTable(response.students || []);
+                        } else {
+                            console.error('API returned error:', response.message || 'Unknown error');
+                            // Hide loading indicator on error
+                            document.getElementById('loading-indicator').style.display = 'none';
+                        }
+                    } catch (e) {
+                        console.error('Failed to parse response:', e);
+                        // Hide loading indicator on error
+                        document.getElementById('loading-indicator').style.display = 'none';
+                    }
                 } else {
-                    // Handle error
+                    console.error('HTTP error:', xhr.status, xhr.responseText);
+                    // Hide loading indicator on error
+                    document.getElementById('loading-indicator').style.display = 'none';
                 }
             }
         };
         xhr.send();
     }
 
-    function updateCharts(logs, total_pages, total_minutes) {
+    function updateAnalyticsCards(groupTotals) {
+        console.log('📊 Updating analytics cards with:', groupTotals);
+        
+        // Update analytics cards with group data
+        document.getElementById('total-pages-display').textContent = groupTotals.pages || 0;
+        document.getElementById('avg-pages-display').textContent = (groupTotals.avg_pages_per_student || 0) + ' avg per student';
+        
+        document.getElementById('total-minutes-display').textContent = groupTotals.minutes || 0;
+        document.getElementById('avg-minutes-display').textContent = (groupTotals.avg_minutes_per_student || 0) + ' avg per student';
+        
+        const achievementRate = groupTotals.goal_achievement_rate;
+        document.getElementById('goal-achievement-display').textContent = achievementRate !== null ? achievementRate + '%' : 'N/A';
+        document.getElementById('students-with-goals-display').textContent = (groupTotals.students_with_goals || 0) + ' students with goals';
+        
+        document.getElementById('struggling-students-display').textContent = groupTotals.struggling_students || 0;
+        document.getElementById('total-students-display').textContent = (groupTotals.students_count || 0) + ' total students';
+    }
 
-        // Calculate average pages and minutes per day
-        let dateRangeValue = document.getElementById('dashboard_range').value;
-        let dateRange = dateRangeValue.split(' to ');
-        let start_date = new Date(dateRange[0]);
-        let end_date = new Date(dateRange[1]);
-        let temp_curr = new Date();
-        if (start_date >= temp_curr && end_date >= temp_curr){
+    function updateCharts(students, groupTotals) {
+        // Calculate daily averages for gauge charts
+        const total_pages = groupTotals.pages || 0;
+        const total_minutes = groupTotals.minutes || 0;
+        const daily_avg_pages = groupTotals.daily_avg_pages || 0;
+        const daily_avg_minutes = groupTotals.daily_avg_minutes || 0;
+
+        // Initialize gauges with group totals and daily averages
+        initializeGauge('pages-gauge', total_pages, daily_avg_pages);
+        initializeGauge('minutes-gauge', total_minutes, daily_avg_minutes);
+    }
+
+    function updateStudentTable(students) {
+        console.log('📋 Updating student table with', students.length, 'students');
+        
+        var tableBody = document.getElementById('user-table-body');
+        if (!tableBody) {
+            console.error('❌ Table body element not found!');
+            console.log('Available elements:', document.querySelectorAll('[id*="table"]'));
+            return;
         }
-        else if (end_date >= temp_curr){
-            end_date = temp_curr;
+        
+        console.log('✅ Table body found:', tableBody);
+        
+        tableBody.innerHTML = '';
+        
+        if (students.length === 0) {
+            console.log('⚠️ No students to display');
+            tableBody.innerHTML = '<tr><td colspan="6" class="text-center">No student data available</td></tr>';
+            return;
+        }
+        
+        console.log('📊 Processing', students.length, 'students');
+        
+        students.forEach(function(student) {
+            // Determine status badge
+            let statusBadge = '';
+            let statusClass = '';
+            switch(student.goal_status) {
+                case 'struggling':
+                    statusBadge = '<span class="badge bg-danger">🚨 Struggling</span>';
+                    statusClass = 'table-danger';
+                    break;
+                case 'behind':
+                    statusBadge = '<span class="badge bg-warning">⚠️ Behind</span>';
+                    statusClass = 'table-warning';
+                    break;
+                case 'on_track':
+                    statusBadge = '<span class="badge bg-success">✅ On Track</span>';
+                    statusClass = 'table-success';
+                    break;
+                case 'exceeding':
+                    statusBadge = '<span class="badge bg-info">🌟 Exceeding</span>';
+                    statusClass = 'table-info';
+                    break;
+                default:
+                    statusBadge = '<span class="badge bg-secondary">➖ No Goal</span>';
+                    statusClass = '';
             }
-
-        let days = (end_date - start_date) / (1000 * 3600 * 24);
-
-        let avg_pages_per_day = Math.round(total_pages / days);
-        let avg_minutes_per_day = Math.round(total_minutes / days);
-
-        // Initialize gauges
-        initializeGauge('pages-gauge', total_pages, avg_pages_per_day);
-        initializeGauge('minutes-gauge', total_minutes, avg_minutes_per_day);
+            
+            // Format goal progress
+            let progressDisplay = 'No Goal';
+            if (student.goal_progress !== null) {
+                const progressPercentage = Math.round(student.goal_progress);
+                progressDisplay = `${progressPercentage}% of ${student.goal_value} ${student.goal_type}/day`;
+            }
+            
+            // Format daily average
+            let dailyAvgDisplay = '';
+            if (student.goal_type === 'pages') {
+                dailyAvgDisplay = `${student.daily_avg_pages} pages/day`;
+            } else if (student.goal_type === 'minutes') {
+                dailyAvgDisplay = `${student.daily_avg_minutes} min/day`;
+            } else {
+                dailyAvgDisplay = `${student.daily_avg_pages}p, ${student.daily_avg_minutes}m/day`;
+            }
+            
+            var row = `<tr class="${statusClass}">
+                <td class="align-middle">${statusBadge}</td>
+                <td class="align-middle font-weight-bold">${student.name}</td>
+                <td class="align-middle">${progressDisplay}</td>
+                <td class="align-middle">${student.pages}</td>
+                <td class="align-middle">${student.minutes}</td>
+                <td class="align-middle"><small>${dailyAvgDisplay}</small></td>
+            </tr>`;
+            tableBody.innerHTML += row;
+        });
+        
+        // Ensure table is visible
+        var table = document.getElementById('table-user-body');
+        if (table && table.style.display === 'none') {
+            table.style.display = 'table';
+        }
+        
+        console.log(`✅ Student table updated: ${students.length} students loaded`);
     }
 
     function initializeGauge(elementId, total, average) {
-        console.log(total);
-        console.log(average);
         var gaugeEl = document.getElementById(elementId);
         if (gaugeEl && window.echarts) {
             var chart = window.echarts.init(gaugeEl);
@@ -167,13 +394,13 @@
                         roundCap: true,
                         clip: false,
                         itemStyle: {
-                            color: utils.getColor('info')
+                            color: '#0d6efd'
                         }
                     },
                     axisLine: {
                         lineStyle: {
                             width: 8,
-                            color: [[1, utils.getColor('gray-200')]]
+                            color: [[1, '#e9ecef']]
                         }
                     },
                     splitLine: {
@@ -210,13 +437,13 @@
                         roundCap: true,
                         clip: false,
                         itemStyle: {
-                            color: utils.getColor('success')
+                            color: '#198754'
                         }
                     },
                     axisLine: {
                         lineStyle: {
                             width: 8,
-                            color: [[1, utils.getColor('gray-200')]]
+                            color: [[1, '#e9ecef']]
                         }
                     },
                     splitLine: {
@@ -243,23 +470,114 @@
         }
     }
 
-    function updateTable(logs) {
-        var tableBody = document.getElementById('user-table-body');
-        tableBody.innerHTML = '';
-        logs.forEach(function(log) {
-            var row = `<tr>
-                <td class="align-middle">
-                    <div class="echart-gauge-ring-chart-example" style="min-height: 60px;" data-value="${log.pages}"></div>
-                </td>
-                <td class="align-middle">${log.name}</td>
-                <td class="align-middle">${log.pages}</td>
-                <td class="align-middle">${log.minutes}</td>
-            </tr>`;
-            tableBody.innerHTML += row;
-        });
-    }
+
 
     function toggleTable() {
         var table = document.getElementById('table-user-body');
         table.style.display = table.style.display === 'none' ? 'table' : 'none';
-    }</script>{% endblock %}
+    }
+
+    // Debug function to manually test table population
+    window.debugTablePopulation = function() {
+        console.log('🔧 MANUAL TABLE DEBUG TEST');
+        
+        // Test data matching what API returns
+        var testStudents = [
+            {
+                name: 'ALEX M.',
+                goal_status: 'struggling',
+                goal_progress: 26.2,
+                goal_type: 'pages',
+                goal_value: 30,
+                pages: 55,
+                minutes: 110,
+                daily_avg_pages: 7.9,
+                daily_avg_minutes: 15.7
+            },
+            {
+                name: 'BAILEY S.',
+                goal_status: 'struggling',
+                goal_progress: 0.0,
+                goal_type: 'pages',
+                goal_value: 30,
+                pages: 0,
+                minutes: 0,
+                daily_avg_pages: 0.0,
+                daily_avg_minutes: 0.0
+            }
+        ];
+        
+        console.log('🧪 Testing updateStudentTable with sample data...');
+        updateStudentTable(testStudents);
+        
+        return 'Debug test completed - check console logs and table content';
+    };
+    
+    // Debug function to check current table state
+    window.checkTableState = function() {
+        var tableBody = document.getElementById('user-table-body');
+        var table = document.getElementById('table-user-body');
+        var dataContent = document.getElementById('data-content');
+        
+        console.log('📋 TABLE STATE CHECK:');
+        console.log('  Table body element:', tableBody ? 'Found' : 'Not found');
+        console.log('  Table element:', table ? 'Found' : 'Not found');
+        console.log('  Data content div:', dataContent ? 'Found' : 'Not found');
+        
+        if (tableBody) {
+            console.log('  Table body HTML length:', tableBody.innerHTML.length);
+            console.log('  Table body content preview:', tableBody.innerHTML.substring(0, 100));
+        }
+        
+        if (table) {
+            console.log('  Table display style:', table.style.display);
+            console.log('  Table computed display:', window.getComputedStyle(table).display);
+        }
+        
+        if (dataContent) {
+            console.log('  Data content display:', dataContent.style.display);
+        }
+        
+        return 'Table state check completed';
+    };
+    
+    // Manual dashboard reload function for debugging
+    window.reloadDashboard = function() {
+        console.log('🔄 Manual dashboard reload triggered');
+        fetchLogs();
+        return 'Dashboard reload initiated';
+    };
+    
+    // Function to test with specific data
+    window.testDashboardWithData = function() {
+        console.log('🧪 Testing dashboard with sample data');
+        
+        var sampleData = {
+            status: 'success',
+            group_totals: {
+                pages: 110,
+                minutes: 240,
+                goal_achievement_rate: 0,
+                avg_pages_per_student: 18.3,
+                avg_minutes_per_student: 40.0,
+                struggling_students: 5,
+                students_with_goals: 5
+            },
+            students: [
+                {name: 'ALEX M.', pages: 55, minutes: 110, goal_status: 'struggling', goal_progress: 26.2},
+                {name: 'BAILEY S.', pages: 0, minutes: 0, goal_status: 'struggling', goal_progress: 0.0},
+                {name: 'CHARLIE J.', pages: 0, minutes: 0, goal_status: 'struggling', goal_progress: 0.0}
+            ]
+        };
+        
+        // Test the update functions directly
+        updateAnalyticsCards(sampleData.group_totals);
+        updateStudentTable(sampleData.students);
+        updateCharts(sampleData.students, sampleData.group_totals);
+        
+        return 'Sample data applied to dashboard';
+    };</script>
+
+
+
+{% endblock %}

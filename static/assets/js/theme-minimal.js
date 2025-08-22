@@ -70,26 +70,44 @@ const popoverInit = () => {
 
 // Choices.js initialization for select elements
 const choicesInit = () => {
+  if (typeof Choices === 'undefined') {
+    console.warn('Choices.js library not loaded - skipping dropdown enhancements');
+    return;
+  }
+  
   const elements = document.querySelectorAll('.js-choice');
   elements.forEach(element => {
-    const userOptions = getData(element, 'options');
-    const choices = new Choices(element, {
-      itemSelectText: '',
-      ...userOptions
-    });
+    try {
+      const userOptions = getData(element, 'options');
+      const choices = new Choices(element, {
+        itemSelectText: '',
+        ...userOptions
+      });
+    } catch (error) {
+      console.warn('Failed to initialize Choices for element:', element, error);
+    }
   });
 };
 
 // Flatpickr (date picker) initialization
 const flatpickrInit = () => {
+  if (typeof flatpickr === 'undefined') {
+    console.warn('Flatpickr library not loaded - skipping date picker enhancements');
+    return;
+  }
+  
   const elements = document.querySelectorAll('.datetimepicker');
   elements.forEach(element => {
-    const userOptions = getData(element, 'options');
-    flatpickr(element, {
-      nextArrow: '<svg width="14" height="11" viewBox="0 0 14 11"><path d="m1 6 4 4 4-4"/></svg>',
-      prevArrow: '<svg width="14" height="11" viewBox="0 0 14 11"><path d="m9 1-4 4 4 4"/></svg>',
-      ...userOptions
-    });
+    try {
+      const userOptions = getData(element, 'options');
+      flatpickr(element, {
+        nextArrow: '<svg width="14" height="11" viewBox="0 0 14 11"><path d="m1 6 4 4 4-4"/></svg>',
+        prevArrow: '<svg width="14" height="11" viewBox="0 0 14 11"><path d="m9 1-4 4 4 4"/></svg>',
+        ...userOptions
+      });
+    } catch (error) {
+      console.warn('Failed to initialize Flatpickr for element:', element, error);
+    }
   });
 };
 

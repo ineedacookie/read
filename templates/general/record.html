@@ -1,6 +1,6 @@
 {% extends "general/nav_template.html" %}
 {% load static %}
-{% block title %}Manage Forms{% endblock %}
+{% block title %}{{ object_name }}{% if form_name %} - {{ form_name }}{% endif %}{% endblock %}
 {% block content %}
 <style>
     .l_status {
@@ -12,29 +12,217 @@
     .l_settings {
         
     }
+    
+    /* Enhanced form styling */
+    .l_settings input:not([type="checkbox"]):not([type="radio"]),
+    .l_settings select,
+    .l_settings textarea,
+    .card-body input:not([type="checkbox"]):not([type="radio"]),
+    .card-body select,
+    .card-body textarea {
+        display: block;
+        width: 100%;
+        padding: 0.375rem 0.75rem;
+        font-size: 1rem;
+        font-weight: 400;
+        line-height: 1.5;
+        color: #212529;
+        background-color: #fff;
+        background-image: none;
+        border: 1px solid #ced4da;
+        border-radius: 0.25rem;
+        transition: border-color 0.15s ease-in-out, box-shadow 0.15s ease-in-out;
+    }
+    
+    .l_settings input[type="checkbox"],
+    .card-body input[type="checkbox"] {
+        width: 1rem;
+        height: 1rem;
+        vertical-align: top;
+        background-color: #fff;
+        background-repeat: no-repeat;
+        background-position: center;
+        background-size: contain;
+        border: 1px solid rgba(0, 0, 0, 0.25);
+        border-radius: 0.25em;
+    }
+    
+    .l_settings select,
+    .card-body select {
+        background-image: url("data:image/svg+xml,%3csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 16 16'%3e%3cpath fill='none' stroke='%23343a40' stroke-linecap='round' stroke-linejoin='round' stroke-width='2' d='m1 6 7 7 7-7'/%3e%3c/svg%3e");
+        background-repeat: no-repeat;
+        background-position: right 0.75rem center;
+        background-size: 16px 12px;
+        padding-right: 2.25rem;
+    }
+    
+    /* Section headers styling */
+    .border-bottom {
+        border-bottom: 2px solid rgba(var(--bs-primary-rgb), 0.1) !important;
+    }
+    
+    /* Improved spacing for form sections */
+    .form-section {
+        padding: 1.5rem 0;
+        border-bottom: 1px solid rgba(0,0,0,0.1);
+        margin-bottom: 1.5rem;
+    }
+    
+    .form-section:last-child {
+        border-bottom: none;
+        margin-bottom: 0;
+    }
 </style>
 <div class="container mt-5">
+    <!-- Page Header with Breadcrumb -->
+    <div class="row mb-4">
+        <div class="col-12">
+            <nav aria-label="breadcrumb">
+                <ol class="breadcrumb">
+                    <li class="breadcrumb-item"><a href="{% url 'home' %}">Dashboard</a></li>
+                    {% if form_name == "Student" %}
+                        <li class="breadcrumb-item"><a href="{% url 'my_students' %}">My Students</a></li>
+                    {% elif form_name == "Classroom" %}
+                        <li class="breadcrumb-item"><a href="{% url 'classrooms' %}">Classrooms</a></li>
+                    {% elif form_name == "Reading Group" %}
+                        <li class="breadcrumb-item"><a href="{% url 'reading_groups' %}">Reading Groups</a></li>
+                    {% elif form_name in "TeacherAdministratorParent" %}
+                        <li class="breadcrumb-item"><a href="{% url 'user_list_page' form_name|lower %}">{{ form_name }}s</a></li>
+                    {% endif %}
+                    <li class="breadcrumb-item active" aria-current="page">{{ object_name }}</li>
+                </ol>
+            </nav>
+            <h2 class="mb-0">
+                {% if form_name == "Student" %}
+                    <i class="fas fa-user-graduate me-2 text-primary"></i>
+                {% elif form_name == "Teacher" %}
+                    <i class="fas fa-chalkboard-teacher me-2 text-success"></i>
+                {% elif form_name == "Administrator" %}
+                    <i class="fas fa-user-shield me-2 text-danger"></i>
+                {% elif form_name == "Parent" %}
+                    <i class="fas fa-users me-2 text-info"></i>
+                {% elif form_name == "Classroom" %}
+                    <i class="fas fa-door-open me-2 text-warning"></i>
+                {% elif form_name == "Reading Group" %}
+                    <i class="fas fa-book-reader me-2 text-purple"></i>
+                {% else %}
+                    <i class="fas fa-edit me-2 text-secondary"></i>
+                {% endif %}
+                {{ object_name }}
+            </h2>
+            <p class="text-muted mb-0">
+                {% if form_name == "Student" %}
+                    View and manage student information, reading progress, and goals
+                {% elif form_name == "Teacher" %}
+                    Manage teacher profile, assignments, and access permissions
+                {% elif form_name == "Administrator" %}
+                    Configure administrator settings and system access
+                {% elif form_name == "Parent" %}
+                    Manage parent profile and student relationships
+                {% elif form_name == "Classroom" %}
+                    Configure classroom settings, teachers, and student assignments
+                {% elif form_name == "Reading Group" %}
+                    Manage reading group composition and settings
+                {% else %}
+                    Edit and manage {{ form_name|lower }} information
+                {% endif %}
+            </p>
+        </div>
+    </div>
+
+    <!-- Quick Stats Section -->
+    {% if form_name == "Student" %}
+    <div class="row mb-4" id="student-stats">
+        <div class="col-md-3">
+            <div class="card bg-primary text-white">
+                <div class="card-body text-center">
+                    <h4 class="mb-0" id="total-pages">0</h4>
+                    <small>Total Pages Read</small>
+                </div>
+            </div>
+        </div>
+        <div class="col-md-3">
+            <div class="card bg-success text-white">
+                <div class="card-body text-center">
+                    <h4 class="mb-0" id="total-minutes">0</h4>
+                    <small>Total Minutes</small>
+                </div>
+            </div>
+        </div>
+        <div class="col-md-3">
+            <div class="card bg-info text-white">
+                <div class="card-body text-center">
+                    <h4 class="mb-0" id="reading-streak">0</h4>
+                    <small>Day Reading Streak</small>
+                </div>
+            </div>
+        </div>
+        <div class="col-md-3">
+            <div class="card bg-warning text-white">
+                <div class="card-body text-center">
+                    <h4 class="mb-0" id="goal-progress">0%</h4>
+                    <small>Goal Progress</small>
+                </div>
+            </div>
+        </div>
+    </div>
+    {% elif form_name in "ClassroomsGroups" %}
+    <div class="row mb-4" id="group-stats">
+        <div class="col-md-3">
+            <div class="card bg-primary text-white">
+                <div class="card-body text-center">
+                    <h4 class="mb-0" id="total-students">{{ object.students.count }}</h4>
+                    <small>Total Students</small>
+                </div>
+            </div>
+        </div>
+        <div class="col-md-3">
+            <div class="card bg-success text-white">
+                <div class="card-body text-center">
+                    <h4 class="mb-0" id="active-students">0</h4>
+                    <small>Active This Week</small>
+                </div>
+            </div>
+        </div>
+        <div class="col-md-3">
+            <div class="card bg-info text-white">
+                <div class="card-body text-center">
+                    <h4 class="mb-0" id="avg-pages">0</h4>
+                    <small>Avg Pages/Student</small>
+                </div>
+            </div>
+        </div>
+        <div class="col-md-3">
+            <div class="card bg-warning text-white">
+                <div class="card-body text-center">
+                    <h4 class="mb-0" id="goal-achievers">0%</h4>
+                    <small>Meeting Goals</small>
+                </div>
+            </div>
+        </div>
+    </div>
+    {% endif %}
+
     <div class="d-flex align-items-center mb-4">
-                <h2>Forms Management</h2>
                 {% if form_name == "Student" %}
                 <ul class="nav nav-tabs">
                     <li class="nav-item">
-                        <a class="nav-link active" id="tab-status" href="#">Status</a>
+                        <a class="nav-link {% if default_tab == 'status' %}active{% endif %}" id="tab-status" href="#">Status</a>
                     </li>
                     <li class="nav-item">
-                        <a class="nav-link" id="tab-calendar" href="#">Calendar</a>
+                        <a class="nav-link {% if default_tab == 'calendar' %}active{% endif %}" id="tab-calendar" href="#">Calendar</a>
                     </li>
                     <li class="nav-item">
-                        <a class="nav-link" id="tab-settings" href="#">Settings</a>
+                        <a class="nav-link {% if default_tab == 'settings' %}active{% endif %}" id="tab-settings" href="#">Settings</a>
                     </li>
                 </ul>
                 {% elif form_name in "ClassroomsGroups" %}
                 <ul class="nav nav-tabs">
                     <li class="nav-item">
-                        <a class="nav-link active" id="tab-status" href="#">Status</a>
+                        <a class="nav-link {% if default_tab == 'status' %}active{% endif %}" id="tab-status" href="#">Status</a>
                     </li>
                     <li class="nav-item">
-                        <a class="nav-link" id="tab-settings" href="#">Settings</a>
+                        <a class="nav-link {% if default_tab == 'settings' %}active{% endif %}" id="tab-settings" href="#">Settings</a>
                     </li>
                 </ul>
                 {% endif %}
@@ -85,13 +273,46 @@
         <div class="card-header border-bottom border-200 px-0">
             <div class="row flex-between-center gy-2 px-x1">
                 <div class="col-auto pe-0">
-                    <h6 class="mb-0">Forms</h6>
+                    <h5 class="mb-0">
+                        {% if form_name == "Student" %}
+                            <i class="fas fa-user-edit me-2"></i>Student Information
+                        {% elif form_name == "Teacher" %}
+                            <i class="fas fa-id-card me-2"></i>Teacher Profile
+                        {% elif form_name == "Administrator" %}
+                            <i class="fas fa-user-cog me-2"></i>Administrator Settings
+                        {% elif form_name == "Parent" %}
+                            <i class="fas fa-user-friends me-2"></i>Parent Profile
+                        {% elif form_name == "Classroom" %}
+                            <i class="fas fa-cog me-2"></i>Classroom Configuration
+                        {% elif form_name == "Reading Group" %}
+                            <i class="fas fa-users-cog me-2"></i>Reading Group Settings
+                        {% else %}
+                            <i class="fas fa-edit me-2"></i>{{ form_name }} Details
+                        {% endif %}
+                    </h5>
+                    <small class="text-muted">
+                        {% if form_name == "Student" %}
+                            Manage personal details, contact information, and academic settings
+                        {% elif form_name == "Teacher" %}
+                            Update profile information and teaching preferences
+                        {% elif form_name == "Administrator" %}
+                            Configure administrative permissions and system access
+                        {% elif form_name == "Parent" %}
+                            Update contact details and notification preferences
+                        {% elif form_name == "Classroom" %}
+                            Configure classroom settings and assign teachers/students
+                        {% elif form_name == "Reading Group" %}
+                            Manage group membership and reading goals
+                        {% else %}
+                            Update {{ form_name|lower }} information and settings
+                        {% endif %}
+                    </small>
                 </div>
                 {% if change_password_form %}
                 <div class="col-auto">
-                    <button type="button" class="btn btn-secondary" data-bs-toggle="modal"
+                    <button type="button" class="btn btn-secondary btn-sm" data-bs-toggle="modal"
                             data-bs-target="#changePasswordModal">
-                        Change Password
+                        <i class="fas fa-key me-1"></i>Change Password
                     </button>
                 </div>
                 {% endif %}
@@ -100,35 +321,305 @@
         {{ form.errors }}
         <form id="dynamic-form" method="post">
             {% csrf_token %}
-            <div class="card-body p-0">
-                <div class="table-responsive scrollbar">
-                    <table class="table table-sm mb-0 fs-10 table-view-forms" id="table-form-body">
-                        <thead class="bg-body-tertiary">
-                        <tr>
-                            <th class="text-800 sort align-middle ps-2">Field</th>
-                            <th class="text-800 sort align-middle ps-2">Value</th>
-                        </tr>
-                        </thead>
-                        <tbody class="list" id="form-table-body">
-                        <!-- This will display all the form fields dynamically -->
-                        {% for field in form %}
-                        <tr>
-                            <td class="align-middle">{{ field.label_tag }}</td>
-                            <td class="align-middle">
-                                {{ field }}
-                                {% if field.errors %}
-                                <div class="text-danger">{{ field.errors }}</div>
+            <div class="card-body">
+                {% if form_name == "Student" %}
+                    <!-- Student-specific form sections -->
+                    <div class="row">
+                        <div class="col-md-6">
+                            <h6 class="text-primary border-bottom pb-2 mb-3">
+                                <i class="fas fa-user me-2"></i>Personal Information
+                            </h6>
+                            {% for field in form %}
+                                {% if field.name in "first_name,last_name,email,date_of_birth" %}
+                                <div class="mb-3">
+                                    {{ field.label_tag }}
+                                    {{ field }}
+                                    {% if field.errors %}
+                                        <div class="text-danger small mt-1">{{ field.errors }}</div>
+                                    {% endif %}
+                                </div>
                                 {% endif %}
-                            </td>
-                        </tr>
-                        {% endfor %}
-                        </tbody>
-                    </table>
-                </div>
+                            {% endfor %}
+                        </div>
+                        <div class="col-md-6">
+                            <h6 class="text-success border-bottom pb-2 mb-3">
+                                <i class="fas fa-graduation-cap me-2"></i>Academic Settings
+                            </h6>
+                            {% for field in form %}
+                                {% if field.name in "student_id,grade_level,reading_level,classrooms,reading_groups" %}
+                                <div class="mb-3">
+                                    {{ field.label_tag }}
+                                    {{ field }}
+                                    {% if field.errors %}
+                                        <div class="text-danger small mt-1">{{ field.errors }}</div>
+                                    {% endif %}
+                                </div>
+                                {% endif %}
+                            {% endfor %}
+                        </div>
+                    </div>
+                    <div class="row mt-4">
+                        <div class="col-12">
+                            <h6 class="text-info border-bottom pb-2 mb-3">
+                                <i class="fas fa-bullseye me-2"></i>Reading Goals & Preferences
+                            </h6>
+                            <div class="row">
+                                {% for field in form %}
+                                    {% if field.name in "daily_goal_pages,daily_goal_minutes,reading_preferences,notes" %}
+                                    <div class="col-md-6 mb-3">
+                                        {{ field.label_tag }}
+                                        {{ field }}
+                                        {% if field.errors %}
+                                            <div class="text-danger small mt-1">{{ field.errors }}</div>
+                                        {% endif %}
+                                    </div>
+                                    {% endif %}
+                                {% endfor %}
+                            </div>
+                        </div>
+                    </div>
+
+                {% elif form_name in "TeacherAdministratorParent" %}
+                    <!-- User-specific form sections -->
+                    <div class="row">
+                        <div class="col-md-6">
+                            <h6 class="text-primary border-bottom pb-2 mb-3">
+                                <i class="fas fa-user me-2"></i>Personal Information
+                            </h6>
+                            {% for field in form %}
+                                {% if field.name in "first_name,last_name,email,phone,date_of_birth" %}
+                                <div class="mb-3">
+                                    {{ field.label_tag }}
+                                    {{ field }}
+                                    {% if field.errors %}
+                                        <div class="text-danger small mt-1">{{ field.errors }}</div>
+                                    {% endif %}
+                                </div>
+                                {% endif %}
+                            {% endfor %}
+                        </div>
+                        <div class="col-md-6">
+                            <h6 class="text-success border-bottom pb-2 mb-3">
+                                <i class="fas fa-cog me-2"></i>Account Settings
+                            </h6>
+                            {% for field in form %}
+                                {% if field.name in "username,user_type,is_active,is_staff" %}
+                                <div class="mb-3">
+                                    {{ field.label_tag }}
+                                    {{ field }}
+                                    {% if field.errors %}
+                                        <div class="text-danger small mt-1">{{ field.errors }}</div>
+                                    {% endif %}
+                                </div>
+                                {% endif %}
+                            {% endfor %}
+                        </div>
+                    </div>
+                    {% if form_name == "Teacher" %}
+                    <div class="row mt-4">
+                        <div class="col-12">
+                            <h6 class="text-warning border-bottom pb-2 mb-3">
+                                <i class="fas fa-chalkboard me-2"></i>Teaching Assignments
+                            </h6>
+                            <div class="row">
+                                {% for field in form %}
+                                    {% if field.name in "classrooms,reading_groups,subject_specialization,department" %}
+                                    <div class="col-md-6 mb-3">
+                                        {{ field.label_tag }}
+                                        {{ field }}
+                                        {% if field.errors %}
+                                            <div class="text-danger small mt-1">{{ field.errors }}</div>
+                                        {% endif %}
+                                    </div>
+                                    {% endif %}
+                                {% endfor %}
+                            </div>
+                        </div>
+                    </div>
+                    {% elif form_name == "Parent" %}
+                    <div class="row mt-4">
+                        <div class="col-12">
+                            <h6 class="text-info border-bottom pb-2 mb-3">
+                                <i class="fas fa-child me-2"></i>Student Relationships
+                            </h6>
+                            <div class="row">
+                                {% for field in form %}
+                                    {% if field.name in "children,emergency_contact,relationship_type" %}
+                                    <div class="col-md-6 mb-3">
+                                        {{ field.label_tag }}
+                                        {{ field }}
+                                        {% if field.errors %}
+                                            <div class="text-danger small mt-1">{{ field.errors }}</div>
+                                        {% endif %}
+                                    </div>
+                                    {% endif %}
+                                {% endfor %}
+                            </div>
+                        </div>
+                    </div>
+                    {% endif %}
+
+                {% elif form_name == "Classroom" %}
+                    <!-- Classroom-specific form sections -->
+                    <div class="row">
+                        <div class="col-md-6">
+                            <h6 class="text-primary border-bottom pb-2 mb-3">
+                                <i class="fas fa-door-open me-2"></i>Basic Information
+                            </h6>
+                            {% for field in form %}
+                                {% if field.name in "name,description,room_number,capacity" %}
+                                <div class="mb-3">
+                                    {{ field.label_tag }}
+                                    {{ field }}
+                                    {% if field.errors %}
+                                        <div class="text-danger small mt-1">{{ field.errors }}</div>
+                                    {% endif %}
+                                </div>
+                                {% endif %}
+                            {% endfor %}
+                        </div>
+                        <div class="col-md-6">
+                            <h6 class="text-success border-bottom pb-2 mb-3">
+                                <i class="fas fa-users me-2"></i>Assignments
+                            </h6>
+                            {% for field in form %}
+                                {% if field.name in "teachers,students,grade_level,subject" %}
+                                <div class="mb-3">
+                                    {{ field.label_tag }}
+                                    {{ field }}
+                                    {% if field.errors %}
+                                        <div class="text-danger small mt-1">{{ field.errors }}</div>
+                                    {% endif %}
+                                </div>
+                                {% endif %}
+                            {% endfor %}
+                        </div>
+                    </div>
+
+                {% elif form_name == "Reading Group" %}
+                    <!-- Reading Group-specific form sections -->
+                    <div class="row">
+                        <div class="col-md-6">
+                            <h6 class="text-primary border-bottom pb-2 mb-3">
+                                <i class="fas fa-book-reader me-2"></i>Group Information
+                            </h6>
+                            {% for field in form %}
+                                {% if field.name in "name,description,reading_level,max_students" %}
+                                <div class="mb-3">
+                                    {{ field.label_tag }}
+                                    {{ field }}
+                                    {% if field.errors %}
+                                        <div class="text-danger small mt-1">{{ field.errors }}</div>
+                                    {% endif %}
+                                </div>
+                                {% endif %}
+                            {% endfor %}
+                        </div>
+                        <div class="col-md-6">
+                            <h6 class="text-success border-bottom pb-2 mb-3">
+                                <i class="fas fa-users me-2"></i>Membership
+                            </h6>
+                            {% for field in form %}
+                                {% if field.name in "students,teachers,goals,meeting_schedule" %}
+                                <div class="mb-3">
+                                    {{ field.label_tag }}
+                                    {{ field }}
+                                    {% if field.errors %}
+                                        <div class="text-danger small mt-1">{{ field.errors }}</div>
+                                    {% endif %}
+                                </div>
+                                {% endif %}
+                            {% endfor %}
+                        </div>
+                    </div>
+
+                {% else %}
+                    <!-- Generic form layout for other objects -->
+                    <div class="row">
+                        <div class="col-12">
+                            <h6 class="text-secondary border-bottom pb-2 mb-3">
+                                <i class="fas fa-edit me-2"></i>{{ form_name }} Information
+                            </h6>
+                            <div class="row">
+                                {% for field in form %}
+                                <div class="col-md-6 mb-3">
+                                    {{ field.label_tag }}
+                                    {{ field }}
+                                    {% if field.errors %}
+                                        <div class="text-danger small mt-1">{{ field.errors }}</div>
+                                    {% endif %}
+                                </div>
+                                {% endfor %}
+                            </div>
+                        </div>
+                    </div>
+                {% endif %}
+
+                <!-- Show any remaining fields that weren't categorized -->
+                {% if form_name == "Student" %}
+                    {% for field in form %}
+                        {% if field.name not in "first_name,last_name,email,date_of_birth,student_id,grade_level,reading_level,classrooms,reading_groups,daily_goal_pages,daily_goal_minutes,reading_preferences,notes" %}
+                        <div class="mb-3">
+                            {{ field.label_tag }}
+                            {{ field }}
+                            {% if field.errors %}
+                                <div class="text-danger small mt-1">{{ field.errors }}</div>
+                            {% endif %}
+                        </div>
+                        {% endif %}
+                    {% endfor %}
+                {% elif form_name in "TeacherAdministratorParent" %}
+                    {% for field in form %}
+                        {% if field.name not in "first_name,last_name,email,phone,date_of_birth,username,user_type,is_active,is_staff,classrooms,reading_groups,subject_specialization,department,children,emergency_contact,relationship_type" %}
+                        <div class="mb-3">
+                            {{ field.label_tag }}
+                            {{ field }}
+                            {% if field.errors %}
+                                <div class="text-danger small mt-1">{{ field.errors }}</div>
+                            {% endif %}
+                        </div>
+                        {% endif %}
+                    {% endfor %}
+                {% elif form_name == "Classroom" %}
+                    {% for field in form %}
+                        {% if field.name not in "name,description,room_number,capacity,teachers,students,grade_level,subject" %}
+                        <div class="mb-3">
+                            {{ field.label_tag }}
+                            {{ field }}
+                            {% if field.errors %}
+                                <div class="text-danger small mt-1">{{ field.errors }}</div>
+                            {% endif %}
+                        </div>
+                        {% endif %}
+                    {% endfor %}
+                {% elif form_name == "Reading Group" %}
+                    {% for field in form %}
+                        {% if field.name not in "name,description,reading_level,max_students,students,teachers,goals,meeting_schedule" %}
+                        <div class="mb-3">
+                            {{ field.label_tag }}
+                            {{ field }}
+                            {% if field.errors %}
+                                <div class="text-danger small mt-1">{{ field.errors }}</div>
+                            {% endif %}
+                        </div>
+                        {% endif %}
+                    {% endfor %}
+                {% endif %}
             </div>
-            <div class="card-footer d-flex justify-content-between">
-                <button type="button" class="btn btn-danger" id="btn-delete-record">Delete</button>
-                <button type="submit" class="btn btn-primary" id="btn-save-form">Save</button>
+            <div class="card-footer d-flex justify-content-between align-items-center">
+                <div>
+                    <button type="button" class="btn btn-danger" id="btn-delete-record">
+                        <i class="fas fa-trash me-1"></i>Delete {{ form_name }}
+                    </button>
+                </div>
+                <div class="d-flex gap-2">
+                    <button type="button" class="btn btn-secondary" onclick="history.back()">
+                        <i class="fas fa-arrow-left me-1"></i>Cancel
+                    </button>
+                    <button type="submit" class="btn btn-primary" id="btn-save-form">
+                        <i class="fas fa-save me-1"></i>Save {{ form_name }}
+                    </button>
+                </div>
             </div>
         </form>
     </div>
@@ -159,6 +650,20 @@
 </div>
 
 <script>$(document).ready(function() {
+    // Handle default tab from URL parameter
+    const defaultTab = '{{ default_tab }}';
+    if (defaultTab !== 'status') {
+        handleTabSwitch('l_' + defaultTab);
+        $('.nav-link').removeClass('active');
+        $('#tab-' + defaultTab).addClass('active');
+    }
+
+    // Load stats for students
+    {% if form_name == "Student" %}
+    loadStudentStats({{ id }});
+    {% elif form_name in "ClassroomsGroups" %}
+    loadGroupStats({{ id }}, '{{ form_name|lower }}');
+    {% endif %}
     $('#dynamic-form').on('submit', function(e) {
         e.preventDefault();
         const form = new FormData(this);
@@ -258,5 +763,97 @@
         $('#changePasswordModal').modal('hide');
     });
 
-});</script>
+});
+
+// Load student statistics
+function loadStudentStats(studentId) {
+    // Get current date range (last 30 days)
+    const endDate = new Date();
+    const startDate = new Date();
+    startDate.setDate(startDate.getDate() - 30);
+    
+    const dateRange = startDate.toLocaleDateString('en-US', { month: 'short', day: 'numeric', year: 'numeric' }) + 
+                     ' to ' + 
+                     endDate.toLocaleDateString('en-US', { month: 'short', day: 'numeric', year: 'numeric' });
+
+    // Fetch reading logs data
+    fetch(`/reading_logs/api/student/progress/?student_id=${studentId}&date_range=${encodeURIComponent(dateRange)}`)
+        .then(response => response.json())
+        .then(data => {
+            if (data.success) {
+                $('#total-pages').text(data.total_pages || 0);
+                $('#total-minutes').text(data.total_minutes || 0);
+                $('#reading-streak').text(data.streak_days || 0);
+                
+                // Calculate goal progress
+                let goalProgress = 0;
+                if (data.daily_goal && data.daily_goal.value > 0) {
+                    if (data.daily_goal.type === 'pages') {
+                        goalProgress = Math.round((data.avg_pages_per_day / data.daily_goal.value) * 100);
+                    } else if (data.daily_goal.type === 'minutes') {
+                        goalProgress = Math.round((data.avg_minutes_per_day / data.daily_goal.value) * 100);
+                    }
+                }
+                $('#goal-progress').text(goalProgress + '%');
+                
+                // Update card colors based on performance
+                updateCardColors(goalProgress, data.streak_days || 0);
+            }
+        })
+        .catch(error => {
+            console.log('Stats loading failed, using placeholder data');
+            // Use placeholder data if API fails
+            $('#total-pages').text('--');
+            $('#total-minutes').text('--');
+            $('#reading-streak').text('--');
+            $('#goal-progress').text('--');
+        });
+}
+
+// Load group (classroom/reading group) statistics
+function loadGroupStats(groupId, groupType) {
+    const apiUrl = groupType.includes('classroom') ? 
+        `/reading_logs/api/analytics/classroom/${groupId}/` : 
+        `/reading_logs/api/analytics/classroom/${groupId}/`; // Will need group endpoint
+    
+    fetch(apiUrl)
+        .then(response => response.json())
+        .then(data => {
+            if (data.success) {
+                $('#active-students').text(data.active_students || 0);
+                $('#avg-pages').text(Math.round(data.avg_pages_per_student || 0));
+                $('#goal-achievers').text(Math.round(data.goal_achievement_rate || 0) + '%');
+            }
+        })
+        .catch(error => {
+            console.log('Group stats loading failed, using placeholder data');
+            $('#active-students').text('--');
+            $('#avg-pages').text('--');
+            $('#goal-achievers').text('--');
+        });
+}
+
+// Update card colors based on performance
+function updateCardColors(goalProgress, streakDays) {
+    const goalCard = $('#goal-progress').closest('.card');
+    const streakCard = $('#reading-streak').closest('.card');
+    
+    // Goal progress colors
+    if (goalProgress >= 100) {
+        goalCard.removeClass('bg-warning').addClass('bg-success');
+    } else if (goalProgress >= 75) {
+        goalCard.removeClass('bg-warning').addClass('bg-info');
+    } else if (goalProgress < 50) {
+        goalCard.removeClass('bg-warning').addClass('bg-danger');
+    }
+    
+    // Streak colors
+    if (streakDays >= 7) {
+        streakCard.removeClass('bg-info').addClass('bg-success');
+    } else if (streakDays >= 3) {
+        streakCard.removeClass('bg-info').addClass('bg-primary');
+    } else if (streakDays === 0) {
+        streakCard.removeClass('bg-info').addClass('bg-secondary');
+    }
+}</script>
 {% endblock %}

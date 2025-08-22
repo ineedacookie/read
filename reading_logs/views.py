@@ -1,6 +1,6 @@
 from django.shortcuts import render
 from .forms import LogForm
-from .models import Log, DailyGoal
+from .models import Log, DailyGoal, TotalGoal
 
 from django.http import JsonResponse
 from django.contrib.auth.decorators import login_required
@@ -16,6 +16,7 @@ from django.db import transaction
 from django.core.exceptions import ValidationError
 from django.utils.html import escape
 import logging
+from datetime import datetime
 
 # Set up logging for security events
 logger = logging.getLogger('reading_logs.security')
@@ -81,7 +82,20 @@ def teacher_dashboard_logs(request):
     if request.method == 'GET':
         date_range = request.GET.get('date_range')
         group = request.GET.get('group')
-        group_type, group_id = group.split('_')
+        
+        # Handle both old and new parameter formats
+        if group and '_' in group:
+            group_type, group_id = group.split('_')
+        else:
+            # Try new format with separate parameters
+            group_type = request.GET.get('group_type', 'classroom')
+            group_id = request.GET.get('group_id')
+            
+        if not group_id:
+            return JsonResponse({
+                'status': 'error',
+                'message': 'group_id parameter is required'
+            }, status=400)
         if group_type == 'class':
             group_obj = Classroom.objects.get(id=group_id, school=request.user.school)
         elif group_type == 'group':
@@ -104,22 +118,116 @@ def teacher_dashboard_logs(request):
             return JsonResponse({'status': 'error', 'message': 'Invalid date range'})
 
         students = group_obj.students.all()
+        num_days = (end_date - start_date).days + 1
 
-        log_dict = {}
+        # Enhanced student data with goals and progress
+        student_data = []
+        group_totals = {'pages': 0, 'minutes': 0, 'students_with_goals': 0, 'struggling_students': 0}
+        
         for student in students:
-            log_dict[student.id] = {'pages': 0, 'minutes': 0, 'name': student.full_name}
+            # Get student's reading logs for the period
+            logs = Log.objects.filter(
+                student=student, 
+                date__range=(start_date, end_date)
+            ).values('pages', 'minutes')
+            
+            total_pages = sum(log['pages'] or 0 for log in logs)
+            total_minutes = sum(log['minutes'] or 0 for log in logs)
+            
+            # Get student's goals
+            daily_goal = DailyGoal.objects.filter(student=student).first()
+            total_goal = TotalGoal.objects.filter(student=student).first()
+            
+            # Calculate goal progress
+            goal_progress = None
+            goal_status = 'no_goal'
+            daily_avg_pages = total_pages / num_days if num_days > 0 else 0
+            daily_avg_minutes = total_minutes / num_days if num_days > 0 else 0
+            
+            if daily_goal:
+                group_totals['students_with_goals'] += 1
+                if daily_goal.type == 'pages' and daily_goal.value > 0:
+                    goal_progress = (daily_avg_pages / daily_goal.value) * 100
+                    if goal_progress < 50:
+                        goal_status = 'struggling'
+                        group_totals['struggling_students'] += 1
+                    elif goal_progress < 80:
+                        goal_status = 'behind'
+                    elif goal_progress >= 100:
+                        goal_status = 'exceeding'
+                    else:
+                        goal_status = 'on_track'
+                        
+                elif daily_goal.type == 'minutes' and daily_goal.value > 0:
+                    goal_progress = (daily_avg_minutes / daily_goal.value) * 100
+                    if goal_progress < 50:
+                        goal_status = 'struggling'
+                        group_totals['struggling_students'] += 1
+                    elif goal_progress < 80:
+                        goal_status = 'behind'
+                    elif goal_progress >= 100:
+                        goal_status = 'exceeding'
+                    else:
+                        goal_status = 'on_track'
+            
+            student_info = {
+                'id': student.id,
+                'name': student.full_name,
+                'pages': total_pages,
+                'minutes': total_minutes,
+                'daily_avg_pages': round(daily_avg_pages, 1),
+                'daily_avg_minutes': round(daily_avg_minutes, 1),
+                'goal_progress': round(goal_progress, 1) if goal_progress is not None else None,
+                'goal_status': goal_status,
+                'goal_type': daily_goal.type if daily_goal else None,
+                'goal_value': daily_goal.value if daily_goal else None,
+                'has_total_goal': total_goal is not None,
+                'logs_count': len(logs)
+            }
+            
+            student_data.append(student_info)
+            group_totals['pages'] += total_pages
+            group_totals['minutes'] += total_minutes
 
-        logs = Log.objects.filter(school=request.user.school, date__range=(start_date, end_date),
-                                  student__in=group_obj.students.all()).values('student__id', 'pages', 'minutes')
+        # Calculate group-level metrics
+        group_totals['students_count'] = len(students)
+        group_totals['avg_pages_per_student'] = round(group_totals['pages'] / len(students) if students else 0, 1)
+        group_totals['avg_minutes_per_student'] = round(group_totals['minutes'] / len(students) if students else 0, 1)
+        group_totals['daily_avg_pages'] = round(group_totals['pages'] / (num_days * len(students)) if students and num_days > 0 else 0, 1)
+        group_totals['daily_avg_minutes'] = round(group_totals['minutes'] / (num_days * len(students)) if students and num_days > 0 else 0, 1)
+        
+        # Calculate group goal progress
+        if group_totals['students_with_goals'] > 0:
+            students_on_track = sum(1 for s in student_data if s['goal_status'] in ['on_track', 'exceeding'])
+            group_totals['goal_achievement_rate'] = round((students_on_track / group_totals['students_with_goals']) * 100, 1)
+        else:
+            group_totals['goal_achievement_rate'] = None
 
-        total_pages = total_minutes = 0
-        for log in logs:
-            log_dict[log['student__id']]['pages'] += log['pages']
-            log_dict[log['student__id']]['minutes'] += log['minutes']
-            total_pages += log['pages']
-            total_minutes += log['minutes']
+        # Sort students by goal status (struggling first) and then by name
+        status_priority = {'struggling': 1, 'behind': 2, 'on_track': 3, 'exceeding': 4, 'no_goal': 5}
+        student_data.sort(key=lambda x: (status_priority.get(x['goal_status'], 6), x['name']))
 
-        return JsonResponse({'status': 'success', 'logs': list(log_dict.values()), 'pages': total_pages, 'minutes': total_minutes})
+        response_data = {
+            'status': 'success',
+            'group_totals': group_totals,
+            'students': student_data,
+            'date_range': {
+                'start': start_date.strftime('%Y-%m-%d'),
+                'end': end_date.strftime('%Y-%m-%d'),
+                'days': num_days
+            },
+            'group_info': {
+                'name': group_obj.name,
+                'type': group_type,
+                'id': group_id
+            },
+            # Legacy fields for backward compatibility
+            'logs': student_data,
+            'pages': group_totals['pages'],
+            'minutes': group_totals['minutes']
+        }
+
+        return JsonResponse(response_data)
     else:
         return JsonResponse({'status': 'error', 'message': 'Invalid request method'})
 
@@ -184,11 +292,17 @@ def student_quick_log(request):
         return JsonResponse({'status': 'error', 'message': 'Too many requests. Please wait.'}, status=429)
     
     try:
-        # Security: Validate JSON and handle malformed data
+        # Security: Handle both JSON and form data
         try:
-            data = json.loads(request.body)
-            if not isinstance(data, dict):
-                raise ValueError("Invalid data format")
+            if request.content_type == 'application/json':
+                data = json.loads(request.body)
+                if not isinstance(data, dict):
+                    raise ValueError("Invalid data format")
+            else:
+                # Handle form data (application/x-www-form-urlencoded)
+                data = dict(request.POST)
+                # Convert single-item lists to strings (Django form parsing)
+                data = {k: v[0] if isinstance(v, list) and len(v) == 1 else v for k, v in data.items()}
         except (json.JSONDecodeError, ValueError) as e:
             logger.warning(f"Invalid JSON from user {request.user.id}: {str(e)}")
             return JsonResponse({'status': 'error', 'message': 'Invalid data format'}, status=400)
@@ -277,6 +391,15 @@ def student_quick_log(request):
             date=log_date,
             **validated_data
         )
+        
+        # Phase 2: Process gamification achievements
+        try:
+            from .gamification import GamificationEngine
+            gamification_engine = GamificationEngine()
+            gamification_engine.process_reading_log(log)
+        except Exception as gamification_error:
+            # Don't fail the log creation if gamification fails
+            logger.warning(f"Gamification processing failed for log {log.id}: {str(gamification_error)}")
         
         # Security: Update rate limiting counter
         cache.set(cache_key, recent_requests + 1, 60)  # 1 minute window

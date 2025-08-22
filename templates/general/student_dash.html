@@ -56,6 +56,60 @@
     </div>
 </div>
 
+<!-- Gamification Status -->
+<div class="row mb-4">
+    <div class="col-12">
+        <div class="card bg-gradient-primary text-white">
+            <div class="card-body">
+                <div class="row align-items-center">
+                    <div class="col-md-2 text-center">
+                        <div class="level-badge">
+                            <i class="fas fa-crown fa-2x"></i>
+                            <div class="mt-1">
+                                <strong id="player-level">Level 1</strong>
+                            </div>
+                        </div>
+                    </div>
+                    <div class="col-md-4">
+                        <div class="level-progress">
+                            <div class="d-flex justify-content-between mb-1">
+                                <small>Progress to Next Level</small>
+                                <small id="points-display">0 / 100 XP</small>
+                            </div>
+                            <div class="progress bg-white bg-opacity-25">
+                                <div id="xp-progress-bar" class="progress-bar bg-warning" style="width: 0%"></div>
+                            </div>
+                        </div>
+                    </div>
+                    <div class="col-md-2 text-center">
+                        <div class="streak-counter">
+                            <i class="fas fa-fire fa-lg text-warning"></i>
+                            <div class="mt-1">
+                                <strong id="reading-streak">0</strong>
+                                <br><small>Day Streak</small>
+                            </div>
+                        </div>
+                    </div>
+                    <div class="col-md-2 text-center">
+                        <div class="badges-counter">
+                            <i class="fas fa-medal fa-lg text-success"></i>
+                            <div class="mt-1">
+                                <strong id="badge-count">0</strong>
+                                <br><small>Badges</small>
+                            </div>
+                        </div>
+                    </div>
+                    <div class="col-md-2 text-center">
+                        <a href="#" class="btn btn-light btn-sm" onclick="showGamificationModal()">
+                            <i class="fas fa-trophy me-1"></i>View All
+                        </a>
+                    </div>
+                </div>
+            </div>
+        </div>
+    </div>
+</div>
+
 <!-- Progress Overview -->
 <div class="row mb-4">
     <div class="col-md-3">
@@ -153,6 +207,9 @@
 document.addEventListener('DOMContentLoaded', function() {
     // Load initial progress data
     loadProgressData();
+    
+    // Load gamification data
+    loadGamificationData();
     
     // Handle quick log form submission
     document.getElementById('quick-log-form').addEventListener('submit', function(e) {
@@ -454,8 +511,160 @@ function showAlert(type, message) {
         }
     }, 3000);
 }
+
+// Phase 2: Gamification Functions
+function loadGamificationData() {
+    fetch('/reading_logs/api/gamification/profile/')
+        .then(response => response.json())
+        .then(data => {
+            if (data.status === 'success') {
+                updateGamificationDisplay(data.data);
+            } else {
+                console.log('Gamification data not available yet');
+            }
+        })
+        .catch(error => {
+            console.log('Gamification loading error:', error);
+        });
+}
+
+function updateGamificationDisplay(profile) {
+    // Update level
+    document.getElementById('player-level').textContent = `Level ${profile.points.level}`;
+    
+    // Update XP progress
+    const currentXP = profile.points.total;
+    const nextLevelXP = profile.points.points_to_next_level;
+    const progressPercentage = profile.points.progress_percentage;
+    
+    document.getElementById('points-display').textContent = `${currentXP} / ${nextLevelXP} XP`;
+    document.getElementById('xp-progress-bar').style.width = `${progressPercentage}%`;
+    
+    // Update streak
+    document.getElementById('reading-streak').textContent = profile.achievements.current_streak;
+    
+    // Update badge count
+    document.getElementById('badge-count').textContent = profile.badges.length;
+    
+    // Show level up animation if needed
+    if (profile.recent_activity && profile.recent_activity.length > 0) {
+        const latestActivity = profile.recent_activity[0];
+        if (latestActivity.reason.includes('Level up')) {
+            showLevelUpAnimation(profile.points.level);
+        }
+    }
+}
+
+function showLevelUpAnimation(level) {
+    // Create level up notification
+    const levelUpDiv = document.createElement('div');
+    levelUpDiv.className = 'level-up-notification';
+    levelUpDiv.innerHTML = `
+        <div class="level-up-content">
+            <i class="fas fa-crown fa-3x text-warning mb-3"></i>
+            <h2>Level Up!</h2>
+            <p>You reached Level ${level}!</p>
+            <button class="btn btn-warning" onclick="this.parentElement.parentElement.remove()">
+                Awesome!
+            </button>
+        </div>
+    `;
+    
+    document.body.appendChild(levelUpDiv);
+    
+    // Auto remove after 5 seconds
+    setTimeout(() => {
+        if (levelUpDiv.parentNode) {
+            levelUpDiv.remove();
+        }
+    }, 5000);
+}
+
+function showGamificationModal() {
+    // For now, show a coming soon message
+    showAlert('info', '🏆 Full gamification dashboard coming soon! Keep reading to earn badges and level up!');
+}
 </script>
 
 <!-- Add CSRF token for AJAX requests -->
 {% csrf_token %}
+
+<style>
+/* Phase 2: Gamification Styles */
+.bg-gradient-primary {
+    background: linear-gradient(135deg, #007bff 0%, #0056b3 100%);
+}
+
+.level-badge {
+    background: rgba(255, 255, 255, 0.2);
+    border-radius: 50%;
+    padding: 15px;
+    display: inline-block;
+}
+
+.level-up-notification {
+    position: fixed;
+    top: 0;
+    left: 0;
+    width: 100%;
+    height: 100%;
+    background: rgba(0, 0, 0, 0.8);
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    z-index: 9999;
+    animation: fadeIn 0.5s ease-in;
+}
+
+.level-up-content {
+    background: white;
+    padding: 3rem;
+    border-radius: 15px;
+    text-align: center;
+    animation: bounceIn 0.8s ease-out;
+    box-shadow: 0 20px 40px rgba(0, 0, 0, 0.3);
+}
+
+@keyframes fadeIn {
+    from { opacity: 0; }
+    to { opacity: 1; }
+}
+
+@keyframes bounceIn {
+    0% {
+        transform: scale(0.3);
+        opacity: 0;
+    }
+    50% {
+        transform: scale(1.05);
+    }
+    70% {
+        transform: scale(0.9);
+    }
+    100% {
+        transform: scale(1);
+        opacity: 1;
+    }
+}
+
+.progress {
+    height: 8px;
+    border-radius: 4px;
+}
+
+.streak-counter i,
+.badges-counter i {
+    filter: drop-shadow(0 2px 4px rgba(0, 0, 0, 0.3));
+}
+
+.card {
+    transition: transform 0.2s ease, box-shadow 0.2s ease;
+}
+
+.card:hover {
+    transform: translateY(-2px);
+    box-shadow: 0 4px 15px rgba(0, 0, 0, 0.1);
+}
+</style>
+
 {% endblock %}

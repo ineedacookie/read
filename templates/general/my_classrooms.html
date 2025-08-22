@@ -1,0 +1,353 @@
+{% extends "general/nav_template.html" %}
+{% load static %}
+{% block title %}My Classrooms | Teacher Dashboard{% endblock %}
+{% block content %}
+
+{% csrf_token %}
+
+<!-- Page Header -->
+<div class="row mb-4">
+    <div class="col-12">
+        <h2 class="mb-1">My Classrooms</h2>
+        <p class="text-muted mb-0">Manage your classrooms and student assignments</p>
+    </div>
+</div>
+
+<!-- Classrooms Summary Cards -->
+<div class="row mb-4">
+    <div class="col-md-3">
+        <div class="card bg-primary text-white">
+            <div class="card-body">
+                <div class="d-flex align-items-center">
+                    <div class="flex-grow-1">
+                        <h4 class="mb-0">{{ classrooms.count }}</h4>
+                        <p class="mb-0">Total Classrooms</p>
+                    </div>
+                    <div class="ms-3">
+                        <i class="fas fa-door-open fa-2x"></i>
+                    </div>
+                </div>
+            </div>
+        </div>
+    </div>
+    <div class="col-md-3">
+        <div class="card bg-success text-white">
+            <div class="card-body">
+                <div class="d-flex align-items-center">
+                    <div class="flex-grow-1">
+                        <h4 class="mb-0">{{ all_students.count }}</h4>
+                        <p class="mb-0">Available Students</p>
+                    </div>
+                    <div class="ms-3">
+                        <i class="fas fa-users fa-2x"></i>
+                    </div>
+                </div>
+            </div>
+        </div>
+    </div>
+    <div class="col-md-3">
+        <div class="card bg-info text-white">
+            <div class="card-body">
+                <div class="d-flex align-items-center">
+                    <div class="flex-grow-1">
+                        <h4 class="mb-0">
+                            {% for stat in classroom_stats %}
+                                {{ stat.students_count|add:0 }}{% if not forloop.last %}, {% endif %}
+                            {% empty %}0{% endfor %}
+                        </h4>
+                        <p class="mb-0">Total Enrolled</p>
+                    </div>
+                    <div class="ms-3">
+                        <i class="fas fa-user-graduate fa-2x"></i>
+                    </div>
+                </div>
+            </div>
+        </div>
+    </div>
+    <div class="col-md-3">
+        <div class="card bg-warning text-white">
+            <div class="card-body">
+                <div class="d-flex align-items-center">
+                    <div class="flex-grow-1">
+                        <h4 class="mb-0">{{ classrooms.count }}</h4>
+                        <p class="mb-0">My Classrooms</p>
+                    </div>
+                    <div class="ms-3">
+                        <i class="fas fa-chalkboard-teacher fa-2x"></i>
+                    </div>
+                </div>
+            </div>
+        </div>
+    </div>
+</div>
+
+<!-- Classrooms List -->
+<div class="card">
+    <div class="card-header">
+        <div class="row align-items-center">
+            <div class="col">
+                <h5 class="mb-0">Classroom Management</h5>
+            </div>
+            <div class="col-auto">
+                <div class="input-group">
+                    <span class="input-group-text"><i class="fas fa-search"></i></span>
+                    <input type="text" class="form-control" id="classroomSearch" placeholder="Search classrooms...">
+                </div>
+            </div>
+        </div>
+    </div>
+    <div class="card-body p-0">
+        <div class="table-responsive">
+            <table class="table table-hover mb-0">
+                <thead class="bg-light">
+                    <tr>
+                        <th>Classroom</th>
+                        <th>Students</th>
+                        <th>Teachers</th>
+                        <th>Created Date</th>
+                        <th>Actions</th>
+                    </tr>
+                </thead>
+                <tbody id="classroomTableBody">
+                    {% for stat in classroom_stats %}
+                    <tr class="classroom-row" data-classroom-id="{{ stat.classroom.id }}" onclick="viewClassroomDetails({{ stat.classroom.id }})">
+                        <td>
+                            <div>
+                                <h6 class="mb-0">{{ stat.classroom.name }}</h6>
+                                <small class="text-muted">Created {{ stat.classroom.created_date|date:"M d, Y" }}</small>
+                            </div>
+                        </td>
+                        <td>
+                            <span class="badge bg-primary">{{ stat.students_count }} students</span>
+                        </td>
+                        <td>
+                            <span class="badge bg-success">{{ stat.classroom.teachers.count }} teachers</span>
+                        </td>
+                        <td>{{ stat.classroom.created_date|date:"M d, Y" }}</td>
+                        <td>
+                            <div class="d-flex gap-1">
+                                <button class="btn btn-sm btn-outline-primary" 
+                                        onclick="event.stopPropagation(); manageStudents({{ stat.classroom.id }})"
+                                        data-bs-toggle="modal" data-bs-target="#manageStudentsModal"
+                                        title="Manage Students">
+                                    <i class="fas fa-users"></i>
+                                </button>
+                                <button class="btn btn-sm btn-outline-secondary" 
+                                        onclick="event.stopPropagation(); editClassroom({{ stat.classroom.id }})"
+                                        title="Edit Classroom">
+                                    <i class="fas fa-edit"></i>
+                                </button>
+                            </div>
+                        </td>
+                    </tr>
+                    {% empty %}
+                    <tr>
+                        <td colspan="5" class="text-center text-muted py-4">
+                            <i class="fas fa-door-open fa-3x mb-3"></i>
+                            <p>No classrooms assigned yet</p>
+                        </td>
+                    </tr>
+                    {% endfor %}
+                </tbody>
+            </table>
+        </div>
+    </div>
+</div>
+
+<!-- Manage Students Modal -->
+<div class="modal fade" id="manageStudentsModal" tabindex="-1" aria-labelledby="manageStudentsModalLabel" aria-hidden="true">
+    <div class="modal-dialog modal-lg">
+        <div class="modal-content">
+            <div class="modal-header">
+                <h5 class="modal-title" id="manageStudentsModalLabel">Manage Classroom Students</h5>
+                <button type="button" class="btn-close" data-bs-dismiss="modal" aria-label="Close"></button>
+            </div>
+            <div class="modal-body">
+                <div class="row">
+                    <!-- Current Students -->
+                    <div class="col-md-6">
+                        <h6>Current Students</h6>
+                        <div id="currentStudentsList" class="border rounded p-3" style="max-height: 300px; overflow-y: auto;">
+                            <!-- Dynamic content -->
+                        </div>
+                    </div>
+                    <!-- Available Students -->
+                    <div class="col-md-6">
+                        <h6>Available Students</h6>
+                        <div class="mb-2">
+                            <input type="text" class="form-control form-control-sm" id="studentSearchModal" placeholder="Search students...">
+                        </div>
+                        <div id="availableStudentsList" class="border rounded p-3" style="max-height: 300px; overflow-y: auto;">
+                            {% for student in all_students %}
+                            <div class="d-flex justify-content-between align-items-center py-2 border-bottom available-student" data-student-id="{{ student.id }}">
+                                <div>
+                                    <strong>{{ student.first_name }} {{ student.last_initial }}</strong>
+                                    <small class="text-muted d-block">ID: {{ student.id }}</small>
+                                </div>
+                                <button class="btn btn-sm btn-success add-student-btn" data-student-id="{{ student.id }}">
+                                    <i class="fas fa-plus"></i>
+                                </button>
+                            </div>
+                            {% endfor %}
+                        </div>
+                    </div>
+                </div>
+            </div>
+            <div class="modal-footer">
+                <button type="button" class="btn btn-secondary" data-bs-dismiss="modal">Close</button>
+            </div>
+        </div>
+    </div>
+</div>
+
+<script>
+$(document).ready(function() {
+    let currentClassroomId = null;
+    
+    // Search functionality for classrooms
+    $('#classroomSearch').on('input', function() {
+        const searchTerm = $(this).val().toLowerCase();
+        $('#classroomTableBody tr').each(function() {
+            const classroomName = $(this).find('h6').text().toLowerCase();
+            const subject = $(this).find('small').text().toLowerCase();
+            
+            if (classroomName.includes(searchTerm) || subject.includes(searchTerm)) {
+                $(this).show();
+            } else {
+                $(this).hide();
+            }
+        });
+    });
+    
+    // Search functionality for students in modal
+    $('#studentSearchModal').on('input', function() {
+        const searchTerm = $(this).val().toLowerCase();
+        $('.available-student').each(function() {
+            const studentName = $(this).find('strong').text().toLowerCase();
+            
+            if (studentName.includes(searchTerm)) {
+                $(this).show();
+            } else {
+                $(this).hide();
+            }
+        });
+    });
+});
+
+function viewClassroomDetails(classroomId) {
+    // Navigate to classroom details/status page
+    window.location.href = `/classrooms/${classroomId}/`;
+}
+
+function editClassroom(classroomId) {
+    // Navigate to classroom edit page
+    window.location.href = `/classrooms/${classroomId}/?tab=settings`;
+}
+
+function manageStudents(classroomId) {
+    currentClassroomId = classroomId;
+    
+    // Load current students for this classroom
+    fetch(`/api/classrooms/${classroomId}/students/`)
+        .then(response => response.json())
+        .then(data => {
+            if (data.success) {
+                updateCurrentStudentsList(data.students);
+            }
+        })
+        .catch(error => {
+            console.error('Error loading students:', error);
+        });
+}
+
+function updateCurrentStudentsList(students) {
+    const container = $('#currentStudentsList');
+    container.empty();
+    
+    if (students.length === 0) {
+        container.html('<p class="text-muted">No students enrolled</p>');
+        return;
+    }
+    
+    students.forEach(student => {
+        const studentDiv = $(`
+            <div class="d-flex justify-content-between align-items-center py-2 border-bottom">
+                <div>
+                    <strong>${student.first_name} ${student.last_initial}</strong>
+                    <small class="text-muted d-block">ID: ${student.id}</small>
+                </div>
+                <button class="btn btn-sm btn-danger remove-student-btn" data-student-id="${student.id}">
+                    <i class="fas fa-minus"></i>
+                </button>
+            </div>
+        `);
+        container.append(studentDiv);
+    });
+    
+    // Add click handlers for remove buttons
+    $('.remove-student-btn').click(function() {
+        const studentId = $(this).data('student-id');
+        removeStudentFromClassroom(studentId);
+    });
+}
+
+function removeStudentFromClassroom(studentId) {
+    const formData = new FormData();
+    formData.append('student_id', studentId);
+    formData.append('classroom_id', currentClassroomId);
+    formData.append('csrfmiddlewaretoken', $('[name=csrfmiddlewaretoken]').val());
+    
+    fetch('/api/remove-student-from-classroom/', {
+        method: 'POST',
+        body: formData
+    })
+    .then(response => response.json())
+    .then(data => {
+        if (data.success) {
+            // Refresh the modal content
+            manageStudents(currentClassroomId);
+            // Optionally refresh the page or update the table
+            location.reload();
+        } else {
+            alert('Error removing student: ' + data.message);
+        }
+    })
+    .catch(error => {
+        console.error('Error:', error);
+        alert('Error removing student');
+    });
+}
+
+// Add student to classroom
+$(document).on('click', '.add-student-btn', function() {
+    const studentId = $(this).data('student-id');
+    
+    const formData = new FormData();
+    formData.append('student_id', studentId);
+    formData.append('classroom_id', currentClassroomId);
+    formData.append('assignment_type', 'classroom');
+    formData.append('csrfmiddlewaretoken', $('[name=csrfmiddlewaretoken]').val());
+    
+    fetch('/api/add-student-to-class/', {
+        method: 'POST',
+        body: formData
+    })
+    .then(response => response.json())
+    .then(data => {
+        if (data.success) {
+            // Refresh the modal content
+            manageStudents(currentClassroomId);
+            // Optionally refresh the page or update the table
+            location.reload();
+        } else {
+            alert('Error adding student: ' + data.message);
+        }
+    })
+    .catch(error => {
+        console.error('Error:', error);
+        alert('Error adding student');
+    });
+});
+</script>
+
+{% endblock %}

@@ -38,6 +38,7 @@
     <link href="{% static 'vendors/prism/prism-okaidia.css' %}" rel="stylesheet">
     <link href="{% static 'vendors/fullcalendar/main.min.css' %}" rel="stylesheet">
     <link href="{% static 'vendors/flatpickr/flatpickr.min.css' %}" rel="stylesheet">
+    <link href="{% static 'vendors/choices/choices.min.css' %}" rel="stylesheet">
     <link rel="preconnect" href="https://fonts.gstatic.com">
     <link href="https://fonts.googleapis.com/css?family=Open+Sans:300,400,500,600,700%7cPoppins:300,400,500,600,700,800,900&amp;display=swap" rel="stylesheet">
     <link href="{% static 'vendors/simplebar/simplebar.min.css' %}" rel="stylesheet">
@@ -50,6 +51,198 @@
     
     <!-- Mobile Optimizations -->
     <link href="{% static 'css/mobile-optimizations.css' %}" rel="stylesheet">
+
+    <!-- Universal Theme Fixes -->
+    <style>
+    /* Universal Stats Card Text - Always Pure White */
+    .card .text-white,
+    .card .text-white h1,
+    .card .text-white h2,
+    .card .text-white h3,
+    .card .text-white h4,
+    .card .text-white h5,
+    .card .text-white h6,
+    .card .text-white p,
+    .card .text-white small,
+    .card .text-white i,
+    .card .text-white .fa,
+    .card .text-white .fas,
+    .card .text-white .far,
+    .card .text-white .fab {
+        color: #FFFFFF !important;
+    }
+
+    /* Enhanced Stats Card Text Specificity */
+    .card.bg-primary .text-white h4,
+    .card.bg-success .text-white h4,
+    .card.bg-info .text-white h4,
+    .card.bg-warning .text-white h4,
+    .card.bg-danger .text-white h4,
+    .card.bg-primary .text-white p,
+    .card.bg-success .text-white p,
+    .card.bg-info .text-white p,
+    .card.bg-warning .text-white p,
+    .card.bg-danger .text-white p,
+    .card.bg-primary .text-white i,
+    .card.bg-success .text-white i,
+    .card.bg-info .text-white i,
+    .card.bg-warning .text-white i,
+    .card.bg-danger .text-white i,
+    .card.bg-primary .text-white .fas,
+    .card.bg-success .text-white .fas,
+    .card.bg-info .text-white .fas,
+    .card.bg-warning .text-white .fas,
+    .card.bg-danger .text-white .fas {
+        color: #FFFFFF !important;
+    }
+
+    /* Direct element targeting for stats cards */
+    .card.bg-primary h4,
+    .card.bg-success h4,
+    .card.bg-info h4,
+    .card.bg-warning h4,
+    .card.bg-danger h4,
+    .card.bg-primary p,
+    .card.bg-success p,
+    .card.bg-info p,
+    .card.bg-warning p,
+    .card.bg-danger p,
+    .card.bg-primary i.fas,
+    .card.bg-success i.fas,
+    .card.bg-info i.fas,
+    .card.bg-warning i.fas,
+    .card.bg-danger i.fas {
+        color: #FFFFFF !important;
+    }
+
+    /* Enhanced icon targeting for both light and dark modes */
+    html.dark .card.bg-primary i,
+    html.dark .card.bg-success i,
+    html.dark .card.bg-info i,
+    html.dark .card.bg-warning i,
+    html.dark .card.bg-danger i,
+    html.dark .card.bg-primary .fas,
+    html.dark .card.bg-success .fas,
+    html.dark .card.bg-info .fas,
+    html.dark .card.bg-warning .fas,
+    html.dark .card.bg-danger .fas,
+    html:not(.dark) .card.bg-primary i,
+    html:not(.dark) .card.bg-success i,
+    html:not(.dark) .card.bg-info i,
+    html:not(.dark) .card.bg-warning i,
+    html:not(.dark) .card.bg-danger i,
+    html:not(.dark) .card.bg-primary .fas,
+    html:not(.dark) .card.bg-success .fas,
+    html:not(.dark) .card.bg-info .fas,
+    html:not(.dark) .card.bg-warning .fas,
+    html:not(.dark) .card.bg-danger .fas {
+        color: #FFFFFF !important;
+    }
+
+    /* Specific targeting for fa-2x icons in stats cards */
+    .card .text-white .fa-2x,
+    .card.bg-primary .fa-2x,
+    .card.bg-success .fa-2x,
+    .card.bg-info .fa-2x,
+    .card.bg-warning .fa-2x,
+    .card.bg-danger .fa-2x {
+        color: #FFFFFF !important;
+    }
+
+    /* Universal Light Mode Table Styling */
+    html:not(.dark) .table {
+        --bs-table-bg: #ffffff !important;
+        --bs-table-striped-bg: #f8f9fa !important;
+        color: #212529 !important;
+        background-color: #ffffff;
+    }
+
+    html:not(.dark) .table thead th {
+        background-color: #f8f9fa !important;
+        color: #495057 !important;
+        border-bottom-color: #dee2e6 !important;
+    }
+
+    html:not(.dark) .table thead th.bg-light {
+        background-color: #f8f9fa !important;
+    }
+
+    html:not(.dark) .table tbody td {
+        color: #212529 !important;
+        border-bottom-color: #dee2e6 !important;
+        background-color: transparent;
+    }
+
+    html:not(.dark) .table tbody tr td:first-child {
+        color: #212529 !important;
+        font-weight: 500;
+    }
+
+    html:not(.dark) .table tbody tr:hover {
+        background-color: rgba(0, 0, 0, 0.05) !important;
+    }
+
+    /* Universal Dark Mode Table Styling */
+    html.dark .table {
+        --bs-table-bg: rgba(255, 255, 255, 0.02) !important;
+        --bs-table-striped-bg: rgba(255, 255, 255, 0.05) !important;
+        color: rgba(255, 255, 255, 0.9) !important;
+        background-color: rgba(255, 255, 255, 0.02);
+    }
+
+    html.dark .table thead th {
+        background-color: rgba(255, 255, 255, 0.1) !important;
+        color: rgba(255, 255, 255, 0.95) !important;
+        border-bottom-color: rgba(255, 255, 255, 0.2) !important;
+    }
+
+    html.dark .table tbody td {
+        color: rgba(255, 255, 255, 0.85) !important;
+        border-bottom-color: rgba(255, 255, 255, 0.1) !important;
+    }
+
+    html.dark .table tbody tr td:first-child {
+        color: rgba(255, 255, 255, 0.95) !important;
+        font-weight: 500;
+    }
+
+    html.dark .table tbody tr:hover {
+        background-color: rgba(255, 255, 255, 0.08) !important;
+    }
+
+    /* Universal Card Header Theme Support */
+    html:not(.dark) .card-header {
+        background-color: #f8f9fa;
+        border-bottom-color: #dee2e6;
+        color: #495057;
+    }
+
+    html.dark .card-header {
+        background-color: rgba(255, 255, 255, 0.05);
+        border-bottom-color: rgba(255, 255, 255, 0.1);
+        color: rgba(255, 255, 255, 0.9);
+    }
+
+    /* Universal Form Control Theme Support */
+    html.dark .form-control {
+        background-color: rgba(255, 255, 255, 0.05);
+        border-color: rgba(255, 255, 255, 0.2);
+        color: rgba(255, 255, 255, 0.9);
+    }
+
+    html.dark .form-control:focus {
+        background-color: rgba(255, 255, 255, 0.08);
+        border-color: rgba(255, 255, 255, 0.3);
+        color: rgba(255, 255, 255, 0.95);
+    }
+
+    html.dark .input-group-text {
+        background-color: rgba(255, 255, 255, 0.1);
+        border-color: rgba(255, 255, 255, 0.2);
+        color: rgba(255, 255, 255, 0.8);
+    }
+    </style>
+
     <script>
       var isRTL = JSON.parse(localStorage.getItem('isRTL'));
       if (isRTL) {
@@ -101,13 +294,13 @@
     <script src="{% static 'vendors/fontawesome/all.min.js' %}"></script>
     <script src="{% static 'vendors/lodash/lodash.min.js' %}"></script>
     <script src="{% static 'vendors/dayjs/dayjs.min.js' %}"></script>
-    <script src="https://polyfill.io/v3/polyfill.min.js?features=window.scroll"></script>
     <script src="{% static 'vendors/list.js/list.min.js' %}"></script>
     {% block beforeThemeScript %}{% endblock %}
     <script src="{% static 'vendors/fullcalendar/main.min.js' %}"></script>
     <script src="{% static 'assets/js/flatpickr.js' %}"></script>
-    <!-- Optimized theme - 97.4% smaller (9.6KB vs 365KB) -->
-    <script src="{% static 'assets/js/theme-minimal.js' %}"></script>
+    <script src="{% static 'vendors/choices/choices.min.js' %}"></script>
+    <!-- Full Falcon Theme with Dark Mode Support -->
+    <script src="{% static 'assets/js/theme.min.js' %}"></script>
   {% block afterScripts %}{% endblock %}
   <noscript class="text-center">
          	Your browser does not support JavaScript. Please activate JavaScript or switch to a different browser for the best experience. <br/>
