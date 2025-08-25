@@ -289,18 +289,33 @@
         return item.text;
     }
 
-    // Initialize Select2 for any select fields
-        $('select').each(function() {
-            $(this).select2({
-                placeholder: '',
-                allowClear: true,
-                width: 'resolve', // Resolve the width of the container to fit the element
-                dropdownParent: $('#inviteModal'), // Ensure dropdown displays in front of the modal
-                closeOnSelect: false, // Keep dropdown open when selecting items
-                templateResult: (item) => templateRender(item, this)
-            }).on('select2:select', function (e) {
+    // Initialize Select2 for any select fields with Bootstrap 5 theme
+    $('select').each(function() {
+        const $select = $(this);
+        const isMultiple = $select.prop('multiple');
+        
+        $select.select2({
+            theme: 'bootstrap-5',
+            placeholder: $select.attr('placeholder') || 'Choose...',
+            allowClear: true,
+            width: '100%',
+            dropdownParent: $('#inviteModal'), // Ensure dropdown displays in front of the modal
+            closeOnSelect: !isMultiple, // Keep open for multiple, close for single
+            templateResult: (item) => templateRender(item, this),
+            escapeMarkup: function(markup) { return markup; }, // Allow HTML content
+            language: {
+                noResults: function() {
+                    return '<span class="text-muted">No results found</span>';
+                },
+                searching: function() {
+                    return '<span class="text-muted">Searching...</span>';
+                }
+            }
+        }).on('select2:select', function (e) {
+            if (isMultiple) {
                 $(e.target).select2('close').select2('open');
-            });
+            }
         });
+    });
 </script>
 {% endblock %}

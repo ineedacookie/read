@@ -38,7 +38,9 @@
     });
     $(document).ready(function() {
     $('#emails').select2({
+      theme: 'bootstrap-5',
       tags: true,
+      width: '100%',
       dropdownCssClass: "no-dropdown", // Add a custom CSS class to disable the dropdown
       tokenSeparators: [',', ' '], // Specify the separators to trigger tag creation
       createTag: function(params) {

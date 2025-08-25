@@ -28,14 +28,7 @@
     <div class="collapse navbar-collapse" id="navbarVerticalCollapse">
         <div class="navbar-vertical-content scrollbar">
             <ul class="navbar-nav flex-column mb-3" id="navbarVerticalNav">
-                <!-- Dashboard - Always visible to authenticated users -->
-                <li class="nav-item">
-                    <a class="nav-link" href="{% url 'home' %}">
-                        <div class="d-flex align-items-center"><span class="nav-link-icon"><span
-                                class="fas fa-home"></span></span><span class="nav-link-text ps-1">Dashboard</span>
-                        </div>
-                    </a>
-                </li>
+                <!-- Role-specific navigation only - no general dashboard -->
 
                 {% if user.user_type == 'administrator' %}
                     <!-- Administrator sees everything -->
@@ -107,35 +100,21 @@
                     </li>
 
                 {% elif user.user_type == 'student' %}
-                    <!-- Students see reading log entry -->
+                    <!-- Students see minimal navigation - only their dashboard -->
                     <li class="nav-item">
-                        <a class="nav-link" href="/student/">
+                        <a class="nav-link" href="{% url 'home' %}">
                             <div class="d-flex align-items-center"><span class="nav-link-icon"><span
-                                    class="fas fa-book-open"></span></span><span class="nav-link-text ps-1">Reading Log</span>
-                            </div>
-                        </a>
-                    </li>
-                    <li class="nav-item">
-                        <a class="nav-link" href="/reading_logs/api/gamification/profile/">
-                            <div class="d-flex align-items-center"><span class="nav-link-icon"><span
-                                    class="fas fa-trophy"></span></span><span class="nav-link-text ps-1">Achievements</span>
+                                    class="fas fa-home"></span></span><span class="nav-link-text ps-1">My Dashboard</span>
                             </div>
                         </a>
                     </li>
 
                 {% elif user.user_type == 'parent' %}
-                    <!-- Parents see their children's progress -->
+                    <!-- Parents see their children's dashboards only -->
                     <li class="nav-item">
-                        <a class="nav-link" href="/parent/">
+                        <a class="nav-link" href="{% url 'home' %}">
                             <div class="d-flex align-items-center"><span class="nav-link-icon"><span
-                                    class="fas fa-chart-line"></span></span><span class="nav-link-text ps-1">Children Progress</span>
-                            </div>
-                        </a>
-                    </li>
-                    <li class="nav-item">
-                        <a class="nav-link" href="/student/">
-                            <div class="d-flex align-items-center"><span class="nav-link-icon"><span
-                                    class="fas fa-book-open"></span></span><span class="nav-link-text ps-1">Add Reading Log</span>
+                                    class="fas fa-users"></span></span><span class="nav-link-text ps-1">My Children</span>
                             </div>
                         </a>
                     </li>

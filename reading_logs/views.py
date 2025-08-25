@@ -426,9 +426,28 @@ def student_quick_log(request):
 def student_progress(request):
     """Get student's reading progress and stats - Enterprise security"""
     # Security: Validate user type
-    if request.user.user_type != 'student':
-        logger.warning(f"Non-student user {request.user.id} attempted to access student progress")
+    if request.user.user_type not in ['student', 'parent']:
+        logger.warning(f"Non-student/parent user {request.user.id} attempted to access student progress")
         return JsonResponse({'status': 'error', 'message': 'Access denied'}, status=403)
+    
+    # Determine which student's progress to show
+    target_student = None
+    if request.user.user_type == 'student':
+        target_student = request.user
+    elif request.user.user_type == 'parent':
+        # Parent requesting child's progress
+        student_id = request.GET.get('student_id')
+        if not student_id:
+            return JsonResponse({'status': 'error', 'message': 'Student ID required for parent requests'}, status=400)
+        
+        try:
+            student_id = int(student_id)
+            target_student = request.user.children.get(id=student_id)
+        except (ValueError, TypeError):
+            return JsonResponse({'status': 'error', 'message': 'Invalid student ID format'}, status=400)
+        except CustomUser.DoesNotExist:
+            logger.warning(f"Parent {request.user.id} attempted to access non-child progress: {student_id}")
+            return JsonResponse({'status': 'error', 'message': 'Student not found or access denied'}, status=404)
     
     try:
         # Get date range with proper validation (default to current month)
@@ -467,7 +486,7 @@ def student_progress(request):
         
         # Performance: Optimized query with select_related
         logs = Log.objects.filter(
-            student=request.user, 
+            student=target_student, 
             date__range=(start_date, end_date)
         ).select_related('school').order_by('-date')
         
@@ -487,7 +506,7 @@ def student_progress(request):
         
         # Get daily goals if any (optimized query)
         daily_goal = DailyGoal.objects.filter(
-            student=request.user
+            student=target_student
         ).select_related('school').first()
         
         # Recent logs for display (limit and sanitize)
@@ -504,8 +523,23 @@ def student_progress(request):
                 'comments': log.comments or ''
             })
         
+        # Prepare chart data for progress visualization
+        chart_data = []
+        for log in logs:
+            chart_data.append({
+                'date': log.date.isoformat(),
+                'title': log.title or 'Untitled',
+                'pages': log.pages or 0,
+                'minutes': log.minutes or 0,
+                'rating': float(log.rating) if log.rating else None
+            })
+        
         # Security: Log successful data access
-        logger.info(f"Student progress data accessed by user {request.user.id}")
+        user_type = request.user.user_type
+        if user_type == 'parent':
+            logger.info(f"Student progress data accessed by parent {request.user.id} for child {target_student.id}")
+        else:
+            logger.info(f"Student progress data accessed by user {request.user.id}")
         
         return JsonResponse({
             'status': 'success',
@@ -520,6 +554,7 @@ def student_progress(request):
                 }
             },
             'recent_logs': recent_logs,
+            'chart_data': chart_data,
             'date_range': {
                 'start': start_date.isoformat(),
                 'end': end_date.isoformat()
@@ -647,4 +682,355 @@ def parent_dashboard_data(request):
         # Security: Never expose internal errors
         logger.error(f"Error in parent_dashboard_data for user {request.user.id}: {str(e)}")
         return JsonResponse({'status': 'error', 'message': 'Unable to load dashboard data'}, status=500)
+
+
+@login_required
+@require_http_methods(["POST"])
+@transaction.atomic
+def parent_add_log(request):
+    """Allow parents to add reading logs for their children - Enterprise security"""
+    # Security: Validate user type
+    if request.user.user_type != 'parent':
+        logger.warning(f"Non-parent user {request.user.id} attempted to add child reading log")
+        return JsonResponse({'status': 'error', 'message': 'Access denied'}, status=403)
+    
+    try:
+        # Parse JSON data
+        try:
+            data = json.loads(request.body)
+        except json.JSONDecodeError:
+            return JsonResponse({'status': 'error', 'message': 'Invalid JSON data'}, status=400)
+        
+        # Security: Validate child_id
+        child_id = data.get('child_id')
+        if not child_id:
+            return JsonResponse({'status': 'error', 'message': 'Child ID is required'}, status=400)
+        
+        try:
+            child_id = int(child_id)
+        except (ValueError, TypeError):
+            return JsonResponse({'status': 'error', 'message': 'Invalid child ID format'}, status=400)
+        
+        # Security: Verify parent-child relationship
+        try:
+            child = request.user.children.get(id=child_id)
+        except CustomUser.DoesNotExist:
+            logger.warning(f"Parent {request.user.id} attempted to add log for non-child user {child_id}")
+            return JsonResponse({'status': 'error', 'message': 'Child not found or access denied'}, status=404)
+        
+        # Validate and sanitize input data
+        validated_data = {}
+        
+        # Optional title field
+        title = data.get('title', '').strip()
+        if title:
+            if len(title) > 255:
+                return JsonResponse({'status': 'error', 'message': 'Book title too long (max 255 characters)'}, status=400)
+            validated_data['title'] = escape(title)  # Prevent XSS
+        
+        # Optional fields with validation
+        author = data.get('author', '').strip()
+        if author:
+            if len(author) > 255:
+                return JsonResponse({'status': 'error', 'message': 'Author name too long (max 255 characters)'}, status=400)
+            validated_data['author'] = escape(author)  # Prevent XSS
+        
+        # Numeric fields
+        pages = data.get('pages')
+        if pages is not None:
+            try:
+                pages = int(pages)
+                if pages < 1 or pages > 9999:
+                    return JsonResponse({'status': 'error', 'message': 'Pages must be between 1 and 9999'}, status=400)
+                validated_data['pages'] = pages
+            except (ValueError, TypeError):
+                return JsonResponse({'status': 'error', 'message': 'Invalid pages format'}, status=400)
+        
+        minutes = data.get('minutes')
+        if minutes is not None:
+            try:
+                minutes = int(minutes)
+                if minutes < 1 or minutes > 1440:  # Max 24 hours
+                    return JsonResponse({'status': 'error', 'message': 'Minutes must be between 1 and 1440'}, status=400)
+                validated_data['minutes'] = minutes
+            except (ValueError, TypeError):
+                return JsonResponse({'status': 'error', 'message': 'Invalid minutes format'}, status=400)
+        
+        rating = data.get('rating')
+        if rating is not None and rating != '':
+            try:
+                rating = float(rating)
+                if rating < 0 or rating > 5:
+                    return JsonResponse({'status': 'error', 'message': 'Rating must be between 0 and 5'}, status=400)
+                validated_data['rating'] = round(rating, 2)
+            except (ValueError, TypeError):
+                return JsonResponse({'status': 'error', 'message': 'Invalid rating format'}, status=400)
+        
+        comments = data.get('comments', '').strip()
+        if comments:
+            if len(comments) > 2000:
+                return JsonResponse({'status': 'error', 'message': 'Comments too long (max 2000 characters)'}, status=400)
+            validated_data['comments'] = escape(comments)  # Prevent XSS
+        
+        # Validate date
+        log_date = date.today()  # Default to today
+        if data.get('date'):
+            try:
+                log_date = datetime.strptime(data.get('date'), '%Y-%m-%d').date()
+                # Security: Prevent future dates and very old dates
+                if log_date > date.today():
+                    return JsonResponse({'status': 'error', 'message': 'Cannot log future dates'}, status=400)
+                if log_date < date.today() - timedelta(days=365):  # Max 1 year back
+                    return JsonResponse({'status': 'error', 'message': 'Date too far in the past'}, status=400)
+            except (ValueError, TypeError):
+                return JsonResponse({'status': 'error', 'message': 'Invalid date format (use YYYY-MM-DD)'}, status=400)
+        
+        # Rate limiting: Check if parent is making too many requests
+        cache_key = f'parent_log_rate_limit_{request.user.id}'
+        recent_requests = cache.get(cache_key, 0)
+        if recent_requests >= 10:  # Max 10 logs per minute
+            logger.warning(f"Parent {request.user.id} exceeded rate limit for adding child logs")
+            return JsonResponse({'status': 'error', 'message': 'Too many requests. Please wait before adding more logs.'}, status=429)
+        
+        # Create log entry within transaction
+        log = Log.objects.create(
+            student=child,
+            school=child.school,
+            date=log_date,
+            **validated_data
+        )
+        
+        # Phase 2: Process gamification achievements for the child
+        try:
+            from .gamification import GamificationEngine
+            gamification_engine = GamificationEngine()
+            gamification_engine.process_reading_log(log)
+        except Exception as gamification_error:
+            # Don't fail the log creation if gamification fails
+            logger.warning(f"Gamification processing failed for log {log.id}: {str(gamification_error)}")
+        
+        # Security: Update rate limiting counter
+        cache.set(cache_key, recent_requests + 1, 60)  # 1 minute window
+        
+        # Security: Log successful creation for audit trail
+        logger.info(f"Reading log created by parent {request.user.id} for child {child.id}, log_id {log.id}")
+        
+        return JsonResponse({
+            'status': 'success',
+            'message': 'Reading log added successfully',
+            'log_id': log.id
+        })
+        
+    except Exception as e:
+        # Security: Log error without exposing internal details
+        logger.error(f"Error in parent_add_log for user {request.user.id}: {str(e)}")
+        return JsonResponse({'status': 'error', 'message': 'Unable to add reading log'}, status=500)
+
+
+@login_required
+@require_http_methods(["POST"])
+@transaction.atomic
+def parent_edit_log(request):
+    """Allow parents to edit reading logs for their children - Enterprise security"""
+    # Security: Validate user type
+    if request.user.user_type != 'parent':
+        logger.warning(f"Non-parent user {request.user.id} attempted to edit child reading log")
+        return JsonResponse({'status': 'error', 'message': 'Access denied'}, status=403)
+    
+    try:
+        # Parse JSON data
+        try:
+            data = json.loads(request.body)
+        except json.JSONDecodeError:
+            return JsonResponse({'status': 'error', 'message': 'Invalid JSON data'}, status=400)
+        
+        # Security: Validate log_id and child_id
+        log_id = data.get('log_id')
+        child_id = data.get('child_id')
+        
+        if not log_id or not child_id:
+            return JsonResponse({'status': 'error', 'message': 'Log ID and Child ID are required'}, status=400)
+        
+        try:
+            log_id = int(log_id)
+            child_id = int(child_id)
+        except (ValueError, TypeError):
+            return JsonResponse({'status': 'error', 'message': 'Invalid ID format'}, status=400)
+        
+        # Security: Verify parent-child relationship
+        try:
+            child = request.user.children.get(id=child_id)
+        except CustomUser.DoesNotExist:
+            logger.warning(f"Parent {request.user.id} attempted to edit log for non-child user {child_id}")
+            return JsonResponse({'status': 'error', 'message': 'Child not found or access denied'}, status=404)
+        
+        # Security: Verify log belongs to the child
+        try:
+            log = Log.objects.get(id=log_id, student=child)
+        except Log.DoesNotExist:
+            logger.warning(f"Parent {request.user.id} attempted to edit non-existent log {log_id} for child {child_id}")
+            return JsonResponse({'status': 'error', 'message': 'Reading log not found'}, status=404)
+        
+        # Validate and sanitize input data
+        validated_data = {}
+        
+        # Optional title field
+        title = data.get('title', '').strip()
+        if title:
+            if len(title) > 255:
+                return JsonResponse({'status': 'error', 'message': 'Book title too long (max 255 characters)'}, status=400)
+            validated_data['title'] = escape(title)  # Prevent XSS
+        else:
+            validated_data['title'] = None
+        
+        # Optional fields with validation
+        author = data.get('author', '').strip()
+        if author:
+            if len(author) > 255:
+                return JsonResponse({'status': 'error', 'message': 'Author name too long (max 255 characters)'}, status=400)
+            validated_data['author'] = escape(author)  # Prevent XSS
+        else:
+            validated_data['author'] = None
+        
+        # Numeric fields
+        pages = data.get('pages')
+        if pages is not None and pages != '':
+            try:
+                pages = int(pages)
+                if pages < 1 or pages > 9999:
+                    return JsonResponse({'status': 'error', 'message': 'Pages must be between 1 and 9999'}, status=400)
+                validated_data['pages'] = pages
+            except (ValueError, TypeError):
+                return JsonResponse({'status': 'error', 'message': 'Invalid pages format'}, status=400)
+        else:
+            validated_data['pages'] = None
+        
+        minutes = data.get('minutes')
+        if minutes is not None and minutes != '':
+            try:
+                minutes = int(minutes)
+                if minutes < 1 or minutes > 1440:  # Max 24 hours
+                    return JsonResponse({'status': 'error', 'message': 'Minutes must be between 1 and 1440'}, status=400)
+                validated_data['minutes'] = minutes
+            except (ValueError, TypeError):
+                return JsonResponse({'status': 'error', 'message': 'Invalid minutes format'}, status=400)
+        else:
+            validated_data['minutes'] = None
+        
+        rating = data.get('rating')
+        if rating is not None and rating != '':
+            try:
+                rating = float(rating)
+                if rating < 0 or rating > 5:
+                    return JsonResponse({'status': 'error', 'message': 'Rating must be between 0 and 5'}, status=400)
+                validated_data['rating'] = round(rating, 2)
+            except (ValueError, TypeError):
+                return JsonResponse({'status': 'error', 'message': 'Invalid rating format'}, status=400)
+        else:
+            validated_data['rating'] = None
+        
+        comments = data.get('comments', '').strip()
+        if comments:
+            if len(comments) > 2000:
+                return JsonResponse({'status': 'error', 'message': 'Comments too long (max 2000 characters)'}, status=400)
+            validated_data['comments'] = escape(comments)  # Prevent XSS
+        else:
+            validated_data['comments'] = None
+        
+        # Validate date
+        if data.get('date'):
+            try:
+                log_date = datetime.strptime(data.get('date'), '%Y-%m-%d').date()
+                # Security: Prevent future dates and very old dates
+                if log_date > date.today():
+                    return JsonResponse({'status': 'error', 'message': 'Cannot log future dates'}, status=400)
+                if log_date < date.today() - timedelta(days=365):  # Max 1 year back
+                    return JsonResponse({'status': 'error', 'message': 'Date too far in the past'}, status=400)
+                validated_data['date'] = log_date
+            except (ValueError, TypeError):
+                return JsonResponse({'status': 'error', 'message': 'Invalid date format (use YYYY-MM-DD)'}, status=400)
+        
+        # Update log entry within transaction
+        for field, value in validated_data.items():
+            setattr(log, field, value)
+        log.save()
+        
+        # Security: Log successful update for audit trail
+        logger.info(f"Reading log updated by parent {request.user.id} for child {child.id}, log_id {log.id}")
+        
+        return JsonResponse({
+            'status': 'success',
+            'message': 'Reading log updated successfully',
+            'log_id': log.id
+        })
+        
+    except Exception as e:
+        # Security: Log error without exposing internal details
+        logger.error(f"Error in parent_edit_log for user {request.user.id}: {str(e)}")
+        return JsonResponse({'status': 'error', 'message': 'Unable to update reading log'}, status=500)
+
+
+@login_required
+@require_http_methods(["POST"])
+@transaction.atomic
+def parent_delete_log(request):
+    """Allow parents to delete reading logs for their children - Enterprise security"""
+    # Security: Validate user type
+    if request.user.user_type != 'parent':
+        logger.warning(f"Non-parent user {request.user.id} attempted to delete child reading log")
+        return JsonResponse({'status': 'error', 'message': 'Access denied'}, status=403)
+    
+    try:
+        # Parse JSON data
+        try:
+            data = json.loads(request.body)
+        except json.JSONDecodeError:
+            return JsonResponse({'status': 'error', 'message': 'Invalid JSON data'}, status=400)
+        
+        # Security: Validate log_id and child_id
+        log_id = data.get('log_id')
+        child_id = data.get('child_id')
+        
+        if not log_id or not child_id:
+            return JsonResponse({'status': 'error', 'message': 'Log ID and Child ID are required'}, status=400)
+        
+        try:
+            log_id = int(log_id)
+            child_id = int(child_id)
+        except (ValueError, TypeError):
+            return JsonResponse({'status': 'error', 'message': 'Invalid ID format'}, status=400)
+        
+        # Security: Verify parent-child relationship
+        try:
+            child = request.user.children.get(id=child_id)
+        except CustomUser.DoesNotExist:
+            logger.warning(f"Parent {request.user.id} attempted to delete log for non-child user {child_id}")
+            return JsonResponse({'status': 'error', 'message': 'Child not found or access denied'}, status=404)
+        
+        # Security: Verify log belongs to the child
+        try:
+            log = Log.objects.get(id=log_id, student=child)
+        except Log.DoesNotExist:
+            logger.warning(f"Parent {request.user.id} attempted to delete non-existent log {log_id} for child {child_id}")
+            return JsonResponse({'status': 'error', 'message': 'Reading log not found'}, status=404)
+        
+        # Store log info for audit before deletion
+        log_title = log.title
+        log_date = log.date
+        
+        # Delete log entry within transaction
+        log.delete()
+        
+        # Security: Log successful deletion for audit trail
+        logger.info(f"Reading log deleted by parent {request.user.id} for child {child.id}, log was: '{log_title}' on {log_date}")
+        
+        return JsonResponse({
+            'status': 'success',
+            'message': 'Reading log deleted successfully'
+        })
+        
+    except Exception as e:
+        # Security: Log error without exposing internal details
+        logger.error(f"Error in parent_delete_log for user {request.user.id}: {str(e)}")
+        return JsonResponse({'status': 'error', 'message': 'Unable to delete reading log'}, status=500)
 

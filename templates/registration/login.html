@@ -34,7 +34,7 @@
     <div class="col-auto">
         <h5>Log in</h5>
     </div>
-    <div class="col-auto fs--1 text-600"><span class="mb-0 undefined">or</span> <span><a
+    <div class="col-auto fs--1 text-700"><span class="mb-0">or</span> <span><a
             href="{% url 'register' %}">Create an account</a></span></div>
 </div>
 <form method="post" action="{% url 'login' %}" id="content">
@@ -63,8 +63,8 @@
     <input type="hidden" name="next" value="{{ next }}"/>
 </form>
 <div class="position-relative mt-4">
-    <hr/>
-    <div class="divider-content-center">or log in with</div>
+    <hr class="text-200"/>
+    <div class="divider-content-center text-500">or log in with</div>
 </div>
 <div class="row g-2 mt-2">
     <div class="col-sm-6"><a class="btn btn-outline-google-plus btn-sm d-block w-100" href="#"><span

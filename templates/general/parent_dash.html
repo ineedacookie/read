@@ -1,6 +1,153 @@
 {% extends "general/nav_template.html" %}
 {% load static %}
 {% block title %}read | Parent Dashboard{% endblock %}
+
+{% block head %}
+<style>
+/* Parent Dashboard Theme Fixes */
+.card {
+    border-radius: 0.5rem !important;
+    box-shadow: 0 0.125rem 0.25rem rgba(0, 0, 0, 0.075) !important;
+}
+
+html:not(.dark) .card:not([class*="bg-"]) {
+    background-color: #ffffff !important;
+    border-color: #dee2e6 !important;
+}
+
+html.dark .card:not([class*="bg-"]) {
+    background-color: rgba(255, 255, 255, 0.05) !important;
+    border-color: rgba(255, 255, 255, 0.1) !important;
+}
+
+html:not(.dark) .card-header {
+    background-color: #f8f9fa !important;
+    border-bottom-color: #dee2e6 !important;
+}
+
+html.dark .card-header {
+    background-color: rgba(255, 255, 255, 0.05) !important;
+    border-bottom-color: rgba(255, 255, 255, 0.1) !important;
+}
+
+html:not(.dark) .card:not([class*="bg-"]) .card-body {
+    background-color: #ffffff !important;
+    color: #212529 !important;
+}
+
+html.dark .card:not([class*="bg-"]) .card-body {
+    background-color: rgba(255, 255, 255, 0.02) !important;
+    color: rgba(255, 255, 255, 0.9) !important;
+}
+
+/* Hover effects */
+.card:hover {
+    transform: translateY(-2px);
+    transition: all 0.3s ease;
+}
+
+/* Chart container styling */
+#childMonthlyReadingChart {
+    width: 100% !important;
+    height: 400px !important;
+}
+
+/* List group items theme support */
+html:not(.dark) .list-group-item {
+    background-color: transparent !important;
+    color: #212529 !important;
+}
+
+html.dark .list-group-item {
+    background-color: transparent !important;
+    color: rgba(255, 255, 255, 0.9) !important;
+}
+
+/* Modal theme support */
+html:not(.dark) .modal-content {
+    background-color: #ffffff !important;
+    color: #212529 !important;
+}
+
+html.dark .modal-content {
+    background-color: #1e2832 !important;
+    color: rgba(255, 255, 255, 0.9) !important;
+}
+
+html:not(.dark) .modal-header {
+    background-color: #f8f9fa !important;
+    border-bottom-color: #dee2e6 !important;
+}
+
+html.dark .modal-header {
+    background-color: rgba(255, 255, 255, 0.05) !important;
+    border-bottom-color: rgba(255, 255, 255, 0.1) !important;
+}
+
+/* Form control theme support for modals */
+html.dark .modal .form-control {
+    background-color: rgba(255, 255, 255, 0.05) !important;
+    border-color: rgba(255, 255, 255, 0.2) !important;
+    color: rgba(255, 255, 255, 0.9) !important;
+}
+
+html.dark .modal .form-control:focus {
+    background-color: rgba(255, 255, 255, 0.08) !important;
+    border-color: rgba(255, 255, 255, 0.3) !important;
+    color: rgba(255, 255, 255, 0.95) !important;
+}
+
+html.dark .modal .form-select {
+    background-color: rgba(255, 255, 255, 0.05) !important;
+    border-color: rgba(255, 255, 255, 0.2) !important;
+    color: rgba(255, 255, 255, 0.9) !important;
+}
+
+/* Table theme support for log management */
+html:not(.dark) .table {
+    --bs-table-bg: #ffffff !important;
+    --bs-table-striped-bg: #f8f9fa !important;
+    color: #212529 !important;
+}
+
+html.dark .table {
+    --bs-table-bg: rgba(255, 255, 255, 0.02) !important;
+    --bs-table-striped-bg: rgba(255, 255, 255, 0.05) !important;
+    color: rgba(255, 255, 255, 0.9) !important;
+}
+
+html:not(.dark) .table thead th {
+    background-color: #f8f9fa !important;
+    color: #495057 !important;
+    border-bottom-color: #dee2e6 !important;
+}
+
+html.dark .table thead th {
+    background-color: rgba(255, 255, 255, 0.1) !important;
+    color: rgba(255, 255, 255, 0.95) !important;
+    border-bottom-color: rgba(255, 255, 255, 0.2) !important;
+}
+
+html:not(.dark) .table tbody td {
+    color: #212529 !important;
+    border-bottom-color: #dee2e6 !important;
+}
+
+html.dark .table tbody td {
+    color: rgba(255, 255, 255, 0.85) !important;
+    border-bottom-color: rgba(255, 255, 255, 0.1) !important;
+}
+
+html:not(.dark) .table tbody tr:hover {
+    background-color: rgba(0, 0, 0, 0.05) !important;
+}
+
+html.dark .table tbody tr:hover {
+    background-color: rgba(255, 255, 255, 0.08) !important;
+}
+</style>
+{% endblock %}
+
 {% block content %}
 
 <!-- Header with Date Range Selector -->
@@ -75,9 +222,259 @@
     </div>
 </div>
 
+<!-- Add Reading Log Modal -->
+<div class="modal fade" id="addLogModal" tabindex="-1" aria-labelledby="addLogModalLabel" aria-hidden="true">
+    <div class="modal-dialog modal-lg">
+        <div class="modal-content">
+            <div class="modal-header">
+                <h5 class="modal-title" id="addLogModalLabel">
+                    <i class="fas fa-book me-2"></i>Add Reading Log for <span id="modal-child-name"></span>
+                </h5>
+                <button type="button" class="btn-close" data-bs-dismiss="modal" aria-label="Close"></button>
+            </div>
+            <div class="modal-body">
+                <form id="addLogForm">
+                    <input type="hidden" id="modal-child-id" />
+                    
+                    <div class="row">
+                        <div class="col-md-6 mb-3">
+                            <label for="log-title" class="form-label">Book Title</label>
+                            <input type="text" class="form-control" id="log-title" maxlength="255">
+                        </div>
+                        <div class="col-md-6 mb-3">
+                            <label for="log-author" class="form-label">Author</label>
+                            <input type="text" class="form-control" id="log-author" maxlength="255">
+                        </div>
+                    </div>
+                    
+                    <div class="row">
+                        <div class="col-md-4 mb-3">
+                            <label for="log-date" class="form-label">Reading Date *</label>
+                            <input type="date" class="form-control" id="log-date" required>
+                        </div>
+                        <div class="col-md-4 mb-3">
+                            <label for="log-pages" class="form-label">Pages Read</label>
+                            <input type="number" class="form-control" id="log-pages" min="1" max="9999">
+                        </div>
+                        <div class="col-md-4 mb-3">
+                            <label for="log-minutes" class="form-label">Minutes Read</label>
+                            <input type="number" class="form-control" id="log-minutes" min="1" max="1440">
+                        </div>
+                    </div>
+                    
+                    <div class="row">
+                        <div class="col-md-6 mb-3">
+                            <label for="log-rating" class="form-label">Rating</label>
+                            <select class="form-select" id="log-rating">
+                                <option value="">No Rating</option>
+                                <option value="1">⭐ (1 star)</option>
+                                <option value="2">⭐⭐ (2 stars)</option>
+                                <option value="3">⭐⭐⭐ (3 stars)</option>
+                                <option value="4">⭐⭐⭐⭐ (4 stars)</option>
+                                <option value="5">⭐⭐⭐⭐⭐ (5 stars)</option>
+                            </select>
+                        </div>
+                    </div>
+                    
+                    <div class="mb-3">
+                        <label for="log-comments" class="form-label">Comments</label>
+                        <textarea class="form-control" id="log-comments" rows="3" maxlength="2000" placeholder="Optional notes about the reading session..."></textarea>
+                    </div>
+                </form>
+            </div>
+            <div class="modal-footer">
+                <button type="button" class="btn btn-secondary" data-bs-dismiss="modal">Cancel</button>
+                <button type="button" class="btn btn-primary" onclick="submitReadingLog()">
+                    <i class="fas fa-save me-1"></i>Save Reading Log
+                </button>
+            </div>
+        </div>
+    </div>
+</div>
+
+<!-- Progress Chart Modal -->
+<div class="modal fade" id="progressModal" tabindex="-1" aria-labelledby="progressModalLabel" aria-hidden="true">
+    <div class="modal-dialog modal-xl">
+        <div class="modal-content">
+            <div class="modal-header">
+                <h5 class="modal-title" id="progressModalLabel">
+                    <i class="fas fa-chart-line me-2"></i>Reading Progress for <span id="progress-child-name"></span>
+                </h5>
+                <button type="button" class="btn-close" data-bs-dismiss="modal" aria-label="Close"></button>
+            </div>
+            <div class="modal-body">
+                <!-- Dynamic View Controls -->
+                <div class="row mb-3" id="dynamic-view-controls">
+                    <div class="col-12">
+                        <div class="d-flex align-items-center justify-content-between">
+                            <div class="d-flex align-items-center">
+                                <label for="month-selector" class="form-label me-2 mb-0">View Month:</label>
+                                <select id="month-selector" class="form-select form-select-sm me-2" style="width: auto;">
+                                    <!-- Populated by JavaScript -->
+                                </select>
+                                <button id="refresh-button" class="btn btn-sm btn-outline-primary" onclick="loadChildMonthlyChart()">
+                                    <i class="fas fa-sync"></i>
+                                </button>
+                            </div>
+                            <button id="toggle-view-button" class="btn btn-sm btn-outline-success" onclick="showLogManagementView()">
+                                <i class="fas fa-edit me-1"></i>Manage Reading Logs
+                            </button>
+                        </div>
+                    </div>
+                </div>
+                
+                <!-- Chart and Stats Container -->
+                <div id="progress-chart-container">
+                    <!-- Loading indicator -->
+                    <div id="chart-loading" class="d-none justify-content-center align-items-center" style="height: 400px;">
+                        <div class="spinner-border text-primary" role="status">
+                            <span class="visually-hidden">Loading chart...</span>
+                        </div>
+                    </div>
+                    
+                    <!-- Chart Section -->
+                    <div id="chart-content" class="d-none">
+                        <div class="row mb-3">
+                            <div class="col-12">
+                                <div style="height: 400px;">
+                                    <canvas id="childMonthlyReadingChart"></canvas>
+                                </div>
+                            </div>
+                        </div>
+                        
+                        <!-- Month Summary - Horizontal Layout Below Chart -->
+                        <div class="row">
+                            <div class="col-12">
+                                <div class="card">
+                                    <div class="card-body py-3">
+                                        <div class="row text-center">
+                                            <div class="col-3">
+                                                <h5 class="text-primary mb-1" id="child-month-pages">0</h5>
+                                                <small class="text-muted">Pages Read</small>
+                                            </div>
+                                            <div class="col-3">
+                                                <h5 class="text-success mb-1" id="child-month-books">0</h5>
+                                                <small class="text-muted">Books Read</small>
+                                            </div>
+                                            <div class="col-3">
+                                                <h5 class="text-info mb-1" id="child-month-minutes">0</h5>
+                                                <small class="text-muted">Minutes Read</small>
+                                            </div>
+                                            <div class="col-3">
+                                                <span class="badge bg-primary" id="child-reading-level">📖 Reader</span>
+                                                <br><small class="text-muted">Reading Level</small>
+                                            </div>
+                                        </div>
+                                    </div>
+                                </div>
+                            </div>
+                        </div>
+                    </div>
+                </div>
+                
+                <!-- Log Management View (Initially Hidden) -->
+                <div id="log-management-container" style="display: none;">
+                    <!-- Logs Table -->
+                    <div class="table-responsive">
+                        <table class="table table-striped table-hover">
+                            <thead>
+                                <tr>
+                                    <th>Date</th>
+                                    <th>Title</th>
+                                    <th>Author</th>
+                                    <th>Pages</th>
+                                    <th>Minutes</th>
+                                    <th>Rating</th>
+                                    <th>Actions</th>
+                                </tr>
+                            </thead>
+                            <tbody id="logs-table-body">
+                                <!-- Populated by JavaScript -->
+                            </tbody>
+                        </table>
+                    </div>
+                </div>
+            </div>
+        </div>
+    </div>
+</div>
+
+<!-- Edit Log Modal -->
+<div class="modal fade" id="editLogModal" tabindex="-1" aria-labelledby="editLogModalLabel" aria-hidden="true">
+    <div class="modal-dialog modal-lg">
+        <div class="modal-content">
+            <div class="modal-header">
+                <h5 class="modal-title" id="editLogModalLabel">
+                    <i class="fas fa-edit me-2"></i>Edit Reading Log
+                </h5>
+                <button type="button" class="btn-close" data-bs-dismiss="modal" aria-label="Close"></button>
+            </div>
+            <div class="modal-body">
+                <form id="editLogForm">
+                    <input type="hidden" id="edit-log-id" />
+                    <input type="hidden" id="edit-child-id" />
+                    
+                    <div class="row">
+                        <div class="col-md-6 mb-3">
+                            <label for="edit-log-title" class="form-label">Book Title</label>
+                            <input type="text" class="form-control" id="edit-log-title" maxlength="255">
+                        </div>
+                        <div class="col-md-6 mb-3">
+                            <label for="edit-log-author" class="form-label">Author</label>
+                            <input type="text" class="form-control" id="edit-log-author" maxlength="255">
+                        </div>
+                    </div>
+                    
+                    <div class="row">
+                        <div class="col-md-4 mb-3">
+                            <label for="edit-log-date" class="form-label">Reading Date *</label>
+                            <input type="date" class="form-control" id="edit-log-date" required>
+                        </div>
+                        <div class="col-md-4 mb-3">
+                            <label for="edit-log-pages" class="form-label">Pages Read</label>
+                            <input type="number" class="form-control" id="edit-log-pages" min="1" max="9999">
+                        </div>
+                        <div class="col-md-4 mb-3">
+                            <label for="edit-log-minutes" class="form-label">Minutes Read</label>
+                            <input type="number" class="form-control" id="edit-log-minutes" min="1" max="1440">
+                        </div>
+                    </div>
+                    
+                    <div class="row">
+                        <div class="col-md-6 mb-3">
+                            <label for="edit-log-rating" class="form-label">Rating</label>
+                            <select class="form-select" id="edit-log-rating">
+                                <option value="">No Rating</option>
+                                <option value="1">⭐ (1 star)</option>
+                                <option value="2">⭐⭐ (2 stars)</option>
+                                <option value="3">⭐⭐⭐ (3 stars)</option>
+                                <option value="4">⭐⭐⭐⭐ (4 stars)</option>
+                                <option value="5">⭐⭐⭐⭐⭐ (5 stars)</option>
+                            </select>
+                        </div>
+                    </div>
+                    
+                    <div class="mb-3">
+                        <label for="edit-log-comments" class="form-label">Comments</label>
+                        <textarea class="form-control" id="edit-log-comments" rows="3" maxlength="2000" placeholder="Optional notes about the reading session..."></textarea>
+                    </div>
+                </form>
+            </div>
+            <div class="modal-footer">
+                <button type="button" class="btn btn-secondary" data-bs-dismiss="modal">Cancel</button>
+                <button type="button" class="btn btn-primary" onclick="updateReadingLog()">
+                    <i class="fas fa-save me-1"></i>Update Log
+                </button>
+            </div>
+        </div>
+    </div>
+</div>
+
 {% endblock %}
 
 {% block afterScripts %}
+<!-- Chart.js for Progress Charts -->
+<script src="https://cdn.jsdelivr.net/npm/chart.js"></script>
 <script>
 document.addEventListener('DOMContentLoaded', function() {
     // Load initial data
@@ -196,7 +593,7 @@ function createChildCard(child, dateRange) {
     return `
         <div class="col-lg-6 mb-4">
             <div class="card h-100 ${hasActivity ? 'border-success' : 'border-light'}">
-                <div class="card-header bg-light">
+                <div class="card-header">
                     <div class="d-flex justify-content-between align-items-center">
                         <h5 class="mb-0">
                             <i class="fas fa-user-graduate me-2 text-primary"></i>
@@ -212,7 +609,7 @@ function createChildCard(child, dateRange) {
                         <h6 class="mt-3 mb-2">Recent Reading:</h6>
                         <div class="list-group list-group-flush">
                             ${child.recent_logs.slice(0, 3).map(log => `
-                                <div class="list-group-item px-0 py-2 border-0 bg-transparent">
+                                <div class="list-group-item px-0 py-2 border-0">
                                     <div class="d-flex justify-content-between align-items-start">
                                         <div>
                                             <strong>${log.title || 'Untitled'}</strong>
@@ -230,6 +627,16 @@ function createChildCard(child, dateRange) {
                         </div>
                     ` : ''}
                 </div>
+                <div class="card-footer">
+                    <div class="d-flex justify-content-between align-items-center">
+                        <button class="btn btn-outline-primary btn-sm" onclick="showProgressChart(${child.id}, '${child.name || child.email}')">
+                            <i class="fas fa-info-circle me-1"></i>More Info
+                        </button>
+                        <button class="btn btn-primary btn-sm" onclick="showAddLogModal(${child.id}, '${child.name || child.email}')">
+                            <i class="fas fa-plus me-1"></i>Add Reading Log
+                        </button>
+                    </div>
+                </div>
             </div>
         </div>
     `;
@@ -240,7 +647,7 @@ function createActiveChildBody(stats) {
         <div class="row text-center mb-3">
             <div class="col-6">
                 <div class="border-end">
-                    <h4 class="text-primary mb-1">${stats.total_books}</h4>
+                    <h4 class="text-primary mb-1">${stats.total_logs}</h4>
                     <small class="text-muted">Books</small>
                 </div>
             </div>
@@ -284,6 +691,812 @@ function showError(message) {
             </div>
         </div>
     `;
+}
+
+// Utility function to properly reset and clear form states
+function resetFormCompletely(formId) {
+    const form = document.getElementById(formId);
+    
+    // Reset form values
+    form.reset();
+    
+    // Clear any validation classes from form and its inputs
+    form.classList.remove('was-validated');
+    
+    // Clear validation classes from all input elements
+    const inputs = form.querySelectorAll('input, select, textarea');
+    inputs.forEach(input => {
+        input.classList.remove('is-valid', 'is-invalid');
+        
+        // Clear any custom validation messages
+        const feedback = input.parentNode.querySelector('.invalid-feedback, .valid-feedback');
+        if (feedback) {
+            feedback.remove();
+        }
+    });
+}
+
+function showAddLogModal(childId, childName) {
+    // Step 1: Reset form completely
+    resetFormCompletely('addLogForm');
+    
+    // Step 2: Set hidden fields and modal title
+    document.getElementById('modal-child-id').value = childId;
+    document.getElementById('modal-child-name').textContent = childName;
+    
+    // Step 3: Set default values
+    const today = new Date().toISOString().split('T')[0];
+    document.getElementById('log-date').value = today;
+    
+    // Step 4: Show modal
+    const modal = new bootstrap.Modal(document.getElementById('addLogModal'));
+    modal.show();
+}
+
+function submitReadingLog() {
+    const form = document.getElementById('addLogForm');
+    const childId = document.getElementById('modal-child-id').value;
+    
+    // Validate required fields
+    const title = document.getElementById('log-title').value.trim();
+    const date = document.getElementById('log-date').value;
+    
+    if (!date) {
+        showAlert('Please select a reading date', 'warning');
+        return;
+    }
+    
+    // Prepare form data
+    const formData = {
+        child_id: childId,
+        title: title,
+        author: document.getElementById('log-author').value.trim(),
+        date: date,
+        pages: document.getElementById('log-pages').value || null,
+        minutes: document.getElementById('log-minutes').value || null,
+        rating: document.getElementById('log-rating').value || null,
+        comments: document.getElementById('log-comments').value.trim()
+    };
+    
+    // Submit the form
+    fetch('{% url "parent_add_log" %}', {
+        method: 'POST',
+        headers: {
+            'Content-Type': 'application/json',
+            'X-CSRFToken': getCSRFToken()
+        },
+        body: JSON.stringify(formData)
+    })
+    .then(response => response.json())
+    .then(data => {
+        if (data.status === 'success') {
+            showAlert('Reading log added successfully!', 'success');
+            
+            // Close modal
+            const modal = bootstrap.Modal.getInstance(document.getElementById('addLogModal'));
+            modal.hide();
+            
+            // Refresh dashboard data
+            loadParentDashboard();
+        } else {
+            showAlert(data.message || 'Error adding reading log', 'danger');
+        }
+    })
+    .catch(error => {
+        console.error('Error submitting reading log:', error);
+        showAlert('Network error. Please try again.', 'danger');
+    });
+}
+
+// Global variables for chart management
+let currentChildId = null;
+let currentChildName = null;
+let currentChildChart = null;
+let currentChildLogs = [];
+
+function showProgressChart(childId = null, childName = null, openModal = true) {
+    // If childId is provided, this is opening a new modal for a specific child
+    if (childId && childName) {
+        currentChildId = childId;
+        currentChildName = childName;
+        document.getElementById('progress-child-name').textContent = childName;
+    }
+    // Otherwise, we're switching views for the current child
+    
+    // Ensure we start in chart view mode
+    document.getElementById('log-management-container').style.display = 'none';
+    document.getElementById('progress-chart-container').style.display = 'block';
+    
+    // Initialize controls for chart mode
+    const toggleButton = document.getElementById('toggle-view-button');
+    const refreshButton = document.getElementById('refresh-button');
+    
+    // Set toggle button to "Manage Reading Logs"
+    toggleButton.innerHTML = '<i class="fas fa-edit me-1"></i>Manage Reading Logs';
+    toggleButton.className = 'btn btn-sm btn-outline-success';
+    toggleButton.onclick = showLogManagementView;
+    
+    // Set refresh button for chart refreshing
+    refreshButton.onclick = loadChildMonthlyChart;
+    
+    // Set modal title to chart view
+    const displayName = childName || currentChildName;
+    document.getElementById('progressModalLabel').innerHTML = `
+        <i class="fas fa-chart-line me-2"></i>Reading Progress for <span id="progress-child-name">${displayName}</span>
+    `;
+    
+    // Always show loading state when switching to chart view
+    const loadingEl = document.getElementById('chart-loading');
+    const contentEl = document.getElementById('chart-content');
+    
+    loadingEl.classList.add('d-flex');
+    loadingEl.classList.remove('d-none');
+    contentEl.classList.add('d-none');
+    contentEl.classList.remove('d-block');
+    
+    // Initialize month selector
+    populateMonthSelector();
+    
+    // Show modal only if this is a new modal (not switching views)
+    if (openModal) {
+        const modal = new bootstrap.Modal(document.getElementById('progressModal'));
+        modal.show();
+    }
+    
+    // Always load/refresh the chart data
+    loadChildMonthlyChart();
+}
+
+function populateMonthSelector() {
+    const selector = document.getElementById('month-selector');
+    selector.innerHTML = '';
+    
+    const today = new Date();
+    const currentYear = today.getFullYear();
+    const currentMonth = today.getMonth();
+    
+    // Generate options for the past 12 months
+    for (let i = 0; i < 12; i++) {
+        const targetDate = new Date(currentYear, currentMonth - i, 1);
+        const year = targetDate.getFullYear();
+        const month = targetDate.getMonth() + 1;
+        const value = `${year}-${month.toString().padStart(2, '0')}`;
+        const text = targetDate.toLocaleDateString('en-US', { year: 'numeric', month: 'long' });
+        
+        const option = document.createElement('option');
+        option.value = value;
+        option.textContent = text;
+        if (i === 0) option.selected = true; // Current month selected by default
+        
+        selector.appendChild(option);
+    }
+    
+    // Remove existing event listeners to avoid duplicates
+    selector.removeEventListener('change', loadChildMonthlyChart);
+    selector.removeEventListener('change', loadChildLogs);
+    
+    // Add appropriate event listener based on current view
+    // We'll determine the mode by checking which container is visible
+    const isLogView = document.getElementById('log-management-container').style.display !== 'none';
+    if (isLogView) {
+        selector.addEventListener('change', loadChildLogs);
+    } else {
+        selector.addEventListener('change', loadChildMonthlyChart);
+    }
+}
+
+function loadChildMonthlyChart() {
+    const selectedMonth = document.getElementById('month-selector').value;
+    const [year, month] = selectedMonth.split('-');
+    
+    // Calculate start and end dates for the selected month
+    const startDate = new Date(year, month - 1, 1);
+    const lastDayOfMonth = new Date(year, month, 0);
+    const today = new Date();
+    const endDate = lastDayOfMonth > today ? today : lastDayOfMonth;
+    
+    console.log(`Loading child chart for ${selectedMonth}`);
+    
+    const url = `{% url "student_progress" %}?student_id=${currentChildId}&start_date=${startDate.toISOString().split('T')[0]}&end_date=${endDate.toISOString().split('T')[0]}`;
+    
+    // Show loading and hide chart content
+    const loadingEl = document.getElementById('chart-loading');
+    const contentEl = document.getElementById('chart-content');
+    
+    // Use class manipulation to handle Bootstrap's !important styles
+    loadingEl.classList.add('d-flex');
+    loadingEl.classList.remove('d-none');
+    contentEl.classList.add('d-none');
+    contentEl.classList.remove('d-block');
+    
+    fetch(url)
+    .then(response => response.json())
+    .then(data => {
+        if (data.status === 'success') {
+            currentChildLogs = data.recent_logs || [];
+            createChildMonthlyChart(data.recent_logs || [], selectedMonth);
+            updateChildMonthlyStats(data.recent_logs || [], selectedMonth);
+        } else {
+            console.error('Error loading child monthly data:', data.message);
+            createChildMonthlyChart([], selectedMonth);
+            updateChildMonthlyStats([], selectedMonth);
+        }
+        
+        // Always hide loading and show content after processing
+        loadingEl.classList.remove('d-flex');
+        loadingEl.classList.add('d-none');
+        contentEl.classList.remove('d-none');
+        contentEl.classList.add('d-block');
+    })
+    .catch(error => {
+        console.error('Error loading child monthly chart:', error);
+        createChildMonthlyChart([], selectedMonth);
+        updateChildMonthlyStats([], selectedMonth);
+        
+        // Always hide loading and show content after processing
+        loadingEl.classList.remove('d-flex');
+        loadingEl.classList.add('d-none');
+        contentEl.classList.remove('d-none');
+        contentEl.classList.add('d-block');
+    });
+}
+
+function createChildMonthlyChart(monthlyData, selectedMonth) {
+    const [year, month] = selectedMonth.split('-');
+    const daysInMonth = new Date(year, month, 0).getDate();
+    
+    // Initialize arrays for each day of the month
+    const days = Array.from({length: daysInMonth}, (_, i) => i + 1);
+    const pages = new Array(daysInMonth).fill(0);
+    const books = new Array(daysInMonth).fill(0);
+    const minutes = new Array(daysInMonth).fill(0);
+    
+    // Aggregate data by day
+    monthlyData.forEach(log => {
+        const logDate = new Date(log.date);
+        if (logDate.getMonth() + 1 == month && logDate.getFullYear() == year) {
+            const dayIndex = logDate.getDate() - 1;
+            pages[dayIndex] += log.pages || 0;
+            books[dayIndex] += 1;
+            minutes[dayIndex] += log.minutes || 0;
+        }
+    });
+    
+    // Check if Chart.js is available
+    if (typeof Chart === 'undefined') {
+        console.warn('Chart.js not available, showing table fallback');
+        createChartFallbackTable(monthlyData, selectedMonth);
+        return;
+    }
+    
+    const ctx = document.getElementById('childMonthlyReadingChart').getContext('2d');
+    
+    // Destroy existing chart if it exists
+    if (currentChildChart) {
+        currentChildChart.destroy();
+    }
+    
+    currentChildChart = new Chart(ctx, {
+        type: 'line',
+        data: {
+            labels: days,
+            datasets: [{
+                label: '📖 Pages Read',
+                data: pages,
+                borderColor: '#007bff',
+                backgroundColor: 'rgba(0, 123, 255, 0.1)',
+                fill: true,
+                tension: 0.4,
+                yAxisID: 'y'
+            }, {
+                label: '📚 Reading Sessions',
+                data: books,
+                borderColor: '#28a745',
+                backgroundColor: 'rgba(40, 167, 69, 0.1)',
+                fill: true,
+                tension: 0.4,
+                yAxisID: 'y1'
+            }, {
+                label: '⏰ Minutes Read',
+                data: minutes,
+                borderColor: '#17a2b8',
+                backgroundColor: 'rgba(23, 162, 184, 0.1)',
+                fill: true,
+                tension: 0.4,
+                yAxisID: 'y2'
+            }]
+        },
+        options: {
+            responsive: true,
+            maintainAspectRatio: false,
+            interaction: {
+                mode: 'index',
+                intersect: false,
+            },
+            scales: {
+                x: {
+                    title: {
+                        display: true,
+                        text: 'Day of Month'
+                    }
+                },
+                y: {
+                    type: 'linear',
+                    display: true,
+                    position: 'left',
+                    min: 0,
+                    title: {
+                        display: true,
+                        text: 'Pages',
+                        color: '#007bff'
+                    }
+                },
+                y1: {
+                    type: 'linear',
+                    display: true,
+                    position: 'right',
+                    min: 0,
+                    title: {
+                        display: true,
+                        text: 'Reading Sessions',
+                        color: '#28a745'
+                    },
+                    grid: {
+                        drawOnChartArea: false,
+                    },
+                },
+                y2: {
+                    type: 'linear',
+                    display: false,
+                    min: 0,
+                }
+            },
+            plugins: {
+                legend: {
+                    display: true,
+                    position: 'top'
+                },
+                title: {
+                    display: true,
+                    text: `${currentChildName}'s Reading Progress - ${new Date(year, month - 1).toLocaleDateString('en-US', { year: 'numeric', month: 'long' })}`
+                },
+                tooltip: {
+                    callbacks: {
+                        afterBody: function(context) {
+                            const dataIndex = context[0].dataIndex;
+                            return `Minutes: ${minutes[dataIndex]}`;
+                        }
+                    }
+                }
+            }
+        }
+    });
+}
+
+function updateChildMonthlyStats(recentLogs, selectedMonth) {
+    const [year, month] = selectedMonth.split('-');
+    
+    // Filter logs to the selected month
+    const filteredLogs = recentLogs.filter(log => {
+        const logDate = new Date(log.date);
+        return logDate.getMonth() + 1 == month && logDate.getFullYear() == year;
+    });
+    
+    // Calculate stats
+    const monthPages = Math.max(0, filteredLogs.reduce((sum, log) => sum + (log.pages || 0), 0));
+    const monthBooks = filteredLogs.length;
+    const monthMinutes = Math.max(0, filteredLogs.reduce((sum, log) => sum + (log.minutes || 0), 0));
+    
+    // Update display
+    document.getElementById('child-month-pages').textContent = monthPages;
+    document.getElementById('child-month-books').textContent = monthBooks;
+    document.getElementById('child-month-minutes').textContent = monthMinutes;
+    
+    // Determine reading level
+    let level = 'Beginner Reader 🌱';
+    if (monthPages >= 1000) level = 'Super Reader! 🌟';
+    else if (monthPages >= 500) level = 'Advanced Reader 📚';
+    else if (monthPages >= 200) level = 'Good Reader 👍';
+    else if (monthPages >= 50) level = 'Growing Reader 🌿';
+    
+    document.getElementById('child-reading-level').textContent = level;
+}
+
+function showLogManagementView() {
+    // Hide chart view, show log view
+    document.getElementById('progress-chart-container').style.display = 'none';
+    document.getElementById('log-management-container').style.display = 'block';
+    
+    // Update controls for log management mode
+    const toggleButton = document.getElementById('toggle-view-button');
+    const refreshButton = document.getElementById('refresh-button');
+    
+    // Update toggle button to "Back to Chart"
+    toggleButton.innerHTML = '<i class="fas fa-chart-line me-1"></i>Back to Chart';
+    toggleButton.className = 'btn btn-sm btn-outline-primary';
+    toggleButton.onclick = () => showProgressChart(null, null, false);
+    
+    // Update refresh button for log refreshing
+    refreshButton.onclick = refreshLogs;
+    
+    // Update modal title
+    document.getElementById('progressModalLabel').innerHTML = `
+        <i class="fas fa-edit me-2"></i>Manage Reading Logs for <span id="manage-child-name">${currentChildName}</span>
+    `;
+    
+    // Initialize month selector with log event listeners
+    populateMonthSelector();
+    
+    // Load logs for the current selected month
+    loadChildLogs();
+}
+
+
+
+function createChartFallbackTable(monthlyData, selectedMonth) {
+    const [year, month] = selectedMonth.split('-');
+    
+    // Filter logs to the selected month
+    const filteredLogs = monthlyData.filter(log => {
+        const logDate = new Date(log.date);
+        return logDate.getMonth() + 1 == month && logDate.getFullYear() == year;
+    });
+    
+    // Update the chart container div (the parent of the canvas)
+    const chartContainer = document.getElementById('childMonthlyReadingChart').parentElement;
+    
+    if (filteredLogs.length === 0) {
+        chartContainer.innerHTML = `
+            <div class="alert alert-info text-center">
+                <i class="fas fa-info-circle me-2"></i>
+                No reading data available for ${new Date(year, month - 1).toLocaleDateString('en-US', { year: 'numeric', month: 'long' })}.
+            </div>
+        `;
+        return;
+    }
+    
+    // Create table fallback
+    chartContainer.innerHTML = `
+        <div class="alert alert-warning mb-3">
+            <i class="fas fa-exclamation-triangle me-2"></i>
+            Chart visualization unavailable. Showing data table instead.
+        </div>
+        <div class="table-responsive">
+            <table class="table table-striped table-hover">
+                <thead>
+                    <tr>
+                        <th>Date</th>
+                        <th>Title</th>
+                        <th>Author</th>
+                        <th>Pages</th>
+                        <th>Minutes</th>
+                        <th>Rating</th>
+                    </tr>
+                </thead>
+                <tbody>
+                    ${filteredLogs.map(log => `
+                        <tr>
+                            <td>${new Date(log.date).toLocaleDateString()}</td>
+                            <td>${log.title || 'Untitled'}</td>
+                            <td>${log.author || '-'}</td>
+                            <td>${log.pages || '-'}</td>
+                            <td>${log.minutes || '-'}</td>
+                            <td>${log.rating ? '⭐'.repeat(Math.floor(log.rating)) : '-'}</td>
+                        </tr>
+                    `).join('')}
+                </tbody>
+            </table>
+        </div>
+    `;
+}
+
+
+
+function loadChildLogs() {
+    const logMonthSelector = document.getElementById('month-selector');
+    let startDate, endDate;
+    
+    if (logMonthSelector && logMonthSelector.value) {
+        // Use selected month from log management
+        const [year, month] = logMonthSelector.value.split('-');
+        startDate = new Date(year, month - 1, 1);
+        endDate = new Date(year, month, 0); // Last day of month
+        
+        // Don't go beyond today
+        const today = new Date();
+        if (endDate > today) {
+            endDate = today;
+        }
+        
+        console.log(`Loading child logs for ${logMonthSelector.value}: ${startDate.toISOString().split('T')[0]} to ${endDate.toISOString().split('T')[0]}`);
+    } else {
+        // Default to current month if no selector
+        const today = new Date();
+        startDate = new Date(today.getFullYear(), today.getMonth(), 1);
+        endDate = today;
+        
+        console.log(`Loading child logs for current month: ${startDate.toISOString().split('T')[0]} to ${endDate.toISOString().split('T')[0]}`);
+    }
+    
+    const url = `{% url "student_progress" %}?student_id=${currentChildId}&start_date=${startDate.toISOString().split('T')[0]}&end_date=${endDate.toISOString().split('T')[0]}`;
+    
+    fetch(url)
+    .then(response => response.json())
+    .then(data => {
+        console.log('Child logs API response:', data);
+        if (data.status === 'success') {
+            const logs = data.recent_logs || [];
+            console.log(`Found ${logs.length} logs for the period`);
+            currentChildLogs = logs;
+            displayChildLogs(logs);
+        } else {
+            console.error('Error loading child logs:', data.message);
+            displayChildLogs([]);
+        }
+    })
+    .catch(error => {
+        console.error('Error loading child logs:', error);
+        displayChildLogs([]);
+    });
+}
+
+function refreshLogs() {
+    // Reload logs for the selected month
+    loadChildLogs();
+    
+    // Show feedback
+    showAlert('Logs refreshed successfully!', 'success');
+}
+
+function displayChildLogs(logs) {
+    const tbody = document.getElementById('logs-table-body');
+    const logMonthSelector = document.getElementById('month-selector');
+    
+    console.log(`Displaying ${logs.length} logs`);
+    
+    if (logs.length === 0) {
+        const selectedMonth = logMonthSelector ? logMonthSelector.value : 'this period';
+        const monthText = selectedMonth !== 'this period' ? 
+            new Date(selectedMonth + '-01').toLocaleDateString('en-US', { year: 'numeric', month: 'long' }) : 
+            'this period';
+            
+        tbody.innerHTML = `
+            <tr>
+                <td colspan="7" class="text-center text-muted py-4">
+                    <i class="fas fa-book-open fa-2x mb-2"></i>
+                    <br>No reading logs found for ${monthText}.
+                    <br><small>Try selecting a different month or check if logs have been added for this child.</small>
+                </td>
+            </tr>
+        `;
+        return;
+    }
+    
+    // Sort logs by date (newest first)
+    logs.sort((a, b) => new Date(b.date) - new Date(a.date));
+    
+    tbody.innerHTML = logs.map(log => `
+        <tr>
+            <td>${new Date(log.date).toLocaleDateString()}</td>
+            <td>${log.title || 'Untitled'}</td>
+            <td>${log.author || '-'}</td>
+            <td>${log.pages || '-'}</td>
+            <td>${log.minutes || '-'}</td>
+            <td>${log.rating ? '⭐'.repeat(Math.floor(log.rating)) : '-'}</td>
+            <td>
+                <button class="btn btn-sm btn-outline-primary me-1" onclick="editLog(${log.id})" title="Edit">
+                    <i class="fas fa-edit"></i>
+                </button>
+                <button class="btn btn-sm btn-outline-danger" onclick="deleteLog(${log.id})" title="Delete">
+                    <i class="fas fa-trash"></i>
+                </button>
+            </td>
+        </tr>
+    `).join('');
+}
+
+
+
+function editLog(logId) {
+    const log = currentChildLogs.find(l => l.id === logId);
+    if (!log) {
+        showAlert('Log not found', 'danger');
+        return;
+    }
+    
+    // Step 1: Reset form completely
+    resetFormCompletely('editLogForm');
+    
+    // Step 2: Set hidden fields
+    document.getElementById('edit-log-id').value = log.id;
+    document.getElementById('edit-child-id').value = currentChildId;
+    
+    // Step 3: Populate form with log data
+    document.getElementById('edit-log-title').value = log.title || '';
+    document.getElementById('edit-log-author').value = log.author || '';
+    document.getElementById('edit-log-date').value = log.date;
+    document.getElementById('edit-log-pages').value = log.pages || '';
+    document.getElementById('edit-log-minutes').value = log.minutes || '';
+    document.getElementById('edit-log-rating').value = log.rating || '';
+    document.getElementById('edit-log-comments').value = log.comments || '';
+    
+    // Step 4: Show edit modal
+    const modal = new bootstrap.Modal(document.getElementById('editLogModal'));
+    modal.show();
+}
+
+function updateReadingLog() {
+    const logId = document.getElementById('edit-log-id').value;
+    const childId = document.getElementById('edit-child-id').value;
+    
+    // Validate required fields
+    const title = document.getElementById('edit-log-title').value.trim();
+    const date = document.getElementById('edit-log-date').value;
+    
+    if (!date) {
+        showAlert('Please select a reading date', 'warning');
+        return;
+    }
+    
+    // Prepare form data
+    const formData = {
+        log_id: logId,
+        child_id: childId,
+        title: title,
+        author: document.getElementById('edit-log-author').value.trim(),
+        date: date,
+        pages: document.getElementById('edit-log-pages').value || null,
+        minutes: document.getElementById('edit-log-minutes').value || null,
+        rating: document.getElementById('edit-log-rating').value || null,
+        comments: document.getElementById('edit-log-comments').value.trim()
+    };
+    
+    // Submit the update
+    fetch('{% url "parent_edit_log" %}', {
+        method: 'POST',
+        headers: {
+            'Content-Type': 'application/json',
+            'X-CSRFToken': getCSRFToken()
+        },
+        body: JSON.stringify(formData)
+    })
+    .then(response => response.json())
+    .then(data => {
+        if (data.status === 'success') {
+            showAlert('Reading log updated successfully!', 'success');
+            
+            // Close modal
+            const modal = bootstrap.Modal.getInstance(document.getElementById('editLogModal'));
+            modal.hide();
+            
+            // Refresh logs and chart
+            loadChildLogs();
+            loadChildMonthlyChart();
+            loadParentDashboard(); // Refresh main dashboard too
+        } else {
+            showAlert(data.message || 'Error updating reading log', 'danger');
+        }
+    })
+    .catch(error => {
+        console.error('Error updating reading log:', error);
+        showAlert('Network error. Please try again.', 'danger');
+    });
+}
+
+function deleteLog(logId) {
+    if (!confirm('Are you sure you want to delete this reading log? This action cannot be undone.')) {
+        return;
+    }
+    
+    // Get CSRF token with better error handling
+    const csrfToken = getCSRFToken();
+    
+    console.log('CSRF Token for delete request:', csrfToken ? `${csrfToken.substring(0, 10)}...` : 'null');
+    
+    if (!csrfToken || csrfToken.trim().length === 0) {
+        showAlert('Security token not found. Please refresh the page and try again.', 'danger');
+        return;
+    }
+    
+    fetch('{% url "parent_delete_log" %}', {
+        method: 'POST',
+        headers: {
+            'Content-Type': 'application/json',
+            'X-CSRFToken': csrfToken.trim() // Ensure no whitespace
+        },
+        body: JSON.stringify({
+            log_id: logId,
+            child_id: currentChildId
+        })
+    })
+    .then(response => {
+        // Handle non-200 responses before trying to parse JSON
+        if (!response.ok) {
+            if (response.status === 403) {
+                throw new Error('Permission denied. Please refresh the page and try again.');
+            }
+            if (response.status === 404) {
+                throw new Error('Reading log not found.');
+            }
+            throw new Error(`Server error: ${response.status}`);
+        }
+        
+        // Check if response is actually JSON
+        const contentType = response.headers.get('Content-Type');
+        if (!contentType || !contentType.includes('application/json')) {
+            throw new Error('Invalid response format from server.');
+        }
+        
+        return response.json();
+    })
+    .then(data => {
+        if (data.status === 'success') {
+            showAlert('Reading log deleted successfully!', 'success');
+            
+            // Refresh logs and chart
+            loadChildLogs();
+            loadChildMonthlyChart();
+            loadParentDashboard(); // Refresh main dashboard too
+        } else {
+            showAlert(data.message || 'Error deleting reading log', 'danger');
+        }
+    })
+    .catch(error => {
+        console.error('Error deleting reading log:', error);
+        showAlert(error.message || 'Error deleting reading log. Please try again.', 'danger');
+    });
+}
+
+function showAlert(message, type = 'info') {
+    // Create and show a Bootstrap alert
+    const alertHtml = `
+        <div class="alert alert-${type} alert-dismissible fade show position-fixed" 
+             style="top: 20px; right: 20px; z-index: 9999; max-width: 300px;" role="alert">
+            ${message}
+            <button type="button" class="btn-close" data-bs-dismiss="alert" aria-label="Close"></button>
+        </div>
+    `;
+    
+    // Add to body
+    document.body.insertAdjacentHTML('beforeend', alertHtml);
+    
+    // Auto-dismiss after 5 seconds
+    setTimeout(() => {
+        const alerts = document.querySelectorAll('.alert');
+        if (alerts.length > 0) {
+            const lastAlert = alerts[alerts.length - 1];
+            if (lastAlert) {
+                bootstrap.Alert.getOrCreateInstance(lastAlert).close();
+            }
+        }
+    }, 5000);
+}
+
+// Get CSRF token with multiple fallback methods
+function getCSRFToken() {
+    // Method 1: Get from Django template (most reliable)
+    const templateToken = '{{ csrf_token }}';
+    if (templateToken && templateToken !== '' && !templateToken.includes('{')) {
+        return templateToken;
+    }
+    
+    // Method 2: Get from cookie (fallback)
+    return getCookie('csrftoken');
+}
+
+function getCookie(name) {
+    let cookieValue = null;
+    if (document.cookie && document.cookie !== '') {
+        const cookies = document.cookie.split(';');
+        for (let i = 0; i < cookies.length; i++) {
+            const cookie = cookies[i].trim();
+            if (cookie.substring(0, name.length + 1) === (name + '=')) {
+                cookieValue = decodeURIComponent(cookie.substring(name.length + 1));
+                break;
+            }
+        }
+    }
+    return cookieValue;
 }
 </script>
 {% endblock %}

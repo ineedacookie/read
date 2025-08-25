@@ -519,12 +519,12 @@
                             <h6 class="text-success border-bottom pb-2 mb-3">
                                 <i class="fas fa-users me-2"></i>Membership
                             </h6>
-                            {% for field in form %}
+                        {% for field in form %}
                                 {% if field.name in "students,teachers,goals,meeting_schedule" %}
                                 <div class="mb-3">
                                     {{ field.label_tag }}
-                                    {{ field }}
-                                    {% if field.errors %}
+                                {{ field }}
+                                {% if field.errors %}
                                         <div class="text-danger small mt-1">{{ field.errors }}</div>
                                     {% endif %}
                                 </div>
@@ -603,7 +603,7 @@
                             {% endif %}
                         </div>
                         {% endif %}
-                    {% endfor %}
+                        {% endfor %}
                 {% endif %}
             </div>
             <div class="card-footer d-flex justify-content-between align-items-center">
@@ -720,16 +720,32 @@
         return item.text;
     }
 
-    // Initialize Select2 for any select fields
+    // Initialize Select2 for any select fields with Bootstrap 5 theme
     $('select').each(function() {
-        $(this).select2({
-            placeholder: '',
+        const $select = $(this);
+        const isMultiple = $select.prop('multiple');
+        
+        $select.select2({
+            theme: 'bootstrap-5',
+            placeholder: $select.attr('placeholder') || 'Choose...',
             allowClear: true,
-            width: 'resolve', // Resolve the width of the container to fit the element
-            closeOnSelect: false, // Keep dropdown open when selecting items
-            templateResult: (item) => templateRender(item, this)
+            width: '100%',
+            closeOnSelect: !isMultiple, // Keep open for multiple, close for single
+            dropdownParent: $select.closest('.modal').length ? $select.closest('.modal') : $('body'),
+            templateResult: (item) => templateRender(item, this),
+            escapeMarkup: function(markup) { return markup; }, // Allow HTML content
+            language: {
+                noResults: function() {
+                    return '<span class="text-muted">No results found</span>';
+                },
+                searching: function() {
+                    return '<span class="text-muted">Searching...</span>';
+                }
+            }
         }).on('select2:select', function (e) {
+            if (isMultiple) {
             $(e.target).select2('close').select2('open');
+            }
         });
     });
 

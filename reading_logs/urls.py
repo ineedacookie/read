@@ -14,6 +14,9 @@ urlpatterns = [
     path('api/student/quick_log/', views.student_quick_log, name='student_quick_log'),
     path('api/student/progress/', views.student_progress, name='student_progress'),
     path('api/parent/dashboard/', views.parent_dashboard_data, name='parent_dashboard'),
+    path('api/parent/add_log/', views.parent_add_log, name='parent_add_log'),
+    path('api/parent/edit_log/', views.parent_edit_log, name='parent_edit_log'),
+    path('api/parent/delete_log/', views.parent_delete_log, name='parent_delete_log'),
     
     # Phase 2: Advanced Analytics APIs
     path('api/analytics/school/', analytics_views.school_analytics_api, name='school_analytics'),

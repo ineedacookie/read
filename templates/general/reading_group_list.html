@@ -162,21 +162,41 @@
 
         function initializeSelect2() {
             $('#reading-group-students').select2({
+                theme: 'bootstrap-5',
                 placeholder: 'Select students',
                 allowClear: true,
-                width: 'resolve', // Resolve the width of the container to fit the element
+                width: '100%',
                 dropdownParent: $('#addEditReadingGroupModal'), // Ensure dropdown displays in front of the modal
                 closeOnSelect: false, // Keep dropdown open when selecting items
-                templateResult: templateRenderStudents
+                templateResult: templateRenderStudents,
+                escapeMarkup: function(markup) { return markup; },
+                language: {
+                    noResults: function() {
+                        return '<span class="text-muted">No students found</span>';
+                    },
+                    searching: function() {
+                        return '<span class="text-muted">Searching students...</span>';
+                    }
+                }
             });
 
             $('#reading-group-teachers').select2({
+                theme: 'bootstrap-5',
                 placeholder: 'Select teachers',
                 allowClear: true,
-                width: 'resolve', // Resolve the width of the container to fit the element
+                width: '100%',
                 dropdownParent: $('#addEditReadingGroupModal'), // Ensure dropdown displays in front of the modal
                 closeOnSelect: false, // Keep dropdown open when selecting items
-                templateResult: templateRenderTeachers
+                templateResult: templateRenderTeachers,
+                escapeMarkup: function(markup) { return markup; },
+                language: {
+                    noResults: function() {
+                        return '<span class="text-muted">No teachers found</span>';
+                    },
+                    searching: function() {
+                        return '<span class="text-muted">Searching teachers...</span>';
+                    }
+                }
             });
         }
 
