@@ -983,5 +983,144 @@ html.dark .table-hover > tbody > tr:hover > * {
     }
 }
 
+/* =============================================================================
+   PARENT DASHBOARD STYLES
+   ============================================================================= */
+
+.parent-dash .card {
+    border-radius: 0.5rem !important;
+    box-shadow: 0 0.125rem 0.25rem rgba(0, 0, 0, 0.075) !important;
+}
+
+html:not(.dark) .parent-dash .card:not([class*="bg-"]) {
+    background-color: #ffffff !important;
+    border-color: #dee2e6 !important;
+}
+
+html.dark .parent-dash .card:not([class*="bg-"]) {
+    background-color: rgba(255, 255, 255, 0.05) !important;
+    border-color: rgba(255, 255, 255, 0.1) !important;
+}
+
+html:not(.dark) .parent-dash .card-header {
+    background-color: #f8f9fa !important;
+    border-bottom-color: #dee2e6 !important;
+}
+
+html.dark .parent-dash .card-header {
+    background-color: rgba(255, 255, 255, 0.05) !important;
+    border-bottom-color: rgba(255, 255, 255, 0.1) !important;
+}
+
+html:not(.dark) .parent-dash .card:not([class*="bg-"]) .card-body {
+    background-color: #ffffff !important;
+    color: #212529 !important;
+}
+
+html.dark .parent-dash .card:not([class*="bg-"]) .card-body {
+    background-color: rgba(255, 255, 255, 0.02) !important;
+    color: rgba(255, 255, 255, 0.9) !important;
+}
+
+.parent-dash .card:hover {
+    transform: translateY(-2px);
+    transition: all 0.3s ease;
+}
+
+.parent-dash #childMonthlyReadingChart {
+    width: 100% !important;
+    height: 400px !important;
+}
+
+html:not(.dark) .parent-dash .list-group-item {
+    background-color: transparent !important;
+    color: #212529 !important;
+}
+
+html.dark .parent-dash .list-group-item {
+    background-color: transparent !important;
+    color: rgba(255, 255, 255, 0.9) !important;
+}
+
+html:not(.dark) .parent-dash .modal-content {
+    background-color: #ffffff !important;
+    color: #212529 !important;
+}
+
+html.dark .parent-dash .modal-content {
+    background-color: #1e2832 !important;
+    color: rgba(255, 255, 255, 0.9) !important;
+}
+
+html:not(.dark) .parent-dash .modal-header {
+    background-color: #f8f9fa !important;
+    border-bottom-color: #dee2e6 !important;
+}
+
+html.dark .parent-dash .modal-header {
+    background-color: rgba(255, 255, 255, 0.05) !important;
+    border-bottom-color: rgba(255, 255, 255, 0.1) !important;
+}
+
+html.dark .parent-dash .modal .form-control {
+    background-color: rgba(255, 255, 255, 0.05) !important;
+    border-color: rgba(255, 255, 255, 0.2) !important;
+    color: rgba(255, 255, 255, 0.9) !important;
+}
+
+html.dark .parent-dash .modal .form-control:focus {
+    background-color: rgba(255, 255, 255, 0.08) !important;
+    border-color: rgba(255, 255, 255, 0.3) !important;
+    color: rgba(255, 255, 255, 0.95) !important;
+}
+
+html.dark .parent-dash .modal .form-select {
+    background-color: rgba(255, 255, 255, 0.05) !important;
+    border-color: rgba(255, 255, 255, 0.2) !important;
+    color: rgba(255, 255, 255, 0.9) !important;
+}
+
+html:not(.dark) .parent-dash .table {
+    --bs-table-bg: #ffffff !important;
+    --bs-table-striped-bg: #f8f9fa !important;
+    color: #212529 !important;
+}
+
+html.dark .parent-dash .table {
+    --bs-table-bg: rgba(255, 255, 255, 0.02) !important;
+    --bs-table-striped-bg: rgba(255, 255, 255, 0.05) !important;
+    color: rgba(255, 255, 255, 0.9) !important;
+}
+
+html:not(.dark) .parent-dash .table thead th {
+    background-color: #f8f9fa !important;
+    color: #495057 !important;
+    border-bottom-color: #dee2e6 !important;
+}
+
+html.dark .parent-dash .table thead th {
+    background-color: rgba(255, 255, 255, 0.1) !important;
+    color: rgba(255, 255, 255, 0.95) !important;
+    border-bottom-color: rgba(255, 255, 255, 0.2) !important;
+}
+
+html:not(.dark) .parent-dash .table tbody td {
+    color: #212529 !important;
+    border-bottom-color: #dee2e6 !important;
+}
+
+html.dark .parent-dash .table tbody td {
+    color: rgba(255, 255, 255, 0.85) !important;
+    border-bottom-color: rgba(255, 255, 255, 0.1) !important;
+}
+
+html:not(.dark) .parent-dash .table tbody tr:hover {
+    background-color: rgba(0, 0, 0, 0.05) !important;
+}
+
+html.dark .parent-dash .table tbody tr:hover {
+    background-color: rgba(255, 255, 255, 0.08) !important;
+}
+
 /* prettier-ignore */
 /*# sourceMappingURL=user.css.map */
