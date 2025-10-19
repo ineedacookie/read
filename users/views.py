@@ -1378,3 +1378,56 @@ def handler404(request, *args, **argv):
 def handler500(request, *args, **argv):
     page = 'general/500.html'
     return render(request, page, {}, status=500)
+
+
+# =============================================================================
+# CLASS-BASED VIEWS (New - Using Mixins for Cleaner Code)
+# =============================================================================
+
+from django.views.generic import ListView
+from django.contrib.auth.mixins import LoginRequiredMixin
+from .view_mixins import (
+    SchoolFilterMixin,
+    UserTypePermissionMixin,
+    SearchableMixin,
+    SortableMixin
+)
+
+
+class StudentListView(
+    LoginRequiredMixin,
+    SchoolFilterMixin,
+    UserTypePermissionMixin,
+    SearchableMixin,
+    SortableMixin,
+    ListView
+):
+    """
+    Class-based view for listing students with automatic filtering and permissions
+    Uses mixins to eliminate boilerplate code
+    """
+    model = CustomUser
+    template_name = 'general/user_list.html'
+    context_object_name = 'page_obj'
+    paginate_by = 10
+    allowed_user_types = ['teacher', 'administrator', 'parent']
+    search_fields = ['email', 'first_name', 'last_name']
+    sortable_fields = {
+        'id': 'id',
+        'first_name': 'first_name',
+        'email': 'email'
+    }
+    default_sort = 'first_name'
+    
+    def get_queryset(self):
+        """Filter for students only, respect teacher permissions"""
+        queryset = super().get_queryset()
+        queryset = queryset.filter(user_type='student')
+        return queryset
+    
+    def get_context_data(self, **kwargs):
+        """Add invite form to context"""
+        context = super().get_context_data(**kwargs)
+        context['user_type'] = 'student'
+        context['invite_form'] = InviteStudentsForm()
+        return context
