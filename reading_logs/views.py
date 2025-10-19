@@ -45,6 +45,13 @@ from read.utils import (
     log_successful_action,
     ValidationError as UtilsValidationError
 )
+from read.utils.decorators import (
+    require_user_types,
+    require_json_body,
+    rate_limit,
+    log_action,
+    measure_performance
+)
 
 
 @login_required
@@ -321,38 +328,29 @@ def manage_log(request):
 
 @login_required
 @require_http_methods(["POST"])
+@require_user_types('student')
+@rate_limit(requests_per_minute=60)
+@log_action('student_quick_log')
+@measure_performance(threshold_ms=500)
 @transaction.atomic
 def student_quick_log(request):
     """
-    Quick log entry API for students - Enterprise-grade security and validation
+    Quick log entry API for students - Enhanced with decorators
     """
     try:
-        # Check user type permission
-        check_user_type(request.user, 'student')
-        
-        # Check rate limiting
-        check_rate_limit(request.user.id, 'student_log')
-        
-        # Security: Check request size (prevent DoS)
-        content_length = len(request.body) if hasattr(request, 'body') else 0
-        if content_length > 10240:  # 10KB limit
-            logger.warning(f"Oversized request from user {request.user.id}: {content_length} bytes")
-            return error_response('Request too large', status=413, user_id=request.user.id)
-        
-        # Parse request data
-        try:
-            if request.content_type == 'application/json':
+        # Parse request data (handles both JSON and form data)
+        if request.content_type == 'application/json':
+            try:
                 data = json.loads(request.body)
                 if not isinstance(data, dict):
                     raise ValueError("Invalid data format")
-            else:
-                # Handle form data (application/x-www-form-urlencoded)
-                data = dict(request.POST)
-                # Convert single-item lists to strings (Django form parsing)
-                data = {k: v[0] if isinstance(v, list) and len(v) == 1 else v for k, v in data.items()}
-        except (json.JSONDecodeError, ValueError) as e:
-            logger.warning(f"Invalid JSON from user {request.user.id}: {str(e)}")
-            return error_response('Invalid data format', status=400, user_id=request.user.id)
+            except (json.JSONDecodeError, ValueError) as e:
+                logger.warning(f"Invalid JSON from user {request.user.id}: {str(e)}")
+                return error_response('Invalid data format', status=400, user_id=request.user.id)
+        else:
+            # Handle form data (application/x-www-form-urlencoded)
+            data = dict(request.POST)
+            data = {k: v[0] if isinstance(v, list) and len(v) == 1 else v for k, v in data.items()}
         
         # Validate reading log data using helper
         try:
@@ -656,14 +654,12 @@ def parent_dashboard_data(request):
 
 @login_required
 @require_http_methods(["POST"])
+@require_user_types('parent')
+@rate_limit(requests_per_minute=60)
+@log_action('parent_add_log')
 @transaction.atomic
 def parent_add_log(request):
-    """Allow parents to add reading logs for their children - Enterprise security"""
-    # Security: Validate user type
-    if request.user.user_type != 'parent':
-        logger.warning(f"Non-parent user {request.user.id} attempted to add child reading log")
-        return JsonResponse({'status': 'error', 'message': 'Access denied'}, status=403)
-    
+    """Allow parents to add reading logs for their children - Enhanced with decorators"""
     try:
         # Parse JSON data
         try:
@@ -799,13 +795,12 @@ def parent_add_log(request):
 
 @login_required
 @require_http_methods(["POST"])
+@require_user_types('parent')
+@rate_limit(requests_per_minute=60)
+@log_action('parent_edit_log')
 @transaction.atomic
 def parent_edit_log(request):
-    """Allow parents to edit reading logs for their children - Enterprise security"""
-    # Security: Validate user type
-    if request.user.user_type != 'parent':
-        logger.warning(f"Non-parent user {request.user.id} attempted to edit child reading log")
-        return JsonResponse({'status': 'error', 'message': 'Access denied'}, status=403)
+    """Allow parents to edit reading logs for their children - Enhanced with decorators"""
     
     try:
         # Parse JSON data
@@ -942,13 +937,12 @@ def parent_edit_log(request):
 
 @login_required
 @require_http_methods(["POST"])
+@require_user_types('parent')
+@rate_limit(requests_per_minute=60)
+@log_action('parent_delete_log')
 @transaction.atomic
 def parent_delete_log(request):
-    """Allow parents to delete reading logs for their children - Enterprise security"""
-    # Security: Validate user type
-    if request.user.user_type != 'parent':
-        logger.warning(f"Non-parent user {request.user.id} attempted to delete child reading log")
-        return JsonResponse({'status': 'error', 'message': 'Access denied'}, status=403)
+    """Allow parents to delete reading logs for their children - Enhanced with decorators"""
     
     try:
         # Parse JSON data
