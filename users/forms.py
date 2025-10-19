@@ -15,6 +15,19 @@ from read.utils.form_helpers import (
 )
 
 
+class BaseUserForm(ModelForm):
+    """Base form for all user forms - eliminates duplication"""
+    
+    def __init__(self, *args, **kwargs):
+        self.logged_in_user = kwargs.pop('logged_in_user', None)
+        super().__init__(*args, **kwargs)
+        apply_form_control_styling(self)
+        
+        if self.instance and self.instance.pk and self.instance.school:
+            setup_school_filtered_querysets(self, self.instance.school, self.logged_in_user)
+            setup_initial_values_for_instance(self, self.instance, self.instance.school)
+
+
 class SchoolForm(ModelForm):
     class Meta:
         model = School
@@ -255,7 +268,7 @@ class StudentParentRelationForm(ModelForm):
         fields = ['school', 'student', 'parent']
 
 
-class CustomStudentForm(ModelForm):
+class CustomStudentForm(BaseUserForm):
     password = CharField(widget=PasswordInput, required=False, help_text='Set password for new students. Leave blank when editing existing students.')
     
     class Meta:
@@ -279,18 +292,6 @@ class CustomStudentForm(ModelForm):
         widget=SelectMultiple,
         required=False
     )
-
-    def __init__(self, *args, **kwargs):
-        logged_in_user = kwargs.pop('logged_in_user', None)
-        super().__init__(*args, **kwargs)
-
-        # Apply common form styling
-        apply_form_control_styling(self)
-
-        # Set up querysets and initial values if instance has school
-        if self.instance and self.instance.school:
-            setup_school_filtered_querysets(self, self.instance.school, logged_in_user)
-            setup_initial_values_for_instance(self, self.instance, self.instance.school)
 
     def clean(self):
         cleaned_data = super().clean()
@@ -318,7 +319,7 @@ class CustomStudentForm(ModelForm):
         return instance
 
 
-class CustomTeacherForm(ModelForm):
+class CustomTeacherForm(BaseUserForm):
     class Meta:
         model = CustomUser
         fields = ['username', 'first_name', 'last_initial', 'email']
@@ -334,18 +335,6 @@ class CustomTeacherForm(ModelForm):
         widget=SelectMultiple,
         required=False
     )
-
-    def __init__(self, *args, **kwargs):
-        logged_in_user = kwargs.pop('logged_in_user', None)
-        super().__init__(*args, **kwargs)
-
-        # Apply common form styling
-        apply_form_control_styling(self)
-
-        # Set up querysets and initial values if instance has school
-        if self.instance and self.instance.school:
-            setup_school_filtered_querysets(self, self.instance.school, logged_in_user)
-            setup_initial_values_for_instance(self, self.instance, self.instance.school)
 
     def clean(self):
         cleaned_data = super().clean()
@@ -367,7 +356,7 @@ class CustomTeacherForm(ModelForm):
         return instance
 
 
-class CustomAdministratorForm(ModelForm):
+class CustomAdministratorForm(BaseUserForm):
     class Meta:
         model = CustomUser
         fields = ['username', 'first_name', 'last_initial', 'email']
@@ -377,18 +366,6 @@ class CustomAdministratorForm(ModelForm):
         widget=SelectMultiple,
         required=False
     )
-
-    def __init__(self, *args, **kwargs):
-        logged_in_user = kwargs.pop('logged_in_user', None)
-        super().__init__(*args, **kwargs)
-
-        # Apply common form styling
-        apply_form_control_styling(self)
-
-        # Set up querysets and initial values if instance has school
-        if self.instance and self.instance.school:
-            setup_school_filtered_querysets(self, self.instance.school, logged_in_user)
-            setup_initial_values_for_instance(self, self.instance, self.instance.school)
 
     def clean(self):
         cleaned_data = super().clean()
@@ -409,18 +386,13 @@ class CustomAdministratorForm(ModelForm):
         return instance
 
 
-class CustomParentForm(ModelForm):
+class CustomParentForm(BaseUserForm):
     class Meta:
         model = CustomUser
         fields = ['username', 'first_name', 'last_initial', 'email']
 
     # Children are now managed through StudentParentRelation
     # This form will need to be updated in Phase 2 to handle child assignment
-
-    def __init__(self, *args, **kwargs):
-        logged_in_user = kwargs.pop('logged_in_user', None)
-        super().__init__(*args, **kwargs)
-        apply_form_control_styling(self)
 
     def clean(self):
         cleaned_data = super().clean()
