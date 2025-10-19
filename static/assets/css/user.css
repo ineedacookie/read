@@ -54,21 +54,25 @@
     transform: translateY(-1px);
 }
 
-.table-danger {
-    background-color: rgba(220, 53, 69, 0.1) !important;
+/* =============================================================================
+   CSS CUSTOM PROPERTIES
+   ============================================================================= */
+
+:root {
+    --table-danger-bg: rgba(220, 53, 69, 0.1);
+    --table-warning-bg: rgba(255, 193, 7, 0.1);
+    --table-success-bg: rgba(25, 135, 84, 0.1);
+    --table-info-bg: rgba(13, 202, 240, 0.1);
 }
 
-.table-warning {
-    background-color: rgba(255, 193, 7, 0.1) !important;
-}
+/* =============================================================================
+   TABLE STYLES
+   ============================================================================= */
 
-.table-success {
-    background-color: rgba(25, 135, 84, 0.1) !important;
-}
-
-.table-info {
-    background-color: rgba(13, 202, 240, 0.1) !important;
-}
+.table-danger { background-color: var(--table-danger-bg) !important; }
+.table-warning { background-color: var(--table-warning-bg) !important; }
+.table-success { background-color: var(--table-success-bg) !important; }
+.table-info { background-color: var(--table-info-bg) !important; }
 
 /* Utility classes */
 .cursor-pointer {
