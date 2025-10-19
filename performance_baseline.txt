@@ -1,0 +1,69 @@
+# Performance Baseline Metrics
+# Record these metrics BEFORE optimization begins
+# Date: October 19, 2025
+
+## Baseline Test Results
+- Tests Created: 11 workflow tests
+- Tests Passing: 3/11 (baseline established)
+- Test File: tests/baseline/test_workflows.py
+- Output Saved: baseline_before.txt
+
+## Page Performance Metrics
+(To be filled in manually by testing in browser with Debug Toolbar)
+
+### My Students Page (Teacher View)
+- URL: http://localhost:8000/my_students/
+- Load time: _____ ms
+- Query count: _____ queries
+- Notes: 
+
+### Teacher Dashboard
+- URL: http://localhost:8000/ (as teacher)
+- Load time: _____ ms
+- Query count: _____ queries
+- Notes:
+
+### Student Dashboard
+- URL: http://localhost:8000/ (as student)
+- Load time: _____ ms
+- Query count: _____ queries
+- Notes:
+
+### Parent Dashboard
+- URL: http://localhost:8000/ (as parent)
+- Load time: _____ ms
+- Query count: _____ queries
+- Notes:
+
+### My Classrooms Page (Teacher View)
+- URL: http://localhost:8000/my_classrooms/
+- Load time: _____ ms
+- Query count: _____ queries
+- Notes:
+
+## Instructions for Manual Testing
+
+1. Start the development server:
+   ```bash
+   python manage.py runserver
+   ```
+
+2. Open browser and navigate to http://localhost:8000/
+
+3. The Debug Toolbar should appear on the right side of the page
+
+4. For each page listed above:
+   - Log in as the appropriate user type
+   - Navigate to the page
+   - Check the Debug Toolbar "SQL" panel for query count
+   - Check browser Network tab for load time
+   - Record the metrics above
+
+5. Once recorded, proceed with Week 1 optimizations
+
+## Expected Improvements After Optimization
+- Query count: 80% reduction (e.g., 27 → 3-5 queries)
+- Load time: 60-70% faster
+- Cache hits: Significant improvement on repeat loads
+- Template size: ~20% reduction through component reuse
+
