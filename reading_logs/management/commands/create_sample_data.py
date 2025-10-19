@@ -12,6 +12,12 @@ import random
 from reading_logs.models import Log, DailyGoal, TotalGoal
 from reading_logs.gamification import GamificationEngine, Badge, StudentBadge, StudentPoints
 from users.models import School, Classroom, ReadingGroup, StudentParentRelation
+from read.utils.user_creation_helpers import (
+    create_school_with_data,
+    create_superuser_if_needed,
+    get_default_school_names
+)
+from django.db import models
 
 User = get_user_model()
 
@@ -45,30 +51,29 @@ class Command(BaseCommand):
         try:
             with transaction.atomic():
                 school_count = options['school_count']
+                default_names = get_default_school_names()
                 
                 for i in range(school_count):
-                    school_name = f"Sample School {i + 1}"
-                    if i == 0:
-                        school_name = "Riverside Elementary School"
-                    elif i == 1:
-                        school_name = "Oak Valley Middle School"
+                    # Get school name
+                    school_name = default_names[i] if i < len(default_names) else f"Sample School {i + 1}"
                     
                     self.stdout.write(f'\n🏫 Creating {school_name}...')
-                    school = self._create_school(school_name, i)
                     
-                    self.stdout.write('👥 Creating users...')
-                    users = self._create_users(school, i)
+                    # Create complete school with data using helper function
+                    school, users, classrooms, reading_groups, relationships_count = create_school_with_data(i, school_name)
+                    
+                    self.stdout.write(f'   ✅ Created school: {school.name}')
+                    self.stdout.write(f'   ✅ Created 1 administrator, {len(users["teachers"])} teachers, '
+                                     f'{len(users["students"])} students, {len(users["parents"])} parents')
+                    self.stdout.write(f'   ✅ Created {len(classrooms)} classrooms and {len(reading_groups)} reading groups')
+                    self.stdout.write('   ✅ Assigned students to classrooms and reading groups')
+                    self.stdout.write(f'   ✅ Created {relationships_count} parent-child relationships')
                     
                     # Create superuser only for the first school to avoid duplicates
                     if i == 0:
                         self.stdout.write('🔑 Creating superuser...')
-                        self._create_superuser()
-                    
-                    self.stdout.write('🏛️  Creating classrooms and groups...')
-                    classrooms, reading_groups = self._create_classrooms_and_groups(school, users['teachers'])
-                    
-                    self.stdout.write('👨‍👩‍👧‍👦 Creating parent-child relationships...')
-                    self._create_parent_child_relationships(school, users['students'], users['parents'])
+                        superuser = create_superuser_if_needed()
+                        self.stdout.write(f'   ✅ Created superuser: {superuser.username} ({superuser.email})')
                     
                     self.stdout.write('🎯 Creating goals...')
                     self._create_goals(users['students'])
@@ -98,207 +103,6 @@ class Command(BaseCommand):
         User.objects.all().delete()  # Delete all users including superusers
         School.objects.all().delete()
 
-    def _create_school(self, name, index):
-        """Create a school with realistic details"""
-        school = School.objects.create(
-            name=name
-        )
-        
-        self.stdout.write(f'   ✅ Created school: {school.name}')
-        return school
-
-    def _create_superuser(self):
-        """Create a superuser for admin access"""
-        # Check if superuser already exists
-        if User.objects.filter(username='temp').exists():
-            self.stdout.write('   ⚠️  Superuser "temp" already exists, skipping creation')
-            return
-        
-        superuser = User.objects.create_superuser(
-            username='temp',
-            email='temp@temp.com',
-            password='temp',
-            first_name='Super',
-            last_initial='U'
-        )
-        
-        self.stdout.write(f'   ✅ Created superuser: {superuser.username} ({superuser.email})')
-        return superuser
-
-    def _create_users(self, school, school_index):
-        """Create users for the school"""
-        users = {
-            'administrators': [],
-            'teachers': [],
-            'students': [],
-            'parents': []
-        }
-        
-        # Create Administrator
-        admin = User.objects.create_user(
-            username=f"admin{school_index + 1}",
-            email=f"admin@school{school_index + 1}.edu",
-            password="password123",
-            user_type="administrator",
-            first_name="Sarah" if school_index == 0 else "Michael",
-            last_initial="A" if school_index == 0 else "B",
-            school=school,
-            verified=True
-        )
-        users['administrators'].append(admin)
-        
-        # Create Teachers
-        teacher_names = [
-            ("Emma", "S", "emma.smith"),
-            ("James", "J", "james.johnson"),
-            ("Lisa", "W", "lisa.williams"),
-            ("David", "B", "david.brown"),
-            ("Maria", "G", "maria.garcia")
-        ]
-        
-        for i, (first_name, last_initial, username) in enumerate(teacher_names[:4]):
-            teacher = User.objects.create_user(
-                username=f"{username}_{school_index + 1}",
-                email=f"{username}@school{school_index + 1}.edu",
-                password="password123",
-                user_type="teacher",
-                first_name=first_name,
-                last_initial=last_initial,
-                school=school,
-                verified=True
-            )
-            users['teachers'].append(teacher)
-        
-        # Create Students
-        student_names = [
-            ("Alex", "M"), ("Bailey", "S"), ("Charlie", "J"), ("Dana", "L"),
-            ("Ethan", "W"), ("Fiona", "H"), ("Gabriel", "R"), ("Hannah", "K"),
-            ("Ian", "P"), ("Julia", "T"), ("Kevin", "N"), ("Luna", "C"),
-            ("Mason", "D"), ("Nora", "F"), ("Oscar", "V"), ("Piper", "B"),
-            ("Quinn", "G"), ("Riley", "A"), ("Sage", "E"), ("Taylor", "Z")
-        ]
-        
-        for i, (first_name, last_initial) in enumerate(student_names[:18]):
-            student = User.objects.create_user(
-                username=f"student{i + 1}_school{school_index + 1}",
-                email=f"student{i + 1}@school{school_index + 1}.edu",
-                password="password123",
-                user_type="student",
-                first_name=first_name,
-                last_initial=last_initial,
-                school=school,
-                verified=True
-            )
-            users['students'].append(student)
-        
-        # Create Parents
-        parent_names = [
-            ("Jennifer", "M", "jennifer.martinez"),
-            ("Robert", "D", "robert.davis"),
-            ("Michelle", "W", "michelle.wilson"),
-            ("Christopher", "A", "christopher.anderson"),
-            ("Amanda", "T", "amanda.taylor"),
-            ("Matthew", "L", "matthew.lopez"),
-            ("Jessica", "H", "jessica.hernandez"),
-            ("Andrew", "K", "andrew.king"),
-            ("Ashley", "Y", "ashley.young"),
-            ("Joshua", "S", "joshua.scott"),
-            ("Stephanie", "G", "stephanie.green"),
-            ("Daniel", "C", "daniel.clark")
-        ]
-        
-        for i, (first_name, last_initial, username) in enumerate(parent_names[:10]):
-            parent = User.objects.create_user(
-                username=f"{username}_{school_index + 1}",
-                email=f"{username}@parent{school_index + 1}.com",
-                password="password123",
-                user_type="parent",
-                first_name=first_name,
-                last_initial=last_initial,
-                school=school,
-                verified=True
-            )
-            users['parents'].append(parent)
-        
-        self.stdout.write(f'   ✅ Created 1 administrator, {len(users["teachers"])} teachers, '
-                         f'{len(users["students"])} students, {len(users["parents"])} parents')
-        
-        return users
-
-    def _create_classrooms_and_groups(self, school, teachers):
-        """Create classrooms and reading groups"""
-        classrooms = []
-        reading_groups = []
-        
-        # Create Classrooms
-        classroom_names = [
-            f"Grade 3A - {teachers[0].first_name}'s Class",
-            f"Grade 3B - {teachers[1].first_name}'s Class",
-            f"Grade 4A - {teachers[2].first_name}'s Class",
-            f"Grade 4B - {teachers[3].first_name}'s Class"
-        ]
-        
-        for i, name in enumerate(classroom_names):
-            classroom = Classroom.objects.create(
-                name=name,
-                school=school
-            )
-            classroom.teachers.add(teachers[i % len(teachers)])
-            classrooms.append(classroom)
-        
-        # Create Reading Groups
-        group_names = [
-            "Advanced Readers",
-            "Story Explorers",
-            "Book Detectives"
-        ]
-        
-        for i, name in enumerate(group_names):
-            group = ReadingGroup.objects.create(
-                name=name,
-                school=school
-            )
-            group.managers.add(teachers[i % len(teachers)])
-            reading_groups.append(group)
-        
-        self.stdout.write(f'   ✅ Created {len(classrooms)} classrooms and {len(reading_groups)} reading groups')
-        
-        return classrooms, reading_groups
-
-    def _create_parent_child_relationships(self, school, students, parents):
-        """Create realistic parent-child relationships"""
-        relationships_created = 0
-        
-        # Each parent typically has 1-3 children
-        student_index = 0
-        
-        for parent in parents:
-            # Random number of children (1-3, weighted towards 2)
-            num_children = random.choices([1, 2, 3], weights=[3, 5, 2])[0]
-            
-            for _ in range(num_children):
-                if student_index < len(students):
-                    StudentParentRelation.objects.create(
-                        school=school,
-                        student=students[student_index],
-                        parent=parent
-                    )
-                    relationships_created += 1
-                    student_index += 1
-        
-        # Ensure any remaining students have parents
-        while student_index < len(students):
-            # Assign to a random existing parent
-            parent = random.choice(parents)
-            StudentParentRelation.objects.create(
-                school=school,
-                student=students[student_index],
-                parent=parent
-            )
-            relationships_created += 1
-            student_index += 1
-        
-        self.stdout.write(f'   ✅ Created {relationships_created} parent-child relationships')
 
     def _create_goals(self, students):
         """Create daily and total goals for students"""
@@ -371,7 +175,6 @@ class Command(BaseCommand):
         
         logs_created = 0
         end_date = date.today()
-        start_date = end_date - timedelta(days=60)
         
         for student in students:
             # Each student has 5-25 reading logs over 60 days
@@ -419,7 +222,7 @@ class Command(BaseCommand):
                 if random.random() < 0.4:
                     comment = random.choice(comments)
                 
-                log = Log.objects.create(
+                _ = Log.objects.create(
                     student=student,
                     school=student.school,
                     date=log_date,
@@ -442,7 +245,7 @@ class Command(BaseCommand):
         
         for student in students:
             # Get all logs for this student
-            logs = Log.objects.filter(student=student).order_by('date', 'created_at')
+            logs = Log.objects.filter(student=student).order_by('date', 'created_date')
             
             for log in logs:
                 engine.process_reading_log(log)
@@ -473,7 +276,7 @@ class Command(BaseCommand):
         student_count = User.objects.filter(user_type='student').count()
         parent_count = User.objects.filter(user_type='parent').count()
         
-        self.stdout.write(f'👥 Users Created:')
+        self.stdout.write('👥 Users Created:')
         self.stdout.write(f'   • Superusers: {superuser_count}')
         self.stdout.write(f'   • Administrators: {admin_count}')
         self.stdout.write(f'   • Teachers: {teacher_count}')
@@ -494,7 +297,7 @@ class Command(BaseCommand):
         # Goals
         daily_goal_count = DailyGoal.objects.count()
         total_goal_count = TotalGoal.objects.count()
-        self.stdout.write(f'🎯 Goals Created:')
+        self.stdout.write('🎯 Goals Created:')
         self.stdout.write(f'   • Daily Goals: {daily_goal_count}')
         self.stdout.write(f'   • Total Goals: {total_goal_count}')
         
@@ -503,7 +306,7 @@ class Command(BaseCommand):
         total_pages = Log.objects.aggregate(total=models.Sum('pages'))['total'] or 0
         total_minutes = Log.objects.aggregate(total=models.Sum('minutes'))['total'] or 0
         
-        self.stdout.write(f'📖 Reading Data:')
+        self.stdout.write('📖 Reading Data:')
         self.stdout.write(f'   • Reading Logs: {log_count:,}')
         self.stdout.write(f'   • Total Pages: {total_pages:,}')
         self.stdout.write(f'   • Total Minutes: {total_minutes:,}')
@@ -513,20 +316,38 @@ class Command(BaseCommand):
         student_badge_count = StudentBadge.objects.count()
         points_profile_count = StudentPoints.objects.count()
         
-        self.stdout.write(f'🎮 Gamification:')
+        self.stdout.write('🎮 Gamification:')
         self.stdout.write(f'   • Available Badges: {badge_count}')
         self.stdout.write(f'   • Badges Earned: {student_badge_count}')
         self.stdout.write(f'   • Student Profiles: {points_profile_count}')
         
         # School Breakdown
-        self.stdout.write(f'\n🏫 School Breakdown:')
+        self.stdout.write('\n🏫 School Breakdown:')
         for school in School.objects.all():
             school_students = User.objects.filter(school=school, user_type='student').count()
+            school_teachers = User.objects.filter(school=school, user_type='teacher').count()
+            school_parents = User.objects.filter(school=school, user_type='parent').count()
+            school_admins = User.objects.filter(school=school, user_type='administrator').count()
+            school_classrooms = Classroom.objects.filter(school=school).count()
+            school_groups = ReadingGroup.objects.filter(school=school).count()
             school_logs = Log.objects.filter(school=school).count()
             school_badges = StudentBadge.objects.filter(school=school).count()
             
+            # Count students in classrooms and groups
+            students_in_classrooms = 0
+            students_in_groups = 0
+            for classroom in Classroom.objects.filter(school=school):
+                students_in_classrooms += classroom.students.count()
+            for group in ReadingGroup.objects.filter(school=school):
+                students_in_groups += group.students.count()
+            
             self.stdout.write(f'   • {school.name}:')
+            self.stdout.write(f'     - Administrators: {school_admins}')
+            self.stdout.write(f'     - Teachers: {school_teachers}')
             self.stdout.write(f'     - Students: {school_students}')
+            self.stdout.write(f'     - Parents: {school_parents}')
+            self.stdout.write(f'     - Classrooms: {school_classrooms} (with {students_in_classrooms} student assignments)')
+            self.stdout.write(f'     - Reading Groups: {school_groups} (with {students_in_groups} student assignments)')
             self.stdout.write(f'     - Reading Logs: {school_logs}')
             self.stdout.write(f'     - Badges Earned: {school_badges}')
         
@@ -560,6 +381,3 @@ class Command(BaseCommand):
         self.stdout.write('🔐 App Login: Any account above / password: password123')
         self.stdout.write('='*60)
 
-
-# Import models at module level to avoid circular imports
-from django.db import models

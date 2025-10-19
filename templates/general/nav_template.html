@@ -1,5 +1,8 @@
 {% extends "general/fluid_template.html" %}
 {% load static %}
+
+
+
 {% block body %}
 <nav class="navbar navbar-light navbar-vertical navbar-expand-xl">
     <script>
@@ -74,9 +77,30 @@
                             </div>
                         </a>
                     </li>
+                    <li class="nav-item">
+                        <a class="nav-link" href="{% url 'admin_student_management' %}">
+                            <div class="d-flex align-items-center"><span class="nav-link-icon"><span
+                                    class="fas fa-users-cog"></span></span><span class="nav-link-text ps-1">Student Management</span>
+                            </div>
+                        </a>
+                    </li>
+                    <li class="nav-item">
+                        <a class="nav-link" href="{% url 'classroom_insights' %}">
+                            <div class="d-flex align-items-center"><span class="nav-link-icon"><span
+                                    class="fas fa-lightbulb"></span></span><span class="nav-link-text ps-1">Classroom Insights</span>
+                            </div>
+                        </a>
+                    </li>
 
                 {% elif user.user_type == 'teacher' %}
-                    <!-- Teachers see students and reading groups -->
+                    <!-- Teachers see dashboard, students and reading groups -->
+                    <li class="nav-item">
+                        <a class="nav-link" href="{% url 'home' %}">
+                            <div class="d-flex align-items-center"><span class="nav-link-icon"><span
+                                    class="fas fa-home"></span></span><span class="nav-link-text ps-1">My Dashboard</span>
+                            </div>
+                        </a>
+                    </li>
                     <li class="nav-item">
                         <a class="nav-link" href="{% url 'my_students' %}">
                             <div class="d-flex align-items-center"><span class="nav-link-icon"><span
@@ -95,6 +119,20 @@
                         <a class="nav-link" href="{% url 'reading_groups' %}">
                             <div class="d-flex align-items-center"><span class="nav-link-icon"><span
                                     class="fas fa-book-reader"></span></span><span class="nav-link-text ps-1">Reading Groups</span>
+                            </div>
+                        </a>
+                    </li>
+                    <li class="nav-item">
+                        <a class="nav-link" href="{% url 'reading_goals' %}">
+                            <div class="d-flex align-items-center"><span class="nav-link-icon"><span
+                                    class="fas fa-bullseye"></span></span><span class="nav-link-text ps-1">Reading Goals</span>
+                            </div>
+                        </a>
+                    </li>
+                    <li class="nav-item">
+                        <a class="nav-link" href="{% url 'classroom_insights' %}">
+                            <div class="d-flex align-items-center"><span class="nav-link-icon"><span
+                                    class="fas fa-lightbulb"></span></span><span class="nav-link-text ps-1">Classroom Insights</span>
                             </div>
                         </a>
                     </li>
@@ -149,7 +187,7 @@
                         <button aria-label="Close" class="btn btn-link btn-close-falcon p-0"></button>
                     </div>
                     <div class="dropdown-menu border font-base start-0 mt-2 py-0 overflow-hidden w-100">
-                        <div class="scrollbar list py-3" style="max-height: 24rem;">
+                        <div class="scrollbar list py-3 dropdown-scrollbar">
                             <h6 class="dropdown-header fw-medium text-uppercase px-card fs--2 pt-0 pb-2">Recently
                                 Browsed</h6><a class="dropdown-item fs--1 px-card py-1 hover-primary"
                                                href="../app/events/event-detail.html">
@@ -287,9 +325,8 @@
             <li class="nav-item dropdown">
                 <a aria-expanded="false"
                    aria-haspopup="true" class="nav-link notification-indicator notification-indicator-primary px-0 fa-icon-wait" data-bs-toggle="dropdown" data-hide-on-body-scroll="data-hide-on-body-scroll"
-                   id="navbarDropdownNotification" role="button"><span class="fas fa-bell"
-                                                                                                   data-fa-transform="shrink-6"
-                                                                                                   style="font-size: 33px;"></span></a>
+                   id="navbarDropdownNotification" role="button"><span class="fas fa-bell bell-icon"
+                                                                                                   data-fa-transform="shrink-6"></span></a>
                 <div aria-labelledby="navbarDropdownNotification"
                      class="dropdown-menu dropdown-caret dropdown-caret dropdown-menu-end dropdown-menu-card dropdown-menu-notification dropdown-caret-bg" id="nav-dropdown-area">
                     <div class="card card-notification shadow-none">
@@ -300,7 +337,7 @@
                                 </div>
                             </div>
                         </div>
-                        <div class="scrollbar-overlay" style="max-height:19rem">
+                        <div class="scrollbar-overlay notification-scrollbar">
                             <div class="list-group list-group-flush fw-normal fs--1" id="nav_list">
                             </div>
                         </div>
@@ -502,7 +539,7 @@
 
                         <div class="dropdown-divider"></div>
                         <a class="dropdown-item" href="../pages/user/settings.html">Settings</a>
-                        <form id="logout-form" method="POST" action="{% url 'logout' %}" style="display: none;">
+                        <form id="logout-form" method="POST" action="{% url 'logout' %}" class="form-hidden">
                            {% csrf_token %}
                        </form>
                        <a class="dropdown-item" href="#" onclick="event.preventDefault(); document.getElementById('logout-form').submit();">

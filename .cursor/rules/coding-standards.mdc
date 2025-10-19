@@ -1,0 +1,264 @@
+---
+description: Coding standards and style guidelines for CSS, JavaScript, and Django
+globs: ["**/*.css", "**/*.js", "**/*.py", "**/*.html"]
+alwaysApply: true
+---
+
+# Coding Standards and Style Guidelines
+
+## CSS Standards
+
+### File Organization
+- **All CSS changes** go in `static/assets/css/user.css`
+- **Organize sections** with clear header comments
+- **Group related styles** together
+- **Use consistent** indentation (2 spaces)
+
+### CSS Naming Conventions
+```css
+/* Use descriptive, component-based names */
+.student-dashboard { }
+.reading-log-form { }
+.progress-mini { }
+.chart-container-small { }
+
+/* Avoid generic names */
+.box { } /* ❌ Not descriptive */
+.thing { } /* ❌ Not descriptive */
+```
+
+### Dark/Light Mode CSS
+```css
+/* Always provide both modes */
+.component {
+    background-color: #ffffff;
+    color: #212529;
+}
+
+html.dark .component {
+    background-color: rgba(255, 255, 255, 0.05);
+    color: rgba(255, 255, 255, 0.9);
+}
+```
+
+### CSS Performance
+- **Use efficient selectors** (avoid deep nesting)
+- **Minimize** `!important` usage
+- **Group** media queries
+- **Use** CSS custom properties for theme values
+
+## JavaScript Standards
+
+### Function Organization
+```javascript
+// Check theme.js first for existing functions
+// Use descriptive function names
+function loadStudentProgress(studentId) {
+    // Implementation
+}
+
+function updateReadingLogTable(data) {
+    // Implementation
+}
+
+// Avoid generic names
+function doStuff() { } // ❌ Not descriptive
+```
+
+### AJAX Patterns
+```javascript
+// Use consistent error handling
+fetch('/api/endpoint')
+    .then(response => response.json())
+    .then(data => {
+        if (data.success) {
+            // Handle success
+        } else {
+            showAlert('error', data.message);
+        }
+    })
+    .catch(error => {
+        console.error('Error:', error);
+        showAlert('error', 'An error occurred');
+    });
+```
+
+### Event Handling
+```javascript
+// Use consistent event listener patterns
+document.addEventListener('DOMContentLoaded', function() {
+    // Initialize components
+    initializeDashboard();
+    setupEventListeners();
+});
+
+function setupEventListeners() {
+    // Group related listeners
+    document.getElementById('save-btn').addEventListener('click', saveData);
+    document.getElementById('cancel-btn').addEventListener('click', cancelEdit);
+}
+```
+
+## Django Code Standards
+
+### View Patterns
+```python
+from django.contrib.auth.decorators import login_required
+from django.shortcuts import get_object_or_404
+
+@login_required
+def student_detail(request, student_id):
+    # Always filter by user permissions
+    if request.user.user_type == 'teacher':
+        student = get_object_or_404(
+            Student,
+            id=student_id,
+            classrooms__teachers=request.user
+        )
+    elif request.user.user_type == 'parent':
+        student = get_object_or_404(
+            Student,
+            id=student_id,
+            parents=request.user
+        )
+    # ... handle other user types
+```
+
+### Model Standards
+```python
+class ReadingLog(models.Model):
+    # Use descriptive field names
+    student = models.ForeignKey(Student, on_delete=models.CASCADE)
+    book_title = models.CharField(max_length=200)
+    pages_read = models.PositiveIntegerField()
+    reading_time_minutes = models.PositiveIntegerField()
+    
+    class Meta:
+        ordering = ['-created_at']
+        
+    def __str__(self):
+        return f"{self.student.name} - {self.book_title}"
+```
+
+### Form Standards
+```python
+class ReadingLogForm(forms.ModelForm):
+    class Meta:
+        model = ReadingLog
+        fields = ['book_title', 'author', 'pages_read', 'reading_time_minutes']
+        widgets = {
+            'book_title': forms.TextInput(attrs={'class': 'form-control'}),
+            'pages_read': forms.NumberInput(attrs={'class': 'form-control', 'min': '0'}),
+        }
+    
+    def __init__(self, *args, **kwargs):
+        self.user = kwargs.pop('user', None)
+        super().__init__(*args, **kwargs)
+        
+        # Filter choices based on user permissions
+        if self.user and self.user.user_type == 'teacher':
+            self.fields['student'].queryset = self.user.teacher_students.all()
+```
+
+## Template Standards
+
+### Template Organization
+```django
+{% extends "general/nav_template.html" %}
+{% load static %}
+
+{% block title %}Page Title{% endblock %}
+
+{% block content %}
+<!-- Main content -->
+{% endblock %}
+
+{% block afterScripts %}
+<!-- Page-specific JavaScript -->
+{% endblock %}
+```
+
+### Conditional Rendering
+```django
+<!-- Use clear permission checks -->
+{% if user.user_type == 'teacher' %}
+    <button class="btn btn-primary">Edit Student</button>
+{% elif user.user_type == 'administrator' %}
+    <button class="btn btn-danger">Delete Student</button>
+{% endif %}
+
+<!-- Group related permissions -->
+{% if user.user_type in 'teacher,administrator' %}
+    <!-- Teacher and admin content -->
+{% endif %}
+```
+
+### Form Templates
+```django
+<form method="post">
+    {% csrf_token %}
+    
+    <div class="row">
+        <div class="col-md-6">
+            <div class="mb-3">
+                <label for="{{ form.book_title.id_for_label }}" class="form-label">
+                    {{ form.book_title.label }}
+                </label>
+                {{ form.book_title }}
+                {% if form.book_title.errors %}
+                    <div class="invalid-feedback d-block">
+                        {{ form.book_title.errors.0 }}
+                    </div>
+                {% endif %}
+            </div>
+        </div>
+    </div>
+    
+    <button type="submit" class="btn btn-primary">Save</button>
+</form>
+```
+
+## Comments and Documentation
+
+### CSS Comments
+```css
+/* =============================================================================
+   SECTION NAME
+   ============================================================================= */
+
+/* Component-specific styles */
+.reading-dashboard {
+    /* Brief explanation for complex styles */
+}
+```
+
+### JavaScript Comments
+```javascript
+/**
+ * Load and display student reading progress
+ * @param {number} studentId - The student's ID
+ * @param {string} dateRange - Date range for filtering
+ */
+function loadStudentProgress(studentId, dateRange) {
+    // Implementation details
+}
+```
+
+### Python Docstrings
+```python
+def filter_students_by_teacher(teacher, queryset=None):
+    """
+    Filter students to only those assigned to the given teacher.
+    
+    Args:
+        teacher (User): The teacher user object
+        queryset (QuerySet, optional): Base queryset to filter
+        
+    Returns:
+        QuerySet: Filtered student queryset
+    """
+    if queryset is None:
+        queryset = Student.objects.all()
+    
+    return queryset.filter(classrooms__teachers=teacher).distinct()
+```

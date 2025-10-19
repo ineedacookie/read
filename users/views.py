@@ -11,6 +11,13 @@ from django.utils.encoding import force_str
 from django.utils.http import urlsafe_base64_decode
 from django.views.decorators.http import require_POST
 
+from read.utils import (
+    success_response, 
+    error_response, 
+    validation_error_response,
+    permission_denied_response
+)
+
 from .forms import OverriddenPasswordChangeForm, ClassroomForm, OverriddenAdminPasswordChangeForm, RegisterUserForm, \
     InviteCombinedForm, InviteStudentsForm, InviteParentForm, InviteUsersForm, ReadingGroupForm, CustomStudentForm, CustomTeacherForm, \
     CustomAdministratorForm, CustomParentForm, CustomClassroomForm, CustomReadingGroupForm
@@ -42,7 +49,7 @@ def home(request, **kwargs):
     page_arguments = {}
     
     if request.user.user_type == 'teacher':
-        page = 'general/teacher_dash_simple.html'
+        page = 'general/teacher_dash.html'
         school = request.user.school
         classrooms = Classroom.objects.filter(school=school, teachers=request.user).order_by('name')
         reading_groups = ReadingGroup.objects.filter(school=school, managers=request.user).order_by('name')
@@ -306,9 +313,9 @@ def invite_user(request):
 
         if form.is_valid():
             form.save()
-            return JsonResponse({'success': True}, status=200)
+            return success_response('Form saved successfully')
         else:
-            return JsonResponse({'form_errors': form.errors}, status=400)
+            return validation_error_response(form.errors, user_id=request.user.id)
 
 
 @login_required
@@ -323,13 +330,13 @@ def delete_users(request):
         user_ids = data.get('user_ids', [])
 
         if not isinstance(user_ids, list):
-            return JsonResponse({'error': 'Invalid data format. Expected a list of user IDs.'}, status=400)
+            return error_response('Invalid data format. Expected a list of user IDs.', status=400, user_id=request.user.id)
 
         CustomUser.objects.filter(id__in=user_ids, school=request.user.school).delete()
-        return JsonResponse({'success': True}, status=200)
+        return success_response('Users deleted successfully')
 
     except json.JSONDecodeError:
-        return JsonResponse({'error': 'Invalid JSON format.'}, status=400)
+        return error_response('Invalid JSON format.', status=400, user_id=request.user.id)
 
 def invited_account(request, uidb64, token):
     """This page is for validating an email and getting the initial info and password set for a user."""
@@ -370,7 +377,7 @@ def fetch_user_type(request):
             data = [{"id": teacher.id, "name": teacher.full_name or teacher.email} for teacher in teachers]
             return JsonResponse(data, safe=False)
 
-    return JsonResponse({"error": "Method not allowed"}, status=405)
+    return error_response("Method not allowed", status=405)
 
 
 @login_required
@@ -392,8 +399,8 @@ def classrooms_view(request):
             form = ClassroomForm(input_dict)
             if form.is_valid():
                 form.save()
-                return JsonResponse({"success": True}, status=200)
-            return JsonResponse({"errors": form.errors}, status=400)
+                return success_response("Classroom created successfully")
+            return validation_error_response(form.errors, user_id=request.user.id)
         except json.JSONDecodeError:
             return HttpResponseBadRequest("Invalid JSON payload")
 
@@ -403,12 +410,12 @@ def classrooms_view(request):
             data = json.loads(request.body)
             ids = data.get('ids', [])
             Classroom.objects.filter(school=request.user.school, id__in=ids).delete()
-            return JsonResponse({"success": True}, status=204)
+            return success_response("Classrooms deleted successfully", status=204)
         except json.JSONDecodeError:
             return HttpResponseBadRequest("Invalid JSON payload")
 
     # Default response for unsupported methods
-    return JsonResponse({"error": "Method not allowed"}, status=405)
+    return error_response("Method not allowed", status=405)
 
 @login_required
 def render_classroom_list_view(request):
@@ -439,8 +446,8 @@ def groups_view(request):
             form = ReadingGroupForm(input_dict)
             if form.is_valid():
                 form.save()
-                return JsonResponse({"success": True}, status=200)
-            return JsonResponse({"errors": form.errors}, status=400)
+                return success_response("Reading group created successfully")
+            return validation_error_response(form.errors, user_id=request.user.id)
         except json.JSONDecodeError:
             return HttpResponseBadRequest("Invalid JSON payload")
 
@@ -450,12 +457,149 @@ def groups_view(request):
             data = json.loads(request.body)
             ids = data.get('ids', [])
             ReadingGroup.objects.filter(school=request.user.school, id__in=ids).delete()
-            return JsonResponse({"success": True}, status=204)
+            return success_response("Reading groups deleted successfully", status=204)
         except json.JSONDecodeError:
             return HttpResponseBadRequest("Invalid JSON payload")
 
     # Default response for unsupported methods
-    return JsonResponse({"error": "Method not allowed"}, status=405)
+    return error_response("Method not allowed", status=405)
+
+
+@login_required
+def groups_detailed_view(request):
+    """Enhanced reading groups API with collaboration details"""
+    if request.method == "GET":
+        # Get reading groups where user is a manager
+        groups = ReadingGroup.objects.filter(
+            school=request.user.school,
+            managers=request.user
+        ).prefetch_related('managers', 'students').order_by('name')
+        
+        data = []
+        for group in groups:
+            # Get manager details
+            managers_data = []
+            for manager in group.managers.all():
+                managers_data.append({
+                    'id': manager.id,
+                    'name': manager.full_name or f"{manager.first_name} {manager.last_initial}"
+                })
+            
+            data.append({
+                "id": group.id,
+                "name": group.name,
+                "created_date": group.created_date.strftime('%b %d, %Y') if hasattr(group, 'created_date') else 'Unknown',
+                "created_by_current_user": hasattr(group, 'created_by') and group.created_by == request.user,
+                "managers": managers_data,
+                "student_count": group.students.count()
+            })
+        
+        return JsonResponse(data, safe=False)
+    
+    return error_response("Method not allowed", status=405)
+
+
+@login_required 
+def reading_group_detail_view(request, group_id):
+    """Individual reading group details API"""
+    try:
+        group = ReadingGroup.objects.get(
+            id=group_id,
+            school=request.user.school,
+            managers=request.user
+        )
+        
+        # Get manager details
+        managers_data = []
+        for manager in group.managers.all():
+            managers_data.append({
+                'id': manager.id,
+                'name': manager.full_name or f"{manager.first_name} {manager.last_initial}"
+            })
+        
+        # Get student details
+        students_data = []
+        for student in group.students.all():
+            students_data.append({
+                'id': student.id,
+                'name': student.full_name or f"{student.first_name} {student.last_initial}"
+            })
+        
+        data = {
+            "id": group.id,
+            "name": group.name,
+            "managers": managers_data,
+            "students": students_data,
+            "created_date": group.created_date.strftime('%b %d, %Y') if hasattr(group, 'created_date') else 'Unknown'
+        }
+        
+        return JsonResponse(data)
+        
+    except ReadingGroup.DoesNotExist:
+        return error_response("Reading group not found", status=404)
+
+
+@login_required
+def reading_group_invite_view(request):
+    """Handle reading group collaboration invitations"""
+    if request.method == "POST":
+        try:
+            group_id = request.POST.get('group_id')
+            teacher_id = request.POST.get('teacher_id') 
+            message = request.POST.get('message', '')
+            
+            # Validate inputs
+            if not group_id or not teacher_id:
+                return error_response("Group ID and Teacher ID are required", status=400)
+            
+            # Get the reading group (must be managed by current user)
+            try:
+                group = ReadingGroup.objects.get(
+                    id=group_id,
+                    school=request.user.school,
+                    managers=request.user
+                )
+            except ReadingGroup.DoesNotExist:
+                return error_response("Reading group not found or access denied", status=404)
+            
+            # Get the teacher to invite
+            try:
+                teacher = CustomUser.objects.get(
+                    id=teacher_id,
+                    school=request.user.school,
+                    user_type='teacher'
+                )
+            except CustomUser.DoesNotExist:
+                return error_response("Teacher not found", status=404)
+            
+            # Check if teacher is already a manager
+            if group.managers.filter(id=teacher_id).exists():
+                return error_response("Teacher is already managing this reading group", status=400)
+            
+            # Add teacher as manager
+            group.managers.add(teacher)
+            
+            # TODO: Send notification email to the invited teacher
+            # For now, we'll just return success
+            # In a real implementation, you'd want to:
+            # 1. Create a notification record
+            # 2. Send an email notification
+            # 3. Add to a notifications system
+            
+            return success_response(
+                f"Invitation sent to {teacher.full_name or teacher.first_name}",
+                data={
+                    'group_id': group.id,
+                    'teacher_id': teacher.id,
+                    'teacher_name': teacher.full_name or f"{teacher.first_name} {teacher.last_initial}"
+                }
+            )
+            
+        except Exception as e:
+            return error_response(f"Failed to send invitation: {str(e)}", status=500)
+    
+    return error_response("Method not allowed", status=405)
+
 
 @login_required
 def render_group_list_view(request):
@@ -501,15 +645,15 @@ def edit_record(request, id):
                 form = form_obj(logged_in_user=request.user, instance=obj, data=request.POST)
                 if form.is_valid():
                     form.save()
-                    return JsonResponse({'success': True}, status=200)
+                    return success_response('Record updated successfully')
                 else:
-                    return JsonResponse({'errors': form.errors}, status=400)
+                    return validation_error_response(form.errors, user_id=request.user.id)
             elif request.method == 'DELETE':
                 try:
                     obj.delete()
-                    return JsonResponse({"success": True}, status=204)
+                    return success_response("Record deleted successfully", status=204)
                 except obj_type.DoesNotExist:
-                    return JsonResponse({"error": "Record not found."}, status=404)
+                    return error_response("Record not found.", status=404)
             else:
                 if obj_type == CustomUser:
                     if request.user == obj:
@@ -576,9 +720,9 @@ def password_change_view(request, id):
     if form is not None:
         if form.is_valid():
             form.save()
-            return JsonResponse({'success': True}, status=200)
+            return success_response('Information updated successfully')
         else:
-            return JsonResponse({'errors': form.errors}, status=400)
+            return validation_error_response(form.errors, user_id=request.user.id)
 
     return handler404(request)
 
@@ -587,7 +731,7 @@ def password_change_view(request, id):
 def list_classrooms_and_groups(request):
     """Currently not used"""
     if request.user.user_type != 'teacher':
-        return JsonResponse({"error": "Unauthorized access"}, status=403)
+        return permission_denied_response(request.user.id, 'access teacher resources')
 
     school = request.user.school
     classrooms = Classroom.objects.filter(school=school, teachers=request.user).order_by('name').values('id', 'name')
@@ -631,7 +775,7 @@ def my_students_page(request):
         id__in=student_ids,
         school=school,
         user_type='student'
-    ).select_related('school').prefetch_related('children_relations__parent').order_by('first_name', 'last_initial')
+         ).select_related('school').prefetch_related('parent_relations__parent').order_by('first_name', 'last_initial')
     
     # Get all available parents for assignment
     available_parents = CustomUser.objects.filter(
@@ -704,18 +848,18 @@ def my_classrooms_page(request):
 def add_student_to_class(request):
     """Add existing student to teacher's classroom or reading group"""
     if request.method != 'POST':
-        return JsonResponse({'success': False, 'message': 'POST method required'})
+        return error_response('POST method required', status=405)
     
     # Security check
     if request.user.user_type not in ['teacher', 'administrator']:
-        return JsonResponse({'success': False, 'message': 'Unauthorized'})
+        return permission_denied_response(request.user.id, 'add students to class')
     
     student_id = request.POST.get('student_id')
     classroom_id = request.POST.get('classroom_id')
     group_id = request.POST.get('group_id')
     
     if not student_id:
-        return JsonResponse({'success': False, 'message': 'Student ID required'})
+        return error_response('Student ID required', status=400)
     
     try:
         student = CustomUser.objects.get(id=student_id, school=request.user.school, user_type='student')
@@ -730,49 +874,55 @@ def add_student_to_class(request):
             group = ReadingGroup.objects.get(id=group_id, school=request.user.school, managers=request.user)
             group.students.add(student)
         
-        return JsonResponse({'success': True, 'message': 'Student added successfully'})
+        return success_response('Student added successfully')
         
     except CustomUser.DoesNotExist:
-        return JsonResponse({'success': False, 'message': 'Student not found'})
+        return error_response('Student not found', status=404)
     except (Classroom.DoesNotExist, ReadingGroup.DoesNotExist):
-        return JsonResponse({'success': False, 'message': 'Classroom or group not found'})
+        return error_response('Classroom or group not found', status=404)
     except Exception as e:
-        return JsonResponse({'success': False, 'message': str(e)})
+        return error_response(str(e), status=500)
 
 
 @login_required
 def create_student(request):
     """Create new student and optionally add to classroom/group"""
     if request.method != 'POST':
-        return JsonResponse({'success': False, 'message': 'POST method required'})
+        return error_response('POST method required', status=405)
     
     # Security check
     if request.user.user_type not in ['teacher', 'administrator']:
-        return JsonResponse({'success': False, 'message': 'Unauthorized'})
+        return permission_denied_response(request.user.id, 'create students')
     
     first_name = request.POST.get('first_name')
     last_initial = request.POST.get('last_initial')
     email = request.POST.get('email')
+    password = request.POST.get('password')
     classroom_id = request.POST.get('classroom_id')
     group_id = request.POST.get('group_id')
     
-    if not all([first_name, last_initial, email]):
-        return JsonResponse({'success': False, 'message': 'All required fields must be filled'})
+    if not all([first_name, last_initial, email, password]):
+        return error_response('All required fields must be filled (first name, last initial, email, and password)', status=400)
     
     try:
         # Check if email already exists
         if CustomUser.objects.filter(email=email).exists():
-            return JsonResponse({'success': False, 'message': 'Email already exists'})
+            return error_response('Email already exists', status=400)
         
-        # Create student
+        # Create student with teacher-provided password
         student = CustomUser.objects.create_user(
             username=email,
             email=email,
+            password=password,  # Use teacher-provided password
             first_name=first_name,
             last_initial=last_initial.upper(),
             user_type='student',
             school=request.user.school
         )
+        
+        # Teacher sets password, so no need to require change on first login
+        student.password_change_required = False
+        student.save()
         
         # Add to classroom if specified
         if classroom_id:
@@ -784,10 +934,10 @@ def create_student(request):
             group = ReadingGroup.objects.get(id=group_id, school=request.user.school, managers=request.user)
             group.students.add(student)
         
-        return JsonResponse({'success': True, 'message': 'Student created successfully'})
+        return success_response('Student created successfully', data={'student_email': email})
         
     except Exception as e:
-        return JsonResponse({'success': False, 'message': str(e)})
+        return error_response(str(e), status=500)
 
 
 @login_required
@@ -977,6 +1127,228 @@ def remove_student_from_classroom(request):
     except Exception as e:
         print(f"Error removing student from classroom: {e}")
         return JsonResponse({'success': False, 'message': 'An error occurred while removing student'})
+
+
+
+@login_required
+def admin_student_management_view(request):
+    """Admin student management page for bulk transfers and management"""
+    if request.user.user_type != 'administrator':
+        from django.core.exceptions import PermissionDenied
+        raise PermissionDenied("You don't have permission to access admin student management")
+    
+    return render(request, 'general/admin_student_management.html')
+
+
+@login_required
+def api_admin_students(request):
+    """API for admin student management data"""
+    if request.user.user_type != 'administrator':
+        return error_response("Access denied", status=403)
+    
+    if request.method == "GET":
+        try:
+            from django.db.models import Count, Max
+            
+            # Get all students in the school
+            students = CustomUser.objects.filter(
+                school=request.user.school,
+                user_type='student'
+            ).prefetch_related(
+                'classrooms',
+                'reading_groups',
+                'parent_relations__parent'
+            ).annotate(
+                last_log_date=Max('log_set__date')
+            )
+            
+            students_data = []
+            for student in students:
+                # Get classrooms
+                classrooms = [{'id': c.id, 'name': c.name} for c in student.classrooms.all()]
+                
+                # Get reading groups
+                reading_groups = [{'id': g.id, 'name': g.name} for g in student.reading_groups.all()]
+                
+                # Get parents
+                parents = []
+                for relation in student.parent_relations.all():
+                    parents.append({
+                        'id': relation.parent.id,
+                        'name': f"{relation.parent.first_name} {relation.parent.last_initial}"
+                    })
+                
+                students_data.append({
+                    'id': student.id,
+                    'name': f"{student.first_name} {student.last_initial}",
+                    'email': student.email,
+                    'classrooms': classrooms,
+                    'reading_groups': reading_groups,
+                    'parents': parents,
+                    'last_activity': student.last_log_date.isoformat() if student.last_log_date else None,
+                    'is_active': student.is_active
+                })
+            
+            # Get statistics
+            total_students = students.count()
+            unassigned_students = sum(1 for s in students if not s.classrooms.exists())
+            active_classrooms = Classroom.objects.filter(school=request.user.school).count()
+            reading_groups_count = ReadingGroup.objects.filter(school=request.user.school).count()
+            
+            return JsonResponse({
+                'success': True,
+                'data': {
+                    'students': students_data,
+                    'stats': {
+                        'total_students': total_students,
+                        'unassigned_students': unassigned_students,
+                        'active_classrooms': active_classrooms,
+                        'reading_groups': reading_groups_count
+                    }
+                }
+            })
+            
+        except Exception as e:
+            return error_response(f"Failed to load student data: {str(e)}", status=500)
+    
+    return error_response("Method not allowed", status=405)
+
+
+@login_required
+def api_bulk_student_transfer(request):
+    """API for bulk student transfers"""
+    if request.user.user_type != 'administrator':
+        return error_response("Access denied", status=403)
+    
+    if request.method == "POST":
+        try:
+            import json
+            
+            # Get form data
+            student_ids = json.loads(request.POST.get('student_ids', '[]'))
+            action = request.POST.get('action')
+            destination = request.POST.get('destination')
+            reason = request.POST.get('reason', '')
+            notify_teachers = request.POST.get('notify_teachers') == 'on'
+            notify_parents = request.POST.get('notify_parents') == 'on'
+            
+            if not student_ids or not action:
+                return error_response("Student IDs and action are required", status=400)
+            
+            # Get students
+            students = CustomUser.objects.filter(
+                id__in=student_ids,
+                school=request.user.school,
+                user_type='student'
+            )
+            
+            if not students.exists():
+                return error_response("No valid students found", status=404)
+            
+            count = 0
+            
+            # Execute the transfer action
+            if action == 'move_classroom':
+                if not destination:
+                    return error_response("Destination classroom is required", status=400)
+                
+                try:
+                    new_classroom = Classroom.objects.get(
+                        id=destination,
+                        school=request.user.school
+                    )
+                    
+                    for student in students:
+                        # Remove from all current classrooms
+                        student.classrooms.clear()
+                        # Add to new classroom
+                        new_classroom.students.add(student)
+                        count += 1
+                        
+                except Classroom.DoesNotExist:
+                    return error_response("Destination classroom not found", status=404)
+            
+            elif action == 'add_classroom':
+                if not destination:
+                    return error_response("Destination classroom is required", status=400)
+                
+                try:
+                    classroom = Classroom.objects.get(
+                        id=destination,
+                        school=request.user.school
+                    )
+                    
+                    for student in students:
+                        classroom.students.add(student)
+                        count += 1
+                        
+                except Classroom.DoesNotExist:
+                    return error_response("Destination classroom not found", status=404)
+            
+            elif action == 'remove_classroom':
+                for student in students:
+                    student.classrooms.clear()
+                    count += 1
+            
+            elif action == 'add_reading_group':
+                if not destination:
+                    return error_response("Destination reading group is required", status=400)
+                
+                try:
+                    reading_group = ReadingGroup.objects.get(
+                        id=destination,
+                        school=request.user.school
+                    )
+                    
+                    for student in students:
+                        reading_group.students.add(student)
+                        count += 1
+                        
+                except ReadingGroup.DoesNotExist:
+                    return error_response("Destination reading group not found", status=404)
+            
+            elif action == 'remove_reading_group':
+                if destination:
+                    # Remove from specific reading group
+                    try:
+                        reading_group = ReadingGroup.objects.get(
+                            id=destination,
+                            school=request.user.school
+                        )
+                        
+                        for student in students:
+                            reading_group.students.remove(student)
+                            count += 1
+                            
+                    except ReadingGroup.DoesNotExist:
+                        return error_response("Reading group not found", status=404)
+                else:
+                    # Remove from all reading groups
+                    for student in students:
+                        student.reading_groups.clear()
+                        count += 1
+            
+            # TODO: Implement notification system
+            if notify_teachers:
+                # Send notifications to affected teachers
+                pass
+            
+            if notify_parents:
+                # Send notifications to affected parents
+                pass
+            
+            # TODO: Log the transfer for audit trail
+            # Create audit log entry with reason, user, etc.
+            
+            return success_response(
+                f"Successfully transferred {count} students",
+                data={'count': count}
+            )
+            
+        except Exception as e:
+            return error_response(f"Failed to transfer students: {str(e)}", status=500)
+    
+    return error_response("Method not allowed", status=405)
 
 
 def handler404(request, *args, **argv):

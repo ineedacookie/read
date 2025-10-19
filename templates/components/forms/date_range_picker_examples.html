@@ -1,0 +1,161 @@
+{% comment %}
+Date Range Picker Component Examples
+
+This file shows various ways to use the date range picker component
+{% endcomment %}
+
+{% load static %}
+
+<!DOCTYPE html>
+<html>
+<head>
+    <title>Date Range Picker Examples</title>
+    <link href="https://cdn.jsdelivr.net/npm/bootstrap@5.3.0/dist/css/bootstrap.min.css" rel="stylesheet">
+    <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.0.0/css/all.min.css">
+</head>
+<body>
+    <div class="container mt-5">
+        <h1>Date Range Picker Component Examples</h1>
+        
+        <div class="row mt-4">
+            <div class="col-12">
+                <h3>Example 1: Basic Usage</h3>
+                <p>Simple date range picker with default settings:</p>
+            </div>
+        </div>
+        
+        <div class="row">
+            {% include "components/forms/date_range_picker.html" with id="example1" %}
+        </div>
+        
+        <div class="row mt-4">
+            <div class="col-12">
+                <h3>Example 2: Custom Label and Styling</h3>
+                <p>Date range picker with custom label and container class:</p>
+            </div>
+        </div>
+        
+        <div class="row">
+            {% include "components/forms/date_range_picker.html" with 
+                id="example2" 
+                label="🗓️ Select Your Date Range" 
+                container_class="col-md-8"
+                placeholder="Choose dates..."
+            %}
+        </div>
+        
+        <div class="row mt-4">
+            <div class="col-12">
+                <h3>Example 3: Without Navigation</h3>
+                <p>Date range picker without prev/next buttons:</p>
+            </div>
+        </div>
+        
+        <div class="row">
+            {% include "components/forms/date_range_picker.html" with 
+                id="example3" 
+                label="📅 Date Selection Only" 
+                show_navigation=False
+            %}
+        </div>
+        
+        <div class="row mt-4">
+            <div class="col-12">
+                <h3>Example 4: With Callback Function</h3>
+                <p>Date range picker that triggers a callback when changed:</p>
+            </div>
+        </div>
+        
+        <div class="row">
+            {% include "components/forms/date_range_picker.html" with 
+                id="example4" 
+                label="📊 Dashboard Range" 
+                callback_function="updateDashboard"
+            %}
+        </div>
+        
+        <div class="row mt-4">
+            <div class="col-12">
+                <h3>Example 5: Multiple Pickers</h3>
+                <p>Multiple date range pickers on the same page:</p>
+            </div>
+        </div>
+        
+        <div class="row">
+            {% include "components/forms/date_range_picker.html" with 
+                id="start_range" 
+                label="📅 Start Period" 
+                container_class="col-md-6"
+                callback_function="compareRanges"
+            %}
+            
+            {% include "components/forms/date_range_picker.html" with 
+                id="end_range" 
+                label="📅 End Period" 
+                container_class="col-md-6"
+                callback_function="compareRanges"
+            %}
+        </div>
+        
+        <div class="row mt-5">
+            <div class="col-12">
+                <h3>JavaScript API Demo</h3>
+                <p>Test the JavaScript functions:</p>
+                
+                <div class="btn-group mb-3" role="group">
+                    <button type="button" class="btn btn-primary" onclick="getCurrentValue()">Get Current Value</button>
+                    <button type="button" class="btn btn-secondary" onclick="setThisWeek()">Set This Week</button>
+                    <button type="button" class="btn btn-info" onclick="adjustBack()">Go Back 7 Days</button>
+                    <button type="button" class="btn btn-warning" onclick="adjustForward()">Go Forward 7 Days</button>
+                </div>
+                
+                <div class="alert alert-info">
+                    <strong>Result:</strong> <span id="result">Use buttons above to test API</span>
+                </div>
+            </div>
+        </div>
+    </div>
+
+    <!-- JavaScript for examples -->
+    <script src="https://cdn.jsdelivr.net/npm/bootstrap@5.3.0/dist/js/bootstrap.bundle.min.js"></script>
+    <script>
+        // Callback function for examples
+        function updateDashboard() {
+            const value = getDateRangeValue('example4');
+            console.log('Dashboard updated with range:', value);
+            document.getElementById('result').textContent = `Dashboard updated: ${value}`;
+        }
+        
+        function compareRanges() {
+            const startRange = getDateRangeValue('start_range');
+            const endRange = getDateRangeValue('end_range');
+            console.log('Comparing ranges:', { startRange, endRange });
+            document.getElementById('result').textContent = `Comparing: ${startRange} vs ${endRange}`;
+        }
+        
+        // API Demo functions
+        function getCurrentValue() {
+            const value = getDateRangeValue('example1');
+            document.getElementById('result').textContent = `Current value: ${value}`;
+        }
+        
+        function setThisWeek() {
+            const thisWeek = getCurrentWeekRange();
+            setDateRangeValue('example1', thisWeek);
+            document.getElementById('result').textContent = `Set to this week: ${thisWeek}`;
+        }
+        
+        function adjustBack() {
+            adjustDateRange('example1', -7);
+            const newValue = getDateRangeValue('example1');
+            document.getElementById('result').textContent = `Adjusted back 7 days: ${newValue}`;
+        }
+        
+        function adjustForward() {
+            adjustDateRange('example1', 7);
+            const newValue = getDateRangeValue('example1');
+            document.getElementById('result').textContent = `Adjusted forward 7 days: ${newValue}`;
+        }
+    </script>
+</body>
+</html>

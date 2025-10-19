@@ -5,20 +5,29 @@ from django.db import models
 from django.utils.translation import gettext_lazy as _
 
 from .managers import CustomUserManager
+from read.utils.model_mixins import (
+    TimestampedModelMixin,
+    SchoolAndTimestampModelMixin,
+    NamedModelMixin,
+    FullNameMixin,
+    VerifiedModelMixin,
+    ActiveModelMixin,
+    SoftDeleteModelMixin,
+    BaseNamedContentModel,
+    SchoolConsistencyMixin
+)
 
 
-class School(models.Model):
+class School(TimestampedModelMixin):
     """
     Represents a school entity.
 
     Attributes:
         name (str): The name of the school.
-        created_date (date): The date when the school record was created.
-        updated_date (date): The date when the school record was last updated.
+        created_date (date): The date when the school record was created (from TimestampedModelMixin).
+        updated_date (date): The date when the school record was last updated (from TimestampedModelMixin).
     """
     name = models.CharField(max_length=255, help_text="School Name", blank=True, null=True)
-    created_date = models.DateField(_("Created Date"), auto_now_add=True, blank=True)
-    updated_date = models.DateField(_("Updated Date"), auto_now=True, blank=True, null=True)
 
     def __str__(self):
         if self.name:
@@ -27,9 +36,10 @@ class School(models.Model):
             return "#" + str(self.pk)
 
 
-class CustomUser(AbstractUser):
+class CustomUser(FullNameMixin, VerifiedModelMixin, ActiveModelMixin, SoftDeleteModelMixin, TimestampedModelMixin, AbstractUser):
     """
-    Custom user model extending AbstractUser with additional fields.
+    Custom user model extending AbstractUser with additional mixins for common functionality.
+    Uses FullNameMixin, VerifiedModelMixin, ActiveModelMixin, SoftDeleteModelMixin, and TimestampedModelMixin.
     """
     USER_TYPE_CHOICES = (
         ('teacher', 'Teacher'),
@@ -43,14 +53,13 @@ class CustomUser(AbstractUser):
     email = models.EmailField(_('Email'), unique=True, db_index=True)
     # REMOVED: students = models.ManyToManyField('CustomUser', blank=True)  # Use StudentParentRelation instead
     change_email = models.EmailField(null=True, blank=True)
-    first_name = models.CharField(_('First Name'), max_length=50, blank=True, null=True)
-    last_initial = models.CharField(_('Last Initial'), max_length=1, blank=True, null=True)
-    verified = models.BooleanField(default=False, blank=True)
-    created_date = models.DateField(_("Created Date"), auto_now_add=True, blank=True, null=True)
-    updated_date = models.DateField(_("Updated Date"), auto_now=True, blank=True, null=True)
-    full_name = models.CharField(_('Full Name'), max_length=210, blank=True, null=True, default=None)
-    active = models.BooleanField(_('Active'), blank=True, null=True, default=True)
-    marked_for_deletion = models.DateField(null=True, blank=True)
+    # Fields now provided by mixins:
+    # first_name, last_initial, full_name - from FullNameMixin
+    # verified - from VerifiedModelMixin
+    # created_date, updated_date - from TimestampedModelMixin
+    # active - from ActiveModelMixin
+    # marked_for_deletion - from SoftDeleteModelMixin
+    password_change_required = models.BooleanField(_('Password Change Required'), default=False, help_text='User must change password on next login')
     USERNAME_FIELD = 'email'
     REQUIRED_FIELDS = ['username', 'first_name', 'last_initial']
 
@@ -62,15 +71,8 @@ class CustomUser(AbstractUser):
     def save(self, *args, **kwargs):
         if not self.school:
             self.school = School.objects.create()
-        self.update_full_name()
+        # update_full_name is now handled by FullNameMixin
         super().save(*args, **kwargs)
-
-    def update_full_name(self):
-        if self.first_name and self.last_initial:
-            text = self.first_name + ' ' + self.last_initial + '.'
-        else:
-            text = ''
-        self.full_name = text.upper()
 
     @classmethod
     def get_by_natural_key(cls, username_or_email):
@@ -91,58 +93,54 @@ class CustomUser(AbstractUser):
         return CustomUser.objects.filter(children_relations__student=self).select_related('school')
 
 
-class Classroom(models.Model):
+class Classroom(BaseNamedContentModel):
     """
     Represents a classroom entity.
 
     Attributes:
-        name (str): The name of the classroom.
+        name (str): The name of the classroom (from NamedModelMixin).
         teachers (list[CustomUser]): The teachers assigned to the classroom.
         students (list[CustomUser]): The students assigned to the classroom.
-        created_date (date): The date when the classroom record was created.
-        updated_date (date): The date when the classroom record was last updated.
+        school (School): The school this classroom belongs to (from SchoolRelatedModelMixin).
+        created_by (CustomUser): User who created this classroom (from UserRelatedModelMixin).
+        created_date (date): The date when the classroom record was created (from TimestampedModelMixin).
+        updated_date (date): The date when the classroom record was last updated (from TimestampedModelMixin).
+        active (bool): Whether the classroom is active (from ActiveModelMixin).
     """
-    school = models.ForeignKey('School', on_delete=models.SET_NULL, null=True, blank=True)
-    name = models.CharField(max_length=255, help_text="Classroom Name")
+    # Fields now provided by BaseNamedContentModel:
+    # school, name, created_by, created_date, updated_date, active
     teachers = models.ManyToManyField(CustomUser, blank=True, related_name='teachers_classrooms',
                                       limit_choices_to={'user_type': 'teacher'})
     students = models.ManyToManyField(CustomUser, related_name='students_classrooms',
                                       limit_choices_to={'user_type': 'student'})
-    created_by = models.ForeignKey(CustomUser, on_delete=models.SET_NULL, null=True, blank=True)
-    created_date = models.DateField(_("Created Date"), auto_now_add=True, blank=True)
-    updated_date = models.DateField(_("Updated Date"), auto_now=True, blank=True, null=True)
-
-    def __str__(self):
-        return self.name
+    # __str__ method now provided by NamedModelMixin
 
 
-class ReadingGroup(models.Model):
+class ReadingGroup(BaseNamedContentModel):
     """
     Represents a reading group entity.
 
     Attributes:
-        name (str): The name of the reading group.
+        name (str): The name of the reading group (from NamedModelMixin).
         managers (list[CustomUser]): The managers of the reading group.
         students (list[CustomUser]): The students in the reading group.
-        created_date (date): The date when the reading group record was created.
-        updated_date (date): The date when the reading group record was last updated.
+        school (School): The school this reading group belongs to (from SchoolRelatedModelMixin).
+        created_by (CustomUser): User who created this reading group (from UserRelatedModelMixin).
+        created_date (date): The date when the reading group record was created (from TimestampedModelMixin).
+        updated_date (date): The date when the reading group record was last updated (from TimestampedModelMixin).
+        active (bool): Whether the reading group is active (from ActiveModelMixin).
     """
-    school = models.ForeignKey('School', on_delete=models.SET_NULL, null=True, blank=True)
-    name = models.CharField(max_length=255, help_text="Reading Group Name")
+    # Fields now provided by BaseNamedContentModel:
+    # school, name, created_by, created_date, updated_date, active
     managers = models.ManyToManyField(CustomUser, related_name='managed_reading_groups',
                                       limit_choices_to=models.Q(user_type='teacher') | models.Q(
                                           user_type='administrator'), blank=False)
     students = models.ManyToManyField(CustomUser, related_name='reading_groups',
                                       limit_choices_to={'user_type': 'student'})
-    created_by = models.ForeignKey(CustomUser, on_delete=models.SET_NULL, null=True, blank=True)
-    created_date = models.DateField(_("Created Date"), auto_now_add=True, blank=True)
-    updated_date = models.DateField(_("Updated Date"), auto_now=True, blank=True, null=True)
-
-    def __str__(self):
-        return self.name
+    # __str__ method now provided by NamedModelMixin
 
 
-class StudentParentRelation(models.Model):
+class StudentParentRelation(SchoolAndTimestampModelMixin, SchoolConsistencyMixin):
     """
     Represents a relation between a student and a parent.
     
@@ -152,17 +150,16 @@ class StudentParentRelation(models.Model):
     Attributes:
         student (CustomUser): The student in the relation.
         parent (CustomUser): The parent in the relation.
-        school (School): The school context for this relationship.
-        created_date (date): The date when the relation record was created.
-        updated_date (date): The date when the relation record was last updated.
+        school (School): The school context for this relationship (from SchoolRelatedModelMixin).
+        created_date (date): The date when the relation record was created (from TimestampedModelMixin).
+        updated_date (date): The date when the relation record was last updated (from TimestampedModelMixin).
     """
-    school = models.ForeignKey('School', on_delete=models.CASCADE, db_index=True)  # Required, not nullable
+    # Fields now provided by SchoolAndTimestampModelMixin:
+    # school, created_date, updated_date
     student = models.ForeignKey(CustomUser, on_delete=models.CASCADE, related_name='parent_relations',
                                 limit_choices_to={'user_type': 'student'}, db_index=True)
     parent = models.ForeignKey(CustomUser, on_delete=models.CASCADE, related_name='children_relations',
                                limit_choices_to={'user_type': 'parent'}, db_index=True)
-    created_date = models.DateField(_("Created Date"), auto_now_add=True, blank=True)
-    updated_date = models.DateField(_("Updated Date"), auto_now=True, blank=True, null=True)
     
     class Meta:
         unique_together = [['student', 'parent']]  # Prevent duplicate relationships
@@ -173,11 +170,10 @@ class StudentParentRelation(models.Model):
     
     def clean(self):
         """Validate that parent and student are in the same school"""
-        from django.core.exceptions import ValidationError
-        if self.student.school != self.parent.school:
-            raise ValidationError("Parent and student must be in the same school")
-        if self.school != self.student.school:
-            raise ValidationError("Relationship school must match student school")
+        super().clean()  # Call SchoolRelatedModelMixin validation
+        # Use SchoolConsistencyMixin validation methods
+        self.validate_school_consistency('student', self.student)
+        self.validate_school_consistency('parent', self.parent)
     
     def save(self, *args, **kwargs):
         if not self.school:

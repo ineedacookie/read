@@ -4238,6 +4238,153 @@ var changeTheme = function changeTheme(element) {
   });
 };
 
+/* -------------------------------------------------------------------------- */
+/*                          Fix Empty Theme Variables                         */
+/* -------------------------------------------------------------------------- */
+
+var fixEmptyThemeVariables = function fixEmptyThemeVariables() {
+  // Fix empty CSS variables in theme.css that cause styling issues
+  var root = document.documentElement;
+  var isDark = document.documentElement.classList.contains('dark');
+  
+  // Define theme-specific variable mappings
+  var lightThemeVariables = {
+    '--falcon-card-color': '#5e6e82',
+    '--falcon-card-cap-color': '#5e6e82', 
+    '--falcon-card-bg': '#fff',  // CRITICAL: Card background color
+    '--falcon-card-box-shadow': '0 0.125rem 0.25rem rgba(0, 0, 0, 0.075)',
+    '--falcon-card-height': 'auto',
+    '--falcon-modal-color': '#5e6e82',
+    '--falcon-offcanvas-color': '#5e6e82',
+    '--falcon-component-active-color': '#fff',
+    '--falcon-form-check-label-color': '#5e6e82',
+    '--falcon-form-file-disabled-border-color': '#dee2e6',
+    '--falcon-nav-link-font-weight': '400',
+    '--falcon-btn-font-family': 'inherit',
+    '--falcon-dropdown-box-shadow': '0 0.5rem 1rem rgba(0, 0, 0, 0.15)',
+    '--falcon-breadcrumb-border-radius': '0.375rem',
+    '--falcon-tooltip-margin': '0',
+    '--falcon-modal-footer-bg': 'transparent'
+  };
+  
+  var darkThemeVariables = {
+    '--falcon-card-color': '#9da9bb',
+    '--falcon-card-cap-color': '#9da9bb',
+    '--falcon-card-bg': '#121e2d',  // CRITICAL: Card background color for dark mode
+    '--falcon-card-box-shadow': '0 0.125rem 0.25rem rgba(255, 255, 255, 0.1)',
+    '--falcon-card-height': 'auto',
+    '--falcon-modal-color': '#9da9bb',
+    '--falcon-offcanvas-color': '#9da9bb',
+    '--falcon-component-active-color': '#fff',
+    '--falcon-form-check-label-color': '#9da9bb',
+    '--falcon-form-file-disabled-border-color': 'rgba(255, 255, 255, 0.1)',
+    '--falcon-nav-link-font-weight': '400',
+    '--falcon-btn-font-family': 'inherit',
+    '--falcon-dropdown-box-shadow': '0 0.5rem 1rem rgba(0, 0, 0, 0.3)',
+    '--falcon-breadcrumb-border-radius': '0.375rem',
+    '--falcon-tooltip-margin': '0',
+    '--falcon-modal-footer-bg': 'transparent'
+  };
+  
+  // Apply theme-specific variables
+  var applyThemeVariables = function(variables) {
+    Object.keys(variables).forEach(function(variable) {
+      root.style.setProperty(variable, variables[variable]);
+    });
+  };
+  
+  // Set initial variables
+  if (isDark) {
+    applyThemeVariables(darkThemeVariables);
+  } else {
+    applyThemeVariables(lightThemeVariables);
+  }
+  
+  // Listen for theme changes
+  var themeController = document.body;
+  if (themeController) {
+    themeController.addEventListener('clickControl', function(event) {
+      var detail = event.detail;
+      if (detail && detail.control === 'theme') {
+        if (detail.value === 'dark') {
+          applyThemeVariables(darkThemeVariables);
+          // Also force apply to all cards immediately
+          var allCards = document.querySelectorAll('.card');
+          allCards.forEach(function(card) {
+            card.style.setProperty('--falcon-card-bg', '#121e2d', 'important');
+            card.style.setProperty('--falcon-card-color', '#9da9bb', 'important');
+            card.style.backgroundColor = '#121e2d';
+            // Fix bg-light elements inside cards for dark mode
+            var bgLightElements = card.querySelectorAll('.bg-light');
+            bgLightElements.forEach(function(bgElement) {
+              bgElement.style.backgroundColor = 'rgba(255, 255, 255, 0.1)';
+            });
+          });
+        } else {
+          applyThemeVariables(lightThemeVariables);
+          // Also force apply to all cards immediately  
+          var allCards = document.querySelectorAll('.card');
+          allCards.forEach(function(card) {
+            card.style.setProperty('--falcon-card-bg', '#ffffff', 'important');
+            card.style.setProperty('--falcon-card-color', '#5e6e82', 'important');
+            card.style.backgroundColor = '#ffffff';
+            // Fix bg-light elements inside cards for light mode
+            var bgLightElements = card.querySelectorAll('.bg-light');
+            bgLightElements.forEach(function(bgElement) {
+              bgElement.style.backgroundColor = '#f8f9fa';
+            });
+          });
+        }
+        console.log('🔄 Theme switched to', detail.value, '- updated', document.querySelectorAll('.card').length, 'cards');
+      }
+    });
+  }
+  
+  console.log('🎨 Empty theme variables fixed for', isDark ? 'dark' : 'light', 'theme');
+  
+  // DEBUGGING: Check current CSS variable values
+  var testCard = document.querySelector('.card');
+  if (testCard) {
+    var computedStyle = getComputedStyle(testCard);
+    var currentBg = computedStyle.getPropertyValue('--falcon-card-bg');
+    var actualBg = computedStyle.backgroundColor;
+    console.log('🔍 Current --falcon-card-bg:', currentBg);
+    console.log('🔍 Actual background-color:', actualBg);
+  }
+  
+  // Force immediate application to all cards on the page
+  var allCards = document.querySelectorAll('.card');
+  allCards.forEach(function(card) {
+    if (isDark) {
+      card.style.setProperty('--falcon-card-bg', '#121e2d', 'important');
+      card.style.setProperty('--falcon-card-color', '#9da9bb', 'important');
+      card.style.backgroundColor = '#121e2d'; // FORCE direct background
+      
+      // Also fix bg-light elements inside cards for dark mode
+      var bgLightElements = card.querySelectorAll('.bg-light');
+      bgLightElements.forEach(function(bgElement) {
+        bgElement.style.backgroundColor = 'rgba(255, 255, 255, 0.1)';
+      });
+    } else {
+      card.style.setProperty('--falcon-card-bg', '#ffffff', 'important');  
+      card.style.setProperty('--falcon-card-color', '#5e6e82', 'important');
+      card.style.backgroundColor = '#ffffff'; // FORCE direct background
+      
+      // Also fix bg-light elements inside cards for light mode
+      var bgLightElements = card.querySelectorAll('.bg-light');
+      bgLightElements.forEach(function(bgElement) {
+        bgElement.style.backgroundColor = '#f8f9fa';
+      });
+    }
+  });
+  
+  console.log('🔧 Applied theme fix to', allCards.length, 'cards on page');
+};
+
+/* -------------------------------------------------------------------------- */
+/*                                Theme Control                               */
+/* -------------------------------------------------------------------------- */
+
 var themeControl = function themeControl() {
   var themeController = new DomNode(document.body);
   var navbarVertical = document.querySelector('.navbar-vertical');
@@ -12661,6 +12808,7 @@ docReady(wizardInit);
 docReady(searchInit);
 docReady(cookieNoticeInit);
 docReady(themeControl);
+docReady(fixEmptyThemeVariables);
 docReady(dropdownOnHover);
 docReady(marketShareEcommerceInit);
 docReady(productShareDoughnutInit);

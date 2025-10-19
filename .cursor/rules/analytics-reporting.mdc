@@ -1,0 +1,411 @@
+---
+description: Analytics and reporting standards for complex aggregations, performance, and insights
+globs: ["**/analytics*", "**/reports*", "**/views.py", "templates/**/dashboard*"]
+alwaysApply: false
+---
+
+# Analytics and Reporting Standards
+
+## Query Optimization Patterns
+
+### Use Database Aggregations Over Python Loops
+```python
+# ✅ GOOD: Database aggregation
+stats = Log.objects.filter(
+    school=school,
+    date__range=(start_date, end_date)
+).aggregate(
+    total_logs=Count('id'),
+    total_pages=Sum('pages'),
+    total_minutes=Sum('minutes'),
+    avg_rating=Avg('rating'),
+    unique_students=Count('student', distinct=True)
+)
+
+# ❌ BAD: Python loops for aggregation
+total_pages = 0
+for log in logs:
+    total_pages += log.pages or 0
+```
+
+### Use Select Related for Foreign Keys
+```python
+# ✅ GOOD: Efficient foreign key access
+logs = Log.objects.select_related('student', 'school')\
+                 .prefetch_related('student__classrooms')\
+                 .filter(date__range=(start_date, end_date))
+
+# ❌ BAD: N+1 query problem
+logs = Log.objects.filter(date__range=(start_date, end_date))
+for log in logs:
+    print(log.student.name)  # Creates additional query for each log
+```
+
+## Date Range Handling Standards
+
+### Consistent Date Range Validation
+```python
+def validate_date_range(start_date, end_date, max_days=90):
+    """
+    Standard date range validation for analytics
+    """
+    if not start_date or not end_date:
+        raise ValueError("Both start_date and end_date are required")
+        
+    if start_date > end_date:
+        raise ValueError("start_date cannot be after end_date")
+        
+    if (end_date - start_date).days > max_days:
+        raise ValueError(f"Date range cannot exceed {max_days} days")
+        
+    return start_date, end_date
+```
+
+### Default Date Range Logic
+```python
+def get_default_date_range(period='month'):
+    """
+    Get standard date ranges for analytics
+    """
+    today = date.today()
+    
+    if period == 'week':
+        start_date = today - timedelta(days=7)
+    elif period == 'month':
+        start_date = today.replace(day=1)
+    elif period == 'quarter':
+        quarter_start = ((today.month - 1) // 3) * 3 + 1
+        start_date = today.replace(month=quarter_start, day=1)
+    else:
+        start_date = today - timedelta(days=30)
+        
+    return start_date, today
+```
+
+## Analytics Class Patterns
+
+### Base Analytics Class Structure
+```python
+class BaseAnalytics:
+    """
+    Base class for all analytics engines
+    Provides common functionality and caching
+    """
+    
+    def __init__(self, user=None, school=None):
+        self.user = user
+        self.school = school or (user.school if user else None)
+        self.cache_timeout = 300  # 5 minutes default
+    
+    def get_cache_key(self, identifier, *args):
+        """Generate consistent cache keys"""
+        key_parts = [self.__class__.__name__, identifier]
+        key_parts.extend([str(arg) for arg in args])
+        return '_'.join(key_parts)
+    
+    def get_or_calculate(self, cache_key, calculation_func, *args, **kwargs):
+        """
+        Get from cache or calculate and cache result
+        """
+        result = cache.get(cache_key)
+        if result is None:
+            result = calculation_func(*args, **kwargs)
+            cache.set(cache_key, result, self.cache_timeout)
+        return result
+```
+
+### School-Wide Analytics Pattern
+```python
+class SchoolAnalytics(BaseAnalytics):
+    def get_overview(self, start_date, end_date):
+        """
+        Get comprehensive school overview with caching
+        """
+        cache_key = self.get_cache_key('overview', self.school.id, start_date, end_date)
+        
+        return self.get_or_calculate(
+            cache_key,
+            self._calculate_overview,
+            start_date,
+            end_date
+        )
+    
+    def _calculate_overview(self, start_date, end_date):
+        """Private method for actual calculation"""
+        logs = Log.objects.filter(
+            school=self.school,
+            date__range=(start_date, end_date)
+        )
+        
+        return {
+            'basic_stats': logs.aggregate(
+                total_logs=Count('id'),
+                total_pages=Sum('pages'),
+                total_minutes=Sum('minutes'),
+                unique_students=Count('student', distinct=True)
+            ),
+            'daily_breakdown': self._get_daily_breakdown(logs),
+            'top_performers': self._get_top_performers(logs)
+        }
+```
+
+## Performance Optimization Strategies
+
+### Use Database Functions for Complex Calculations
+```python
+from django.db.models.functions import TruncWeek, TruncMonth, Coalesce
+
+# Group by week with database functions
+weekly_stats = logs.annotate(
+    week=TruncWeek('date')
+).values('week').annotate(
+    total_pages=Coalesce(Sum('pages'), 0),
+    total_minutes=Coalesce(Sum('minutes'), 0),
+    log_count=Count('id')
+).order_by('week')
+```
+
+### Pagination for Large Datasets
+```python
+def get_paginated_results(queryset, page=1, per_page=50):
+    """
+    Standard pagination for analytics results
+    """
+    from django.core.paginator import Paginator, EmptyPage
+    
+    paginator = Paginator(queryset, per_page)
+    
+    try:
+        page_obj = paginator.page(page)
+    except EmptyPage:
+        page_obj = paginator.page(paginator.num_pages)
+    
+    return {
+        'results': list(page_obj),
+        'pagination': {
+            'current_page': page_obj.number,
+            'total_pages': paginator.num_pages,
+            'total_count': paginator.count,
+            'has_next': page_obj.has_next(),
+            'has_previous': page_obj.has_previous()
+        }
+    }
+```
+
+## Caching Strategies
+
+### Multi-Level Caching Pattern
+```python
+from django.core.cache import cache
+from django.conf import settings
+
+class CachedAnalytics:
+    # Different cache timeouts for different data types
+    CACHE_TIMEOUTS = {
+        'realtime': 60,      # 1 minute for real-time data
+        'hourly': 3600,      # 1 hour for hourly aggregations
+        'daily': 86400,      # 24 hours for daily summaries
+        'static': 604800     # 1 week for historical data
+    }
+    
+    def get_with_cache(self, cache_type, cache_key, calculation_func, *args):
+        """
+        Get data with appropriate cache timeout
+        """
+        timeout = self.CACHE_TIMEOUTS.get(cache_type, 300)
+        
+        data = cache.get(cache_key)
+        if data is None:
+            data = calculation_func(*args)
+            cache.set(cache_key, data, timeout)
+            
+        return data
+```
+
+### Cache Invalidation Pattern
+```python
+def invalidate_analytics_cache(school_id, student_id=None):
+    """
+    Invalidate relevant cache keys when data changes
+    """
+    cache_patterns = [
+        f"analytics_school_{school_id}_*",
+        f"dashboard_overview_{school_id}_*"
+    ]
+    
+    if student_id:
+        cache_patterns.append(f"student_analytics_{student_id}_*")
+    
+    for pattern in cache_patterns:
+        cache.delete_pattern(pattern)
+```
+
+## Chart Data Formatting
+
+### Standard Chart Data Structure
+```python
+def format_chart_data(data, chart_type='line'):
+    """
+    Format data for frontend chart libraries (Chart.js, etc.)
+    """
+    if chart_type == 'line':
+        return {
+            'labels': [item['label'] for item in data],
+            'datasets': [{
+                'label': 'Reading Progress',
+                'data': [item['value'] for item in data],
+                'borderColor': 'rgb(75, 192, 192)',
+                'backgroundColor': 'rgba(75, 192, 192, 0.2)',
+                'tension': 0.1
+            }]
+        }
+    elif chart_type == 'pie':
+        return {
+            'labels': [item['label'] for item in data],
+            'datasets': [{
+                'data': [item['value'] for item in data],
+                'backgroundColor': [
+                    '#FF6384', '#36A2EB', '#FFCE56', '#4BC0C0', '#9966FF'
+                ]
+            }]
+        }
+```
+
+### Time Series Data Formatting
+```python
+def format_time_series(queryset, date_field='date', value_field='total'):
+    """
+    Format database results for time series charts
+    """
+    data = []
+    for item in queryset:
+        data.append({
+            'x': item[date_field].isoformat(),
+            'y': float(item[value_field] or 0)
+        })
+    
+    return {
+        'datasets': [{
+            'label': 'Progress Over Time',
+            'data': data,
+            'fill': False,
+            'borderColor': 'rgb(75, 192, 192)'
+        }]
+    }
+```
+
+## Goal Progress Calculations
+
+### Standardized Goal Progress Formula
+```python
+def calculate_goal_progress(actual, target, as_percentage=True):
+    """
+    Calculate progress towards a goal
+    """
+    if not target or target <= 0:
+        return 0
+    
+    progress = actual / target
+    
+    if as_percentage:
+        return min(100, progress * 100)  # Cap at 100%
+    
+    return progress
+
+def get_goal_status(progress_percentage):
+    """
+    Determine goal status based on progress
+    """
+    if progress_percentage >= 100:
+        return 'exceeded'
+    elif progress_percentage >= 80:
+        return 'on_track'
+    elif progress_percentage >= 50:
+        return 'behind'
+    else:
+        return 'struggling'
+```
+
+## Report Generation Patterns
+
+### Async Report Generation
+```python
+from celery import shared_task
+
+@shared_task
+def generate_analytics_report(school_id, start_date, end_date, report_type):
+    """
+    Generate comprehensive analytics report asynchronously
+    """
+    try:
+        analytics = SchoolAnalytics(school_id=school_id)
+        report_data = analytics.generate_comprehensive_report(
+            start_date, end_date, report_type
+        )
+        
+        # Save report or send via email
+        return {'status': 'success', 'report_id': report_data['id']}
+        
+    except Exception as e:
+        logger.error(f'Report generation failed: {e}')
+        return {'status': 'error', 'message': str(e)}
+```
+
+## Error Handling in Analytics
+
+### Graceful Degradation
+```python
+def safe_calculate_average(queryset, field):
+    """
+    Safely calculate averages with null handling
+    """
+    try:
+        result = queryset.aggregate(avg=Avg(field))['avg']
+        return float(result) if result is not None else 0.0
+    except Exception as e:
+        logger.warning(f'Average calculation failed for {field}: {e}')
+        return 0.0
+
+def safe_divide(numerator, denominator, default=0):
+    """
+    Safe division with zero handling
+    """
+    try:
+        if denominator == 0:
+            return default
+        return numerator / denominator
+    except (TypeError, ValueError):
+        return default
+```
+
+## Frontend Integration Patterns
+
+### Loading States for Analytics
+```javascript
+function loadAnalyticsData(endpoint, containerId) {
+    const container = document.getElementById(containerId);
+    
+    // Show loading state
+    container.innerHTML = `
+        <div class="text-center py-5">
+            <div class="spinner-border text-primary" role="status">
+                <span class="visually-hidden">Loading analytics...</span>
+            </div>
+            <p class="mt-3 text-muted">Calculating insights...</p>
+        </div>
+    `;
+    
+    fetch(endpoint)
+        .then(response => response.json())
+        .then(data => {
+            if (data.status === 'success') {
+                renderAnalytics(data.data, containerId);
+            } else {
+                showAnalyticsError(containerId, data.message);
+            }
+        })
+        .catch(error => {
+            showAnalyticsError(containerId, 'Failed to load analytics data');
+        });
+}
+```

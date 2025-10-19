@@ -1,0 +1,36 @@
+{% comment %}
+Navigation Item Component
+
+Usage:
+{% include "components/navigation/nav_item.html" with 
+    url="home" 
+    icon="fas fa-home" 
+    label="Dashboard" 
+    active=False
+    url_params=None
+%}
+
+Parameters:
+- url: Django URL name (required)
+- icon: FontAwesome icon class (required)
+- label: Display text for the nav item (required)
+- active: Whether this item is currently active (default: False)
+- url_params: Dictionary of URL parameters (default: None)
+- badge_text: Optional badge text to display (default: None)
+- badge_class: CSS class for badge (default: "badge bg-primary")
+{% endcomment %}
+
+<li class="nav-item">
+    <a class="nav-link{% if active %} active{% endif %}" href="{% if url_params %}{% url url url_params %}{% else %}{% url url %}{% endif %}">
+        <div class="d-flex align-items-center">
+            <span class="nav-link-icon">
+                <span class="{{ icon }}"></span>
+            </span>
+            <span class="nav-link-text ps-1">{{ label }}</span>
+            {% if badge_text %}
+                <span class="{{ badge_class|default:'badge bg-primary ms-2' }}">{{ badge_text }}</span>
+            {% endif %}
+        </div>
+    </a>
+</li>
+

@@ -1,6 +1,29 @@
-{% autoescape off %}
-Hi {{ user.first_name }},
-You have been invited to join read.
-Click the link below to activate your account.
-http://{{ domain }}{% url 'invited' uidb64=uid token=token %}
-{% endautoescape %}
+{% extends "email/base_email.html" %}
+
+{% block email_content %}
+<p>You've been invited to join our reading community! We're excited to have you on board.</p>
+
+<p>Click the button below to accept your invitation and set up your account:</p>
+
+<div style="text-align: center;">
+    <a href="http://{{ domain }}{% url 'invited' uidb64=uid token=token %}" class="email-button">
+        Accept Invitation
+    </a>
+</div>
+
+<p>If the button doesn't work, you can copy and paste this link into your browser:</p>
+<div class="link-box">
+    http://{{ domain }}{% url 'invited' uidb64=uid token=token %}
+</div>
+
+<p>As a member, you'll be able to:</p>
+<ul>
+    <li>📖 Track your reading progress</li>
+    <li>🎯 Set personalized reading goals</li>
+    <li>🏆 Earn achievements and badges</li>
+    <li>📊 View detailed reading analytics</li>
+    <li>👥 Connect with other readers</li>
+</ul>
+
+<p>Welcome to the community!</p>
+{% endblock %}

@@ -32,4 +32,17 @@ urlpatterns = [
     path('api/gamification/leaderboard/', gamification_views.leaderboard_api, name='leaderboard'),
     path('api/gamification/award_badge/', gamification_views.award_custom_badge_api, name='award_custom_badge'),
     path('api/gamification/stats/', gamification_views.gamification_stats_api, name='gamification_stats'),
+    
+    # Phase 3: Reading Goals Management
+    path('goals/', views.reading_goals_view, name='reading_goals'),
+    path('api/goals/', views.api_reading_goals, name='api_reading_goals'),
+    path('api/goals/bulk/', views.api_bulk_reading_goals, name='api_bulk_reading_goals'),
+    path('api/goals/individual/', views.api_individual_reading_goal, name='api_individual_reading_goal'),
+    
+    # Phase 4: Classroom Insights Sharing
+    path('insights/', views.classroom_insights_view, name='classroom_insights'),
+    path('api/insights/', views.api_classroom_insights, name='api_classroom_insights'),
+    path('api/insights/comparison/', views.api_classroom_comparison, name='api_classroom_comparison'),
+    path('api/insights/share/', views.api_share_insight, name='api_share_insight'),
+    path('api/insights/helpful/', views.api_mark_helpful, name='api_mark_helpful'),
 ]

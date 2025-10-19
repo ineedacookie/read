@@ -1,0 +1,304 @@
+---
+description: Gamification system guidelines for badges, XP, achievements, and engagement features
+globs: ["**/gamification*", "**/badge*", "**/achievement*", "reading_logs/models.py"]
+alwaysApply: false
+---
+
+# Gamification System Guidelines
+
+## Badge System Standards
+
+### Badge Creation Pattern
+```python
+# Always use the Badge model with proper categories and difficulty
+badge = Badge.objects.create(
+    name="First Steps",
+    description="Read your first book!",
+    category="milestone",  # reading, consistency, milestone, special, social
+    difficulty="bronze",   # bronze, silver, gold, platinum
+    icon="fas fa-book",    # FontAwesome icon class
+    color="#28a745",      # Hex color code
+    criteria={
+        "type": "reading_logs_count",
+        "threshold": 1,
+        "timeframe": "all_time"
+    }
+)
+```
+
+### Badge Criteria JSON Structure
+```python
+# Reading-based achievements
+{
+    "type": "reading_logs_count",
+    "threshold": 10,
+    "timeframe": "all_time"  # all_time, daily, weekly, monthly
+}
+
+# Page-based achievements  
+{
+    "type": "total_pages",
+    "threshold": 100,
+    "timeframe": "monthly"
+}
+
+# Consistency achievements
+{
+    "type": "consecutive_days",
+    "threshold": 7,
+    "timeframe": "current_streak"
+}
+
+# Rating achievements
+{
+    "type": "avg_rating", 
+    "threshold": 4.5,
+    "timeframe": "last_10_logs"
+}
+```
+
+## XP (Experience Points) System
+
+### XP Calculation Rules
+```python
+class XPCalculator:
+    BASE_XP_PER_PAGE = 1
+    BASE_XP_PER_MINUTE = 0.5
+    RATING_MULTIPLIER = {
+        5.0: 2.0,  # 5-star rating doubles XP
+        4.0: 1.5,  # 4-star rating 1.5x XP
+        3.0: 1.2,  # 3-star rating 1.2x XP
+        # Below 3 stars gets base XP
+    }
+    
+    def calculate_log_xp(self, pages, minutes, rating=None):
+        base_xp = (pages * self.BASE_XP_PER_PAGE) + (minutes * self.BASE_XP_PER_MINUTE)
+        
+        if rating and rating >= 3.0:
+            multiplier = self.RATING_MULTIPLIER.get(rating, 1.0)
+            base_xp *= multiplier
+            
+        return int(base_xp)
+```
+
+### Level Progression Formula
+```python
+def calculate_level(total_xp):
+    """
+    Level formula: level = sqrt(total_xp / 100)
+    This creates a smooth progression curve
+    """
+    import math
+    if total_xp <= 0:
+        return 1
+    return int(math.sqrt(total_xp / 100)) + 1
+
+def xp_for_next_level(current_level):
+    """Calculate XP needed for next level"""
+    return (current_level ** 2) * 100
+```
+
+## Achievement Tracking Patterns
+
+### Performance-Optimized Achievement Checking
+```python
+class AchievementEngine:
+    def check_achievements_for_log(self, log):
+        """
+        Check achievements when a new log is created
+        Only check relevant achievements to avoid performance issues
+        """
+        student = log.student
+        
+        # Get achievements that might be triggered by this log
+        relevant_badges = Badge.objects.filter(
+            category__in=['reading', 'milestone'],
+            userprofile__user=student
+        ).exclude(
+            studentbadge__student=student  # Exclude already earned badges
+        )
+        
+        newly_earned = []
+        for badge in relevant_badges:
+            if self._check_badge_criteria(badge, student, log):
+                StudentBadge.objects.create(student=student, badge=badge)
+                newly_earned.append(badge)
+                
+        return newly_earned
+```
+
+### Streak Calculation
+```python
+def calculate_reading_streak(student):
+    """
+    Calculate current consecutive reading days
+    """
+    from datetime import date, timedelta
+    
+    logs = Log.objects.filter(student=student).order_by('-date')
+    
+    if not logs:
+        return 0
+        
+    streak = 0
+    current_date = date.today()
+    
+    # Check if student read today or yesterday
+    latest_log_date = logs.first().date
+    if latest_log_date < current_date - timedelta(days=1):
+        return 0  # Streak broken
+        
+    # Count consecutive days
+    for log in logs:
+        if log.date == current_date - timedelta(days=streak):
+            streak += 1
+        else:
+            break
+            
+    return streak
+```
+
+## User Profile Integration
+
+### Student Profile with Gamification
+```python
+class StudentProfile(models.Model):
+    user = models.OneToOneField(CustomUser, on_delete=models.CASCADE)
+    total_xp = models.PositiveIntegerField(default=0)
+    current_level = models.PositiveIntegerField(default=1)
+    current_streak = models.PositiveIntegerField(default=0)
+    longest_streak = models.PositiveIntegerField(default=0)
+    
+    def update_xp(self, xp_gained):
+        """Update XP and level"""
+        self.total_xp += xp_gained
+        new_level = calculate_level(self.total_xp)
+        
+        level_up = False
+        if new_level > self.current_level:
+            level_up = True
+            self.current_level = new_level
+            
+        self.save()
+        return level_up
+```
+
+## Frontend Integration Patterns
+
+### Level Progress Display
+```javascript
+function updateLevelProgress(totalXp, currentLevel) {
+    const currentLevelXp = (currentLevel - 1) ** 2 * 100;
+    const nextLevelXp = currentLevel ** 2 * 100;
+    const progressXp = totalXp - currentLevelXp;
+    const requiredXp = nextLevelXp - currentLevelXp;
+    
+    const percentage = (progressXp / requiredXp) * 100;
+    
+    document.getElementById('xp-progress-bar').style.width = `${percentage}%`;
+    document.getElementById('points-display').textContent = `${progressXp} / ${requiredXp} XP`;
+}
+```
+
+### Badge Display Pattern
+```html
+<!-- Badge earned notification -->
+<div class="badge-earned-notification">
+    <div class="badge-icon" style="color: {{ badge.color }}">
+        <i class="{{ badge.icon }} fa-2x"></i>
+    </div>
+    <div class="badge-info">
+        <h5>{{ badge.name }}</h5>
+        <p>{{ badge.description }}</p>
+        <small class="badge-difficulty badge-{{ badge.difficulty }}">
+            {{ badge.get_difficulty_display }}
+        </small>
+    </div>
+</div>
+```
+
+## Performance Considerations
+
+### Batch Achievement Processing
+```python
+def process_achievements_batch(student_ids, date_range=None):
+    """
+    Process achievements for multiple students efficiently
+    Use for nightly batch processing
+    """
+    from django.db import transaction
+    
+    with transaction.atomic():
+        for student_id in student_ids:
+            try:
+                student = CustomUser.objects.get(id=student_id)
+                engine = GamificationEngine(student)
+                engine.recalculate_all_achievements(date_range)
+            except Exception as e:
+                logger.error(f'Achievement processing failed for student {student_id}: {e}')
+```
+
+### Caching Strategy
+```python
+from django.core.cache import cache
+
+def get_student_gamification_data(student_id):
+    """Cache expensive gamification calculations"""
+    cache_key = f"gamification_data_{student_id}"
+    data = cache.get(cache_key)
+    
+    if data is None:
+        student = CustomUser.objects.get(id=student_id)
+        data = {
+            'level': student.profile.current_level,
+            'xp': student.profile.total_xp,
+            'streak': student.profile.current_streak,
+            'badges': list(student.studentbadge_set.values('badge__name', 'badge__icon', 'badge__color'))
+        }
+        cache.set(cache_key, data, 300)  # Cache for 5 minutes
+        
+    return data
+```
+
+## Animation and UI Guidelines
+
+### Level Up Animation Trigger
+```javascript
+function triggerLevelUpAnimation(newLevel) {
+    const levelUpNotification = `
+        <div class="level-up-notification">
+            <div class="level-up-content">
+                <i class="fas fa-crown fa-3x text-warning mb-3"></i>
+                <h2>Level Up!</h2>
+                <p>You reached Level ${newLevel}!</p>
+                <button onclick="this.parentElement.parentElement.remove()" 
+                        class="btn btn-primary">Awesome!</button>
+            </div>
+        </div>
+    `;
+    
+    document.body.insertAdjacentHTML('beforeend', levelUpNotification);
+}
+```
+
+## Testing Patterns for Gamification
+
+### Achievement Testing
+```python
+class BadgeTestCase(TestCase):
+    def test_first_reading_badge(self):
+        # Create a reading log
+        log = Log.objects.create(
+            student=self.student,
+            school=self.school,
+            date=date.today(),
+            pages=10,
+            minutes=20
+        )
+        
+        # Check if badge was awarded
+        engine = GamificationEngine(self.student)
+        badges = engine.check_achievements_for_log(log)
+        
+        self.assertIn('First Steps', [b.name for b in badges])
+```

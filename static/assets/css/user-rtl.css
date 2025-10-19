@@ -1,5 +1,128 @@
 /* -------------------------------------------------------------------------- */
-/*                                Falcon Button                               */
+/*                     Consolidated User Theme CSS (RTL)                     */
 /* -------------------------------------------------------------------------- */
-/* prettier-ignore */
+/* 
+ * RTL version of user.css with the same fixes for card theming issues.
+ * This ensures both LTR and RTL layouts get the proper card background fixes.
+ */
+
+/* CRITICAL FIX: Override bg-light utility class that's breaking card backgrounds */
+/* The .bg-light utility class has !important and is overriding card backgrounds */
+
+/* Fix bg-light utility class conflicts */
+html:not(.dark) .bg-light {
+    --falcon-light-rgb: 249, 250, 253 !important;
+    background-color: rgba(249, 250, 253, 1) !important;
+}
+
+html.dark .bg-light {
+    --falcon-light-rgb: 35, 46, 60 !important;
+    --falcon-bg-opacity: 0.25 !important;
+    background-color: rgba(35, 46, 60, 0.25) !important;
+}
+
+/* HIGH PRIORITY: Card theme fixes with higher specificity than .bg-light */
+html:not(.dark) .card,
+html:not(.dark) .card.bg-light {
+    --falcon-card-bg: #ffffff !important;
+    --falcon-card-color: #5e6e82 !important;
+    background-color: #ffffff !important;
+    border-color: #dee2e6 !important;
+    color: #5e6e82 !important;
+}
+
+html.dark .card,
+html.dark .card.bg-light {
+    --falcon-card-bg: #121e2d !important;
+    --falcon-card-color: #9da9bb !important;
+    background-color: #121e2d !important;
+    border-color: rgba(255, 255, 255, 0.1) !important;
+    color: #9da9bb !important;
+}
+
+/* Ensure card-body inherits properly from parent card */
+html:not(.dark) .card-body {
+    background-color: inherit !important;
+    color: inherit !important;
+}
+
+html.dark .card-body {
+    background-color: inherit !important;
+    color: inherit !important;
+}
+
+/* FIX: Ensure elements inside cards with bg-light don't override card backgrounds */
+html:not(.dark) .card .bg-light {
+    background-color: #f8f9fa !important; /* Light gray for contrast */
+}
+
+html.dark .card .bg-light {
+    background-color: rgba(255, 255, 255, 0.1) !important; /* Subtle light for dark mode */
+}
+
+/* ============================================================================= 
+   MY STUDENTS PAGE - SUMMARY CARDS THEME SUPPORT (RTL)
+   ============================================================================= */
+
+/* Summary cards with theme-aware backgrounds (RTL) */
+html:not(.dark) .summary-card-primary {
+    background: linear-gradient(135deg, rgba(13, 110, 253, 0.05) 0%, rgba(13, 110, 253, 0.02) 100%);
+    border-right: 4px solid var(--bs-primary);
+}
+
+html.dark .summary-card-primary {
+    background: linear-gradient(135deg, rgba(13, 110, 253, 0.15) 0%, rgba(13, 110, 253, 0.05) 100%);
+    border-right: 4px solid var(--bs-primary);
+}
+
+html:not(.dark) .summary-card-success {
+    background: linear-gradient(135deg, rgba(25, 135, 84, 0.05) 0%, rgba(25, 135, 84, 0.02) 100%);
+    border-right: 4px solid var(--bs-success);
+}
+
+html.dark .summary-card-success {
+    background: linear-gradient(135deg, rgba(25, 135, 84, 0.15) 0%, rgba(25, 135, 84, 0.05) 100%);
+    border-right: 4px solid var(--bs-success);
+}
+
+html:not(.dark) .summary-card-info {
+    background: linear-gradient(135deg, rgba(13, 202, 240, 0.05) 0%, rgba(13, 202, 240, 0.02) 100%);
+    border-right: 4px solid var(--bs-info);
+}
+
+html.dark .summary-card-info {
+    background: linear-gradient(135deg, rgba(13, 202, 240, 0.15) 0%, rgba(13, 202, 240, 0.05) 100%);
+    border-right: 4px solid var(--bs-info);
+}
+
+/* Ensure summary cards have proper spacing and hover effects (RTL) */
+.summary-card-primary,
+.summary-card-success,
+.summary-card-info {
+    transition: transform 0.2s ease-in-out, box-shadow 0.2s ease-in-out;
+}
+
+.summary-card-primary:hover,
+.summary-card-success:hover,
+.summary-card-info:hover {
+    transform: translateY(-2px);
+}
+
+html:not(.dark) .summary-card-primary:hover,
+html:not(.dark) .summary-card-success:hover,
+html:not(.dark) .summary-card-info:hover {
+    box-shadow: 0 4px 8px rgba(0, 0, 0, 0.1);
+}
+
+html.dark .summary-card-primary:hover,
+html.dark .summary-card-success:hover,
+html.dark .summary-card-info:hover {
+    box-shadow: 0 4px 8px rgba(255, 255, 255, 0.1);
+}
+
+/* RTL specific adjustments if needed */
+[dir="rtl"] .card {
+    /* RTL-specific card adjustments can go here */
+}
+
 /*# sourceMappingURL=user-rtl.css.map */

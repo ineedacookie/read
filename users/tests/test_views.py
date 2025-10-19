@@ -1,48 +1,17 @@
 """
 Test user views and authentication
 """
-from django.test import TestCase, Client
 from django.urls import reverse
 from django.contrib.auth import get_user_model
 
 from ..models import School, CustomUser, Classroom, ReadingGroup
+from read.utils.test_helpers import BaseTestCase
 
 User = get_user_model()
 
 
-class AuthenticationTests(TestCase):
+class AuthenticationTests(BaseTestCase):
     """Test authentication and permissions"""
-    
-    def setUp(self):
-        self.client = Client()
-        self.school = School.objects.create(name="Test School")
-        
-        self.student = CustomUser.objects.create(
-            username="student",
-            email="student@test.com",
-            user_type="student",
-            school=self.school
-        )
-        self.student.set_password("testpass123")
-        self.student.save()
-        
-        self.teacher = CustomUser.objects.create(
-            username="teacher",
-            email="teacher@test.com",
-            user_type="teacher",
-            school=self.school
-        )
-        self.teacher.set_password("testpass123")
-        self.teacher.save()
-        
-        self.admin = CustomUser.objects.create(
-            username="admin",
-            email="admin@test.com",
-            user_type="administrator",
-            school=self.school
-        )
-        self.admin.set_password("testpass123")
-        self.admin.save()
     
     def test_login_required_views(self):
         """Test that views require authentication"""
@@ -52,7 +21,7 @@ class AuthenticationTests(TestCase):
     
     def test_student_home_redirect(self):
         """Test student dashboard loads correctly"""
-        self.client.login(username="student", password="testpass123")
+        self.client.login(username="student@test.com", password="testpass123")
         
         response = self.client.get(reverse('home'))
         self.assertEqual(response.status_code, 200)
@@ -60,7 +29,7 @@ class AuthenticationTests(TestCase):
     
     def test_teacher_home_redirect(self):
         """Test teacher dashboard loads correctly"""
-        self.client.login(username="teacher", password="testpass123")
+        self.client.login(username="teacher@test.com", password="testpass123")
         
         response = self.client.get(reverse('home'))
         self.assertEqual(response.status_code, 200)
@@ -68,7 +37,7 @@ class AuthenticationTests(TestCase):
     
     def test_admin_home_redirect(self):
         """Test admin dashboard loads correctly"""
-        self.client.login(username="admin", password="testpass123")
+        self.client.login(username="admin@test.com", password="testpass123")
         
         response = self.client.get(reverse('home'))
         self.assertEqual(response.status_code, 200)
@@ -77,7 +46,7 @@ class AuthenticationTests(TestCase):
     def test_user_type_restrictions(self):
         """Test that user types are properly restricted"""
         # Student should access student APIs
-        self.client.login(username="student", password="testpass123")
+        self.client.login(username="student@test.com", password="testpass123")
         
         response = self.client.get('/reading_logs/api/student/progress/')
         self.assertEqual(response.status_code, 200)
@@ -94,32 +63,34 @@ class UserManagementTests(TestCase):
         self.client = Client()
         self.school = School.objects.create(name="Test School")
         
-        self.teacher = CustomUser.objects.create(
+        self.teacher = CustomUser.objects.create_user(
             username="teacher",
             email="teacher@test.com",
+            password="testpass123",
             user_type="teacher",
             school=self.school
         )
-        self.teacher.set_password("testpass123")
+        self.teacher.password_change_required = False
+        self.teacher.is_staff = False
         self.teacher.save()
     
     def test_user_list_view(self):
         """Test user list page loads"""
-        self.client.login(username="teacher", password="testpass123")
+        self.client.login(username="teacher@test.com", password="testpass123")
         
         response = self.client.get(reverse('user_list_page', kwargs={'user_type': 'student'}))
         self.assertEqual(response.status_code, 200)
     
     def test_classroom_management(self):
         """Test classroom views"""
-        self.client.login(username="teacher", password="testpass123")
+        self.client.login(username="teacher@test.com", password="testpass123")
         
         response = self.client.get(reverse('classrooms'))
         self.assertEqual(response.status_code, 200)
     
     def test_reading_group_management(self):
         """Test reading group views"""
-        self.client.login(username="teacher", password="testpass123")
+        self.client.login(username="teacher@test.com", password="testpass123")
         
         response = self.client.get(reverse('reading_groups'))
         self.assertEqual(response.status_code, 200)
@@ -132,25 +103,31 @@ class ClassroomAPITests(TestCase):
         self.client = Client()
         self.school = School.objects.create(name="Test School")
         
-        self.teacher = CustomUser.objects.create(
+        self.teacher = CustomUser.objects.create_user(
             username="teacher",
             email="teacher@test.com",
+            password="testpass123",
             user_type="teacher",
             school=self.school
         )
-        self.teacher.set_password("testpass123")
+        self.teacher.password_change_required = False
+        self.teacher.is_staff = False
         self.teacher.save()
         
-        self.student = CustomUser.objects.create(
+        self.student = CustomUser.objects.create_user(
             username="student",
             email="student@test.com",
+            password="studentpass123",
             user_type="student",
             school=self.school
         )
+        self.student.password_change_required = False
+        self.student.is_staff = False
+        self.student.save()
     
     def test_get_classrooms(self):
         """Test getting classrooms list"""
-        self.client.login(username="teacher", password="testpass123")
+        self.client.login(username="teacher@test.com", password="testpass123")
         
         # Create a classroom
         classroom = Classroom.objects.create(

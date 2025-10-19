@@ -1,0 +1,135 @@
+---
+description: Component and logic reuse guidelines - always check existing before creating new
+globs: ["templates/**/*", "static/**/*", "*.py"]
+alwaysApply: true
+---
+
+# Component and Logic Reuse Guidelines
+
+## Priority System: Existing Components First
+
+### Before Creating Anything New
+1. **Search existing codebase** for similar functionality
+2. **Check theme components** in `static/assets/` first
+3. **Review existing templates** for similar UI patterns
+4. **Look for existing CSS classes** that can be reused or extended
+5. **Consider extending existing views** rather than creating new ones
+
+### Theme Components Take Priority
+- **Always use existing** Bootstrap components from the theme
+- **Extend theme patterns** rather than creating custom ones
+- **Check theme.js** for existing JavaScript functionality
+- **Use established** card layouts, forms, and navigation patterns
+
+## Template Component Reuse
+
+### Existing Template Structure
+```
+templates/
+├── general/
+│   ├── fluid_template.html (base template)
+│   ├── nav_template.html (navigation)
+│   └── card.html (card layouts)
+├── components/ (reusable elements)
+└── [specific app templates]
+```
+
+### Component Discovery Process
+1. **Check** `templates/components/` for reusable elements
+2. **Look at** existing dashboard templates for patterns
+3. **Examine** form templates for input patterns
+4. **Review** existing modals and alerts
+
+### Card Layout Patterns
+```django
+<!-- Use existing card patterns -->
+<div class="card">
+    <div class="card-header">
+        <h5 class="mb-0">Title</h5>
+    </div>
+    <div class="card-body">
+        <!-- Content -->
+    </div>
+</div>
+```
+
+## CSS Class Reuse
+
+### Existing Utility Classes
+- **Use existing** progress indicators (`.progress-mini`)
+- **Reuse** chart containers (`.chart-container`, `.chart-container-small`)
+- **Apply** visibility classes (`.data-content-hidden`, `.data-content-visible`)
+- **Leverage** responsive classes and animations
+
+### CSS Discovery Process
+1. **Search** `user.css` for existing classes
+2. **Check** Bootstrap utility classes first
+3. **Use** theme-specific classes when available
+4. **Only create new** classes if nothing exists
+
+## JavaScript Logic Reuse
+
+### Existing Function Discovery
+```javascript
+// Check theme.js for utilities like:
+- Data loading patterns
+- Modal management
+- Form validation
+- Chart initialization
+- Animation utilities
+```
+
+### JavaScript Reuse Checklist
+1. **Examine** `theme.js` for similar functionality
+2. **Look for** existing AJAX patterns
+3. **Find** existing DOM manipulation utilities
+4. **Use** established event handling patterns
+
+## View and Model Patterns
+
+### Django View Reuse
+```python
+# Extend existing views
+class MyStudentListView(StudentListView):
+    def get_queryset(self):
+        # Filter for teacher's students only
+        return super().get_queryset().filter(
+            classrooms__teachers=self.request.user
+        )
+```
+
+### Model Method Reuse
+- **Check existing** model methods before writing new ones
+- **Use established** queryset patterns
+- **Extend existing** model managers
+- **Reuse** validation patterns
+
+## Form Patterns
+
+### Existing Form Classes
+```python
+# Extend existing forms
+class TeacherReadingLogForm(ReadingLogForm):
+    class Meta(ReadingLogForm.Meta):
+        # Inherit and extend
+```
+
+### Form Widget Reuse
+- **Use existing** widget configurations
+- **Apply** consistent styling patterns
+- **Reuse** validation messages
+- **Follow** established error handling
+
+## When to Create New Components
+
+### Only Create New When:
+- **No existing** component meets the requirement
+- **Existing component** cannot be reasonably extended
+- **New functionality** is truly unique to the application
+- **Theme doesn't provide** the needed pattern
+
+### Documentation for New Components
+- **Document** why existing components couldn't be used
+- **Follow** established naming conventions
+- **Make new components** reusable for future use
+- **Add** to appropriate component directories

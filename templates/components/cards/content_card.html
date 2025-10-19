@@ -1,0 +1,50 @@
+{% comment %}
+Content Card Component
+
+Usage:
+{% include "components/cards/content_card.html" with 
+    title="Quick Reading Log" 
+    icon="fas fa-book-open"
+    header_color="bg-primary text-white"
+    content_html=form_content
+    card_class="border-0 shadow-sm"
+%}
+
+Parameters:
+- title: Card header title (required)
+- icon: FontAwesome icon for header (default: None)
+- header_color: CSS class for header background (default: "bg-light")
+- content_html: HTML content for card body (default: None)
+- card_class: Additional CSS classes for card (default: "")
+- container_class: CSS class for container (default: "col-12")
+- show_header: Whether to show header (default: True)
+- footer_html: Optional footer HTML (default: None)
+{% endcomment %}
+
+<div class="{{ container_class|default:'col-12' }}">
+    <div class="card {{ card_class }}">
+        {% if show_header|default:True %}
+            <div class="card-header {{ header_color|default:'bg-light' }}">
+                <h5 class="mb-0">
+                    {% if icon %}<i class="{{ icon }} me-2"></i>{% endif %}{{ title }}
+                </h5>
+            </div>
+        {% endif %}
+        
+        <div class="card-body">
+            {% if content_html %}
+                {{ content_html|safe }}
+            {% endif %}
+            
+            {% comment %}Allow for block content{% endcomment %}
+            {% block card_content %}{% endblock %}
+        </div>
+        
+        {% if footer_html %}
+            <div class="card-footer">
+                {{ footer_html|safe }}
+            </div>
+        {% endif %}
+    </div>
+</div>
+

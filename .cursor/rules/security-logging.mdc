@@ -1,0 +1,582 @@
+---
+description: Security and logging guidelines for audit trails, input validation, and security events
+globs: ["**/views.py", "**/models.py", "**/forms.py", "**/settings.py"]
+alwaysApply: false
+---
+
+# Security and Logging Guidelines
+
+## Security Logging Setup
+
+### Logger Configuration
+```python
+# settings.py
+import os
+
+LOGGING = {
+    'version': 1,
+    'disable_existing_loggers': False,
+    'formatters': {
+        'security': {
+            'format': '{levelname} {asctime} {name} {process:d} {thread:d} '
+                     'user={user_id} ip={ip} {message}',
+            'style': '{',
+        },
+        'verbose': {
+            'format': '{levelname} {asctime} {name} {process:d} {thread:d} {message}',
+            'style': '{',
+        },
+    },
+    'handlers': {
+        'security_file': {
+            'level': 'INFO',
+            'class': 'logging.handlers.RotatingFileHandler',
+            'filename': os.path.join(BASE_DIR, 'security.log'),
+            'maxBytes': 1024*1024*10,  # 10MB
+            'backupCount': 5,
+            'formatter': 'security',
+        },
+        'general_file': {
+            'level': 'INFO',
+            'class': 'logging.handlers.RotatingFileHandler',
+            'filename': os.path.join(BASE_DIR, 'django.log'),
+            'maxBytes': 1024*1024*10,  # 10MB
+            'backupCount': 5,
+            'formatter': 'verbose',
+        },
+    },
+    'loggers': {
+        'reading_logs.security': {
+            'handlers': ['security_file'],
+            'level': 'INFO',
+            'propagate': False,
+        },
+        'users.security': {
+            'handlers': ['security_file'],
+            'level': 'INFO',
+            'propagate': False,
+        },
+        'django': {
+            'handlers': ['general_file'],
+            'level': 'INFO',
+        },
+    },
+}
+```
+
+### Security Event Logging
+```python
+import logging
+from django.contrib.auth.signals import user_login_failed, user_logged_in
+from django.dispatch import receiver
+
+# Set up security logger
+security_logger = logging.getLogger('reading_logs.security')
+
+def log_security_event(event_type, user_id=None, ip_address=None, details=None, level='INFO'):
+    """
+    Centralized security event logging
+    """
+    extra = {
+        'user_id': user_id or 'anonymous',
+        'ip': ip_address or 'unknown'
+    }
+    
+    message = f"SECURITY_EVENT: {event_type}"
+    if details:
+        message += f" | {details}"
+    
+    if level == 'WARNING':
+        security_logger.warning(message, extra=extra)
+    elif level == 'ERROR':
+        security_logger.error(message, extra=extra)
+    else:
+        security_logger.info(message, extra=extra)
+
+def get_client_ip(request):
+    """Get client IP address from request"""
+    x_forwarded_for = request.META.get('HTTP_X_FORWARDED_FOR')
+    if x_forwarded_for:
+        ip = x_forwarded_for.split(',')[0]
+    else:
+        ip = request.META.get('REMOTE_ADDR')
+    return ip
+
+# Signal handlers for authentication events
+@receiver(user_logged_in)
+def log_user_login(sender, request, user, **kwargs):
+    log_security_event(
+        'USER_LOGIN',
+        user_id=user.id,
+        ip_address=get_client_ip(request),
+        details=f"User {user.username} logged in successfully"
+    )
+
+@receiver(user_login_failed)
+def log_failed_login(sender, credentials, request, **kwargs):
+    log_security_event(
+        'LOGIN_FAILED',
+        ip_address=get_client_ip(request),
+        details=f"Failed login attempt for username: {credentials.get('username', 'unknown')}",
+        level='WARNING'
+    )
+```
+
+## Permission and Access Logging
+
+### View-Level Security Logging
+```python
+from functools import wraps
+from django.http import JsonResponse
+from django.contrib.auth.decorators import login_required
+
+def log_access_attempt(resource_type, resource_id=None):
+    """
+    Decorator to log access attempts to sensitive resources
+    """
+    def decorator(view_func):
+        @wraps(view_func)
+        def wrapper(request, *args, **kwargs):
+            user_id = request.user.id if request.user.is_authenticated else None
+            ip_address = get_client_ip(request)
+            
+            # Log access attempt
+            log_security_event(
+                f'ACCESS_ATTEMPT_{resource_type.upper()}',
+                user_id=user_id,
+                ip_address=ip_address,
+                details=f"Attempting to access {resource_type} {resource_id or kwargs.get('id', 'unknown')}"
+            )
+            
+            try:
+                # Execute the view
+                response = view_func(request, *args, **kwargs)
+                
+                # Log successful access
+                if hasattr(response, 'status_code') and response.status_code < 400:
+                    log_security_event(
+                        f'ACCESS_GRANTED_{resource_type.upper()}',
+                        user_id=user_id,
+                        ip_address=ip_address,
+                        details=f"Successfully accessed {resource_type}"
+                    )
+                
+                return response
+                
+            except PermissionError as e:
+                # Log permission denied
+                log_security_event(
+                    f'ACCESS_DENIED_{resource_type.upper()}',
+                    user_id=user_id,
+                    ip_address=ip_address,
+                    details=f"Permission denied: {str(e)}",
+                    level='WARNING'
+                )
+                raise
+                
+        return wrapper
+    return decorator
+
+# Usage example
+@login_required
+@log_access_attempt('student_data')
+def get_student_logs(request, student_id):
+    # Check permissions
+    if not user_can_access_student(request.user, student_id):
+        log_security_event(
+            'UNAUTHORIZED_STUDENT_ACCESS',
+            user_id=request.user.id,
+            ip_address=get_client_ip(request),
+            details=f"User attempted to access student {student_id} without permission",
+            level='WARNING'
+        )
+        return JsonResponse({'status': 'error', 'message': 'Access denied'}, status=403)
+    
+    # Proceed with request...
+```
+
+## Input Validation and Sanitization
+
+### Secure Input Validation
+```python
+import html
+import re
+from django.core.exceptions import ValidationError
+from django.utils.html import escape
+
+def validate_and_sanitize_input(input_data, field_name, max_length=None, allowed_chars=None):
+    """
+    Validate and sanitize user input
+    """
+    if not input_data:
+        return input_data
+    
+    # Convert to string and strip whitespace
+    cleaned_input = str(input_data).strip()
+    
+    # Check length
+    if max_length and len(cleaned_input) > max_length:
+        raise ValidationError(f'{field_name} exceeds maximum length of {max_length}')
+    
+    # Check for allowed characters
+    if allowed_chars:
+        pattern = f"^[{re.escape(allowed_chars)}]*$"
+        if not re.match(pattern, cleaned_input):
+            raise ValidationError(f'{field_name} contains invalid characters')
+    
+    # HTML escape to prevent XSS
+    cleaned_input = escape(cleaned_input)
+    
+    return cleaned_input
+
+def validate_reading_log_data(request, log_data):
+    """
+    Validate reading log input data
+    """
+    validated_data = {}
+    
+    # Validate title
+    if 'title' in log_data:
+        validated_data['title'] = validate_and_sanitize_input(
+            log_data['title'],
+            'Book title',
+            max_length=255,
+            allowed_chars='a-zA-Z0-9 .,!?:-'
+        )
+    
+    # Validate author
+    if 'author' in log_data:
+        validated_data['author'] = validate_and_sanitize_input(
+            log_data['author'],
+            'Author name',
+            max_length=255,
+            allowed_chars='a-zA-Z0-9 .,-'
+        )
+    
+    # Validate numeric fields
+    if 'pages' in log_data:
+        try:
+            pages = int(log_data['pages'])
+            if pages < 0 or pages > 10000:
+                raise ValidationError('Pages must be between 0 and 10000')
+            validated_data['pages'] = pages
+        except (ValueError, TypeError):
+            raise ValidationError('Pages must be a valid number')
+    
+    # Log validation attempt
+    log_security_event(
+        'INPUT_VALIDATION',
+        user_id=request.user.id,
+        ip_address=get_client_ip(request),
+        details="Reading log data validated successfully"
+    )
+    
+    return validated_data
+```
+
+## SQL Injection Prevention
+
+### Safe Query Patterns
+```python
+from django.db import connection
+
+def safe_raw_query_example(school_id, date_range):
+    """
+    Example of safe raw SQL query with parameterization
+    """
+    # ✅ GOOD: Parameterized query
+    with connection.cursor() as cursor:
+        cursor.execute("""
+            SELECT student_id, COUNT(*) as log_count, SUM(pages) as total_pages
+            FROM reading_logs_log 
+            WHERE school_id = %s AND date BETWEEN %s AND %s
+            GROUP BY student_id
+        """, [school_id, date_range['start'], date_range['end']])
+        
+        results = cursor.fetchall()
+    
+    # ❌ BAD: String interpolation (vulnerable to SQL injection)
+    # cursor.execute(f"SELECT * FROM logs WHERE school_id = {school_id}")
+    
+    return results
+
+# Always use Django ORM when possible
+def preferred_orm_query(school_id, date_range):
+    """
+    ✅ PREFERRED: Use Django ORM for safety
+    """
+    return Log.objects.filter(
+        school_id=school_id,
+        date__range=(date_range['start'], date_range['end'])
+    ).values('student_id').annotate(
+        log_count=Count('id'),
+        total_pages=Sum('pages')
+    )
+```
+
+## Data Access Audit Trail
+
+### Model-Level Audit Logging
+```python
+from django.db.models.signals import post_save, post_delete, pre_save
+from django.dispatch import receiver
+
+class AuditLog(models.Model):
+    """
+    Audit trail for data changes
+    """
+    ACTION_CHOICES = [
+        ('CREATE', 'Create'),
+        ('UPDATE', 'Update'),
+        ('DELETE', 'Delete'),
+        ('VIEW', 'View'),
+    ]
+    
+    user = models.ForeignKey(CustomUser, on_delete=models.SET_NULL, null=True)
+    action = models.CharField(max_length=10, choices=ACTION_CHOICES)
+    model_name = models.CharField(max_length=100)
+    object_id = models.CharField(max_length=100)
+    timestamp = models.DateTimeField(auto_now_add=True)
+    ip_address = models.GenericIPAddressField(null=True, blank=True)
+    changes = models.JSONField(null=True, blank=True)  # Store what changed
+    
+    class Meta:
+        ordering = ['-timestamp']
+
+def log_model_change(user, action, instance, ip_address=None, changes=None):
+    """
+    Create audit log entry for model changes
+    """
+    AuditLog.objects.create(
+        user=user,
+        action=action,
+        model_name=instance.__class__.__name__,
+        object_id=str(instance.pk),
+        ip_address=ip_address,
+        changes=changes
+    )
+
+@receiver(post_save, sender=Log)
+def log_reading_log_change(sender, instance, created, **kwargs):
+    """
+    Audit trail for reading log changes
+    """
+    # Get current request and user (requires middleware)
+    request = getattr(_thread_locals, 'request', None)
+    if request and request.user.is_authenticated:
+        action = 'CREATE' if created else 'UPDATE'
+        log_model_change(
+            user=request.user,
+            action=action,
+            instance=instance,
+            ip_address=get_client_ip(request)
+        )
+```
+
+## File Upload Security
+
+### Secure File Handling
+```python
+import os
+import magic
+from django.core.exceptions import ValidationError
+from django.conf import settings
+
+def validate_uploaded_file(uploaded_file):
+    """
+    Validate uploaded files for security
+    """
+    # Check file size
+    max_size = 10 * 1024 * 1024  # 10MB
+    if uploaded_file.size > max_size:
+        raise ValidationError('File size exceeds 10MB limit')
+    
+    # Check file extension
+    allowed_extensions = ['.pdf', '.jpg', '.jpeg', '.png', '.txt', '.csv']
+    file_extension = os.path.splitext(uploaded_file.name)[1].lower()
+    if file_extension not in allowed_extensions:
+        raise ValidationError(f'File type {file_extension} not allowed')
+    
+    # Check MIME type
+    file_content = uploaded_file.read(1024)  # Read first 1KB
+    uploaded_file.seek(0)  # Reset file pointer
+    
+    mime_type = magic.from_buffer(file_content, mime=True)
+    allowed_mime_types = [
+        'application/pdf',
+        'image/jpeg',
+        'image/png', 
+        'text/plain',
+        'text/csv'
+    ]
+    
+    if mime_type not in allowed_mime_types:
+        raise ValidationError(f'MIME type {mime_type} not allowed')
+    
+    # Sanitize filename
+    safe_filename = sanitize_filename(uploaded_file.name)
+    uploaded_file.name = safe_filename
+    
+    return uploaded_file
+
+def sanitize_filename(filename):
+    """
+    Sanitize filename to prevent path traversal
+    """
+    # Remove path components
+    filename = os.path.basename(filename)
+    
+    # Remove or replace dangerous characters
+    import re
+    filename = re.sub(r'[^\w\-_\.]', '_', filename)
+    
+    # Prevent hidden files
+    if filename.startswith('.'):
+        filename = '_' + filename[1:]
+    
+    return filename
+```
+
+## Session Security
+
+### Session Monitoring
+```python
+from django.contrib.sessions.models import Session
+from django.utils import timezone
+
+def monitor_session_security(request):
+    """
+    Monitor session for security anomalies
+    """
+    if not request.user.is_authenticated:
+        return
+    
+    session_key = request.session.session_key
+    user_agent = request.META.get('HTTP_USER_AGENT', '')
+    ip_address = get_client_ip(request)
+    
+    # Check for session hijacking indicators
+    stored_user_agent = request.session.get('user_agent')
+    stored_ip = request.session.get('ip_address')
+    
+    if stored_user_agent and stored_user_agent != user_agent:
+        log_security_event(
+            'SESSION_ANOMALY_USER_AGENT',
+            user_id=request.user.id,
+            ip_address=ip_address,
+            details="User agent changed during session",
+            level='WARNING'
+        )
+    
+    if stored_ip and stored_ip != ip_address:
+        log_security_event(
+            'SESSION_ANOMALY_IP',
+            user_id=request.user.id,
+            ip_address=ip_address,
+            details=f"IP address changed from {stored_ip} to {ip_address}",
+            level='WARNING'
+        )
+    
+    # Store current values
+    request.session['user_agent'] = user_agent
+    request.session['ip_address'] = ip_address
+    request.session['last_activity'] = timezone.now().isoformat()
+
+# Middleware to apply session monitoring
+class SessionSecurityMiddleware:
+    def __init__(self, get_response):
+        self.get_response = get_response
+    
+    def __call__(self, request):
+        if request.user.is_authenticated:
+            monitor_session_security(request)
+        
+        response = self.get_response(request)
+        return response
+```
+
+## Rate Limiting and Abuse Prevention
+
+### Simple Rate Limiting
+```python
+from django.core.cache import cache
+from django.http import HttpResponseTooManyRequests
+
+def rate_limit(max_requests=60, window_seconds=60, key_func=None):
+    """
+    Rate limiting decorator
+    """
+    def decorator(view_func):
+        @wraps(view_func)
+        def wrapper(request, *args, **kwargs):
+            # Generate cache key
+            if key_func:
+                cache_key = key_func(request)
+            else:
+                cache_key = f"rate_limit_{get_client_ip(request)}"
+            
+            # Get current request count
+            current_requests = cache.get(cache_key, 0)
+            
+            if current_requests >= max_requests:
+                log_security_event(
+                    'RATE_LIMIT_EXCEEDED',
+                    user_id=request.user.id if request.user.is_authenticated else None,
+                    ip_address=get_client_ip(request),
+                    details=f"Rate limit exceeded: {current_requests} requests",
+                    level='WARNING'
+                )
+                return HttpResponseTooManyRequests("Rate limit exceeded")
+            
+            # Increment counter
+            cache.set(cache_key, current_requests + 1, window_seconds)
+            
+            return view_func(request, *args, **kwargs)
+        return wrapper
+    return decorator
+
+# Usage
+@rate_limit(max_requests=30, window_seconds=60)
+def api_endpoint(request):
+    # API logic here
+    pass
+```
+
+## Error Handling Security
+
+### Secure Error Responses
+```python
+def handle_view_exception(request, exception):
+    """
+    Handle exceptions securely without revealing sensitive information
+    """
+    user_id = request.user.id if request.user.is_authenticated else None
+    ip_address = get_client_ip(request)
+    
+    # Log the actual error for debugging
+    log_security_event(
+        'VIEW_EXCEPTION',
+        user_id=user_id,
+        ip_address=ip_address,
+        details=f"Exception in {request.path}: {str(exception)}",
+        level='ERROR'
+    )
+    
+    # Return generic error message to user
+    if isinstance(exception, PermissionError):
+        return JsonResponse({
+            'status': 'error',
+            'message': 'Access denied'
+        }, status=403)
+    elif isinstance(exception, ValidationError):
+        return JsonResponse({
+            'status': 'error',
+            'message': 'Invalid input data'
+        }, status=400)
+    else:
+        # Don't reveal internal error details
+        return JsonResponse({
+            'status': 'error',
+            'message': 'An error occurred processing your request'
+        }, status=500)
+```

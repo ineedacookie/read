@@ -3,6 +3,8 @@
 
 {% block title %}Analytics Dashboard - Advanced Insights{% endblock %}
 
+
+
 {% block content %}
 <div class="container-fluid">
     <!-- Page Header -->
@@ -19,7 +21,7 @@
                         <option value="classroom">Classroom</option>
                         <option value="student">Individual Student</option>
                     </select>
-                    <input type="text" id="date-range" class="form-control" placeholder="Select date range" style="min-width: 200px;">
+                    <input type="text" id="date-range" class="form-control date-range-input" placeholder="Select date range">
                     <button id="refresh-data" class="btn btn-primary">
                         <i class="fas fa-sync-alt"></i> Refresh
                     </button>

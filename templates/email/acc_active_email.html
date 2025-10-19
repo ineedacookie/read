@@ -1,5 +1,26 @@
-{% autoescape off %}
-Hi {{ user.first_name }},
-Please click on the link to confirm your registration,
-http://{{ domain }}{% url 'activate' uidb64=uid token=token %}
-{% endautoescape %}
+{% extends "email/base_email.html" %}
+
+{% block email_content %}
+<p>Welcome to our reading community! Please click the button below to confirm your registration and activate your account.</p>
+
+<div style="text-align: center;">
+    <a href="http://{{ domain }}{% url 'activate' uidb64=uid token=token %}" class="email-button">
+        Activate My Account
+    </a>
+</div>
+
+<p>If the button doesn't work, you can copy and paste this link into your browser:</p>
+<div class="link-box">
+    http://{{ domain }}{% url 'activate' uidb64=uid token=token %}
+</div>
+
+<p>Once activated, you'll be able to:</p>
+<ul>
+    <li>📖 Log your daily reading activities</li>
+    <li>🏆 Track your reading progress and achievements</li>
+    <li>📊 View detailed reading analytics</li>
+    <li>🎯 Set and achieve reading goals</li>
+</ul>
+
+<p>We're excited to have you join our reading community!</p>
+{% endblock %}

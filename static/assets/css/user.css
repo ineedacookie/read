@@ -1,5 +1,983 @@
 /* -------------------------------------------------------------------------- */
-/*                                Falcon Button                               */
+/*                     Consolidated User Theme CSS                            */
 /* -------------------------------------------------------------------------- */
+/* 
+ * Combined CSS from HTML templates and custom theme styles
+ * for centralized styling across the application
+ * 
+ * NOTE: Base component styles (.card, .progress, .badge, .table, .spinner-border)
+ * are handled by theme.css. This file contains only application-specific 
+ * customizations and utility classes.
+ */
+
+/* =============================================================================
+   DASHBOARD STYLES (from teacher_dash.html)
+   ============================================================================= */
+
+/* Enhanced Dashboard Styles */
+/* Soft background utilities for better consistency */
+.bg-light-hover:hover { 
+    background-color: #f8f9fa; 
+}
+
+/* Button group customizations */
+.btn-group-sm .btn {
+    padding: 0.25rem 0.5rem;
+    font-size: 0.875rem;
+}
+
+.btn-check:checked + .btn-outline-secondary {
+    background-color: #6c757d;
+    border-color: #6c757d;
+    color: white;
+}
+
+.btn-check:checked + .btn-outline-danger {
+    background-color: #dc3545;
+    border-color: #dc3545;
+    color: white;
+}
+
+.btn-check:checked + .btn-outline-success {
+    background-color: #198754;
+    border-color: #198754;
+    color: white;
+}
+
+/* Table enhancements (specific to students table) */
+#students-table tbody tr {
+    transition: all 0.2s ease;
+}
+
+#students-table tbody tr:hover {
+    background-color: rgba(0, 123, 255, 0.05) !important;
+    transform: translateY(-1px);
+}
+
+.table-danger {
+    background-color: rgba(220, 53, 69, 0.1) !important;
+}
+
+.table-warning {
+    background-color: rgba(255, 193, 7, 0.1) !important;
+}
+
+.table-success {
+    background-color: rgba(25, 135, 84, 0.1) !important;
+}
+
+.table-info {
+    background-color: rgba(13, 202, 240, 0.1) !important;
+}
+
+/* Utility classes */
+.cursor-pointer {
+    cursor: pointer;
+}
+
+.cursor-pointer:hover {
+    opacity: 0.8;
+}
+
+/* Responsive adjustments */
+@media (max-width: 768px) {
+    .d-flex.gap-2 {
+        flex-direction: column;
+        gap: 0.5rem !important;
+    }
+    
+    .btn-group {
+        width: 100%;
+    }
+    
+    .card-body {
+        padding: 1rem;
+    }
+    
+    .h1 {
+        font-size: 1.5rem;
+    }
+}
+
+/* Chart container improvements */
+[id*="chart"] {
+    min-height: 250px;
+}
+
+/* Table improvements */
+.table th {
+    border-top: none;
+    font-weight: 600;
+    color: #495057;
+    font-size: 0.875rem;
+}
+
+.table td {
+    vertical-align: middle;
+    padding: 0.75rem;
+}
+
+/* Icon improvements */
+.fas, .far {
+    width: 1em;
+    text-align: center;
+}
+
+/* Button hover effects */
+.btn:hover {
+    transform: translateY(-1px);
+    transition: all 0.2s ease;
+}
+
+/* =============================================================================
+   STUDENT DASHBOARD STYLES (from student_dash.html)
+   ============================================================================= */
+
+/* Student Dashboard Theme Fixes - Updated for consistency */
+.student-dash .card {
+    border-radius: 0.5rem !important;
+    box-shadow: 0 0.125rem 0.25rem rgba(0, 0, 0, 0.075) !important;
+}
+
+html:not(.dark) .student-dash .card {
+    background-color: #ffffff !important;
+    border-color: #dee2e6 !important;
+    color: #5e6e82 !important;
+}
+
+html.dark .student-dash .card {
+    background-color: rgba(255, 255, 255, 0.05) !important;
+    border-color: rgba(255, 255, 255, 0.1) !important;
+    color: #9da9bb !important;
+}
+
+html:not(.dark) .student-dash .card-header {
+    background-color: #f8f9fa !important;
+    border-bottom-color: #dee2e6 !important;
+    color: #5e6e82 !important;
+}
+
+html.dark .student-dash .card-header {
+    background-color: rgba(255, 255, 255, 0.05) !important;
+    border-bottom-color: rgba(255, 255, 255, 0.1) !important;
+    color: #9da9bb !important;
+}
+
+html:not(.dark) .student-dash .card-body {
+    background-color: #ffffff !important;
+    color: #5e6e82 !important;
+}
+
+html.dark .student-dash .card-body {
+    background-color: rgba(255, 255, 255, 0.02) !important;
+    color: #9da9bb !important;
+}
+
+/* Fun kid-friendly animations */
+.student-dash .card:hover {
+    transform: translateY(-2px);
+    transition: all 0.3s ease;
+}
+
+.fas.fa-fire {
+    animation: flicker 2s infinite alternate;
+}
+
+@keyframes flicker {
+    0% { opacity: 1; }
+    50% { opacity: 0.8; }
+    100% { opacity: 1; }
+}
+
+.student-dash .progress-bar {
+    transition: width 0.8s ease-in-out;
+}
+
+/* Ensure emojis display properly */
+.student-dash .card-body small {
+    font-size: 0.9rem;
+    font-weight: 500;
+}
+
+/* Chart container styling */
+#monthlyReadingChart {
+    max-height: 300px;
+}
+
+/* Goal section styling */
+.border-success {
+    border-width: 2px !important;
+}
+
+/* Achievement cards styling */
+.border-primary, .border-success, .border-warning {
+    border-width: 2px !important;
+    transition: all 0.3s ease;
+}
+
+.border-primary:hover {
+    box-shadow: 0 0 0 0.2rem rgba(0, 123, 255, 0.25);
+}
+
+.border-success:hover {
+    box-shadow: 0 0 0 0.2rem rgba(40, 167, 69, 0.25);
+}
+
+.border-warning:hover {
+    box-shadow: 0 0 0 0.2rem rgba(255, 193, 7, 0.25);
+}
+
+/* =============================================================================
+   GAMIFICATION STYLES (from student_dash.html afterScripts)
+   ============================================================================= */
+
+/* Phase 2: Gamification Styles */
+.bg-gradient-primary {
+    background: linear-gradient(135deg, #007bff 0%, #0056b3 100%);
+}
+
+.level-badge {
+    background: rgba(255, 255, 255, 0.2);
+    border-radius: 50%;
+    padding: 15px;
+    display: inline-block;
+}
+
+.level-up-notification {
+    position: fixed;
+    top: 0;
+    left: 0;
+    width: 100%;
+    height: 100%;
+    background: rgba(0, 0, 0, 0.8);
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    z-index: 9999;
+    animation: fadeIn 0.5s ease-in;
+}
+
+.level-up-content {
+    background: white;
+    padding: 3rem;
+    border-radius: 15px;
+    text-align: center;
+    animation: bounceIn 0.8s ease-out;
+    box-shadow: 0 20px 40px rgba(0, 0, 0, 0.3);
+}
+
+@keyframes fadeIn {
+    from { opacity: 0; }
+    to { opacity: 1; }
+}
+
+@keyframes bounceIn {
+    0% {
+        transform: scale(0.3);
+        opacity: 0;
+    }
+    50% {
+        transform: scale(1.05);
+    }
+    70% {
+        transform: scale(0.9);
+    }
+    100% {
+        transform: scale(1);
+        opacity: 1;
+    }
+}
+
+.streak-counter i,
+.badges-counter i {
+    filter: drop-shadow(0 2px 4px rgba(0, 0, 0, 0.3));
+}
+
+/* Card hover effects for gamification */
+.card-hover:hover {
+    transform: translateY(-2px);
+    box-shadow: 0 4px 15px rgba(0, 0, 0, 0.1);
+    transition: transform 0.2s ease, box-shadow 0.2s ease;
+}
+
+/* =============================================================================
+   STUDENT MANAGEMENT STYLES (from my_students.html)
+   ============================================================================= */
+
+.avatar-name {
+    width: 32px;
+    height: 32px;
+    background-color: #0d6efd;
+    color: white;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    font-weight: bold;
+    font-size: 12px;
+}
+
+.badge .btn-close {
+    font-size: 0.65em;
+    background: none;
+    opacity: 0.8;
+}
+
+.badge .btn-close:hover {
+    opacity: 1;
+}
+
+/* =============================================================================
+   GLOBAL UTILITY CLASSES
+   ============================================================================= */
+
+/* Mobile optimizations for responsive design */
+@media (max-width: 576px) {
+    .btn-group {
+        display: flex;
+        flex-direction: column;
+    }
+    
+    .btn-group .btn {
+        border-radius: 0.25rem !important;
+        margin-bottom: 0.25rem;
+    }
+    
+    .card-header .row {
+        flex-direction: column;
+    }
+    
+    .table-responsive {
+        font-size: 0.875rem;
+    }
+}
+
+/* Loading indicator styling */
+.loading-overlay {
+    position: absolute;
+    top: 0;
+    left: 0;
+    right: 0;
+    bottom: 0;
+    background: rgba(255, 255, 255, 0.8);
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    z-index: 10;
+}
+
+/* Animation utilities */
+.fade-in {
+    animation: fadeIn 0.3s ease-in;
+}
+
+/* Text utilities */
+.text-truncate-2 {
+    display: -webkit-box;
+    -webkit-line-clamp: 2;
+    line-clamp: 2;
+    -webkit-box-orient: vertical;
+    overflow: hidden;
+}
+
+/* =============================================================================
+   INLINE STYLE REPLACEMENTS (Application-Specific Utilities)
+   ============================================================================= */
+
+/* Progress indicators - replaces inline styles */
+.progress-mini {
+    height: 8px !important;
+    width: 60px !important;
+    margin-top: 0.5rem;
+}
+
+.progress-large {
+    height: 30px !important;
+}
+
+.progress-thin {
+    height: 6px !important;
+}
+
+.progress-extra-thin {
+    height: 4px !important;
+}
+
+/* Chart containers - replaces inline height styles */
+.chart-container {
+    height: 300px;
+}
+
+.chart-container-small {
+    height: 250px;
+    width: 100%;
+}
+
+/* Data content visibility - replaces inline display styles */
+.data-content-hidden {
+    display: none;
+}
+
+.data-content-visible {
+    display: block;
+}
+
+/* Dropdown scrollbars */
+.dropdown-scrollbar {
+    max-height: 24rem;
+}
+
+.notification-scrollbar {
+    max-height: 19rem;
+}
+
+/* Bell icon - replaces inline font-size */
+.bell-icon {
+    font-size: 33px;
+}
+
+/* Hidden forms - replaces inline display: none */
+.form-hidden {
+    display: none;
+}
+
+/* Date range input minimum width */
+.date-range-input {
+    min-width: 200px;
+}
+
+/* =============================================================================
+   THEME VARIABLE FIXES (Now handled by theme.js)
+   ============================================================================= */
+
+/* 
+ * NOTE: Empty CSS variables from theme.css are now dynamically populated
+ * by the fixEmptyThemeVariables() function in theme.js for proper theme switching.
+ * 
+ * These legacy CSS overrides are kept as fallbacks but theme.js takes precedence.
+ */
+
+/* CRITICAL FIX: Override bg-light utility class that's breaking card backgrounds */
+/* The .bg-light utility class has !important and is overriding card backgrounds */
+
+/* Fix bg-light utility class conflicts */
+html:not(.dark) .bg-light {
+    --falcon-light-rgb: 249, 250, 253 !important;
+    background-color: rgba(249, 250, 253, 1) !important;
+}
+
+html.dark .bg-light {
+    --falcon-light-rgb: 35, 46, 60 !important;
+    --falcon-bg-opacity: 0.25 !important;
+    background-color: rgba(35, 46, 60, 0.25) !important;
+}
+
+/* HIGH PRIORITY: Card theme fixes with higher specificity than .bg-light */
+html:not(.dark) .card,
+html:not(.dark) .card.bg-light {
+    --falcon-card-bg: #ffffff !important;
+    --falcon-card-color: #5e6e82 !important;
+    background-color: #ffffff !important;
+    border-color: #dee2e6 !important;
+    color: #5e6e82 !important;
+}
+
+html.dark .card,
+html.dark .card.bg-light {
+    --falcon-card-bg: #121e2d !important;
+    --falcon-card-color: #9da9bb !important;
+    background-color: #121e2d !important;
+    border-color: rgba(255, 255, 255, 0.1) !important;
+    color: #9da9bb !important;
+}
+
+/* Ensure card-body inherits properly from parent card */
+html:not(.dark) .card-body {
+    background-color: inherit !important;
+    color: inherit !important;
+}
+
+html.dark .card-body {
+    background-color: inherit !important;
+    color: inherit !important;
+}
+
+/* FIX: Ensure elements inside cards with bg-light don't override card backgrounds */
+html:not(.dark) .card .bg-light {
+    background-color: #f8f9fa !important; /* Light gray for contrast */
+}
+
+html.dark .card .bg-light {
+    background-color: rgba(255, 255, 255, 0.1) !important; /* Subtle light for dark mode */
+}
+
+/* ============================================================================= 
+   STUDENT STATS CARDS - COLORED BACKGROUNDS 
+   ============================================================================= */
+
+/* Override default card styling for student stats to allow Bootstrap color classes */
+/* Use maximum specificity to override theme styles */
+html #student-stats .card.bg-primary,
+html:not(.dark) #student-stats .card.bg-primary,
+html.dark #student-stats .card.bg-primary {
+    background-color: #0d6efd !important;
+    color: #ffffff !important;
+    border-color: #0a58ca !important;
+}
+
+html #student-stats .card.bg-success,
+html:not(.dark) #student-stats .card.bg-success,
+html.dark #student-stats .card.bg-success {
+    background-color: #198754 !important;
+    color: #ffffff !important;
+    border-color: #146c43 !important;
+}
+
+html #student-stats .card.bg-info,
+html:not(.dark) #student-stats .card.bg-info,
+html.dark #student-stats .card.bg-info {
+    background-color: #0dcaf0 !important;
+    color: #ffffff !important;
+    border-color: #0aa2c0 !important;
+}
+
+html #student-stats .card.bg-warning,
+html:not(.dark) #student-stats .card.bg-warning,
+html.dark #student-stats .card.bg-warning {
+    background-color: #ffc107 !important;
+    color: #ffffff !important;
+    border-color: #ffb607 !important;
+}
+
+/* Ensure card-body in stats cards inherits the background */
+html #student-stats .card-body,
+html:not(.dark) #student-stats .card-body,
+html.dark #student-stats .card-body {
+    background-color: inherit !important;
+    color: inherit !important;
+}
+
+/* ============================================================================= 
+   STUDENT PROFILE TABS IMPROVEMENTS
+   ============================================================================= */
+
+/* Enhanced settings tab card styling */
+.card.border-primary.border-opacity-25 {
+    border-width: 2px !important;
+}
+
+.card.border-success.border-opacity-25 {
+    border-width: 2px !important;
+}
+
+.card.border-info.border-opacity-25 {
+    border-width: 2px !important;
+}
+
+.card.border-warning.border-opacity-25 {
+    border-width: 2px !important;
+}
+
+/* Status tab metric cards */
+.l_status .card.border-primary {
+    border-width: 2px !important;
+    border-color: #0d6efd !important;
+}
+
+.l_status .card.border-success {
+    border-width: 2px !important;
+    border-color: #198754 !important;
+}
+
+.l_status .card.border-info {
+    border-width: 2px !important;
+    border-color: #0dcaf0 !important;
+}
+
+.l_status .card.border-warning {
+    border-width: 2px !important;
+    border-color: #ffc107 !important;
+}
+
+/* Reading logs table enhancements */
+#readingLogsTable .badge {
+    font-size: 0.75rem;
+    font-weight: 600;
+}
+
+#readingLogsTable td {
+    vertical-align: middle;
+    padding: 0.75rem 0.5rem;
+}
+
+#readingLogsTable th {
+    background-color: var(--bs-light) !important;
+    font-weight: 600;
+    border-bottom: 2px solid var(--bs-primary);
+}
+
+/* Status tab recent activity styling */
+#recentActivity .d-flex {
+    padding: 0.5rem;
+    border-radius: 0.375rem;
+    margin-bottom: 0.5rem !important;
+    background-color: var(--bs-light);
+}
+
+html.dark #recentActivity .d-flex {
+    background-color: rgba(255, 255, 255, 0.05);
+}
+
+/* Nav tabs enhancement - fixed for light/dark mode */
+.nav-tabs .nav-link {
+    border-radius: 0.375rem 0.375rem 0 0;
+    border: 1px solid transparent;
+    margin-right: 0.25rem;
+    color: var(--bs-body-color);
+    background-color: transparent;
+}
+
+.nav-tabs .nav-link.active {
+    background-color: var(--bs-primary) !important;
+    color: white !important;
+    border-color: var(--bs-primary) !important;
+}
+
+.nav-tabs .nav-link:hover:not(.active) {
+    border-color: var(--bs-primary);
+    background-color: rgba(13, 110, 253, 0.1);
+    color: var(--bs-primary);
+}
+
+html.dark .nav-tabs .nav-link:hover:not(.active) {
+    background-color: rgba(13, 110, 253, 0.2);
+}
+
+/* ============================================================================= 
+   MY STUDENTS PAGE - SUMMARY CARDS THEME SUPPORT
+   ============================================================================= */
+
+/* Summary cards with theme-aware backgrounds */
+html:not(.dark) .summary-card-primary {
+    background: linear-gradient(135deg, rgba(13, 110, 253, 0.05) 0%, rgba(13, 110, 253, 0.02) 100%);
+    border-left: 4px solid var(--bs-primary);
+}
+
+html.dark .summary-card-primary {
+    background: linear-gradient(135deg, rgba(13, 110, 253, 0.15) 0%, rgba(13, 110, 253, 0.05) 100%);
+    border-left: 4px solid var(--bs-primary);
+}
+
+html:not(.dark) .summary-card-success {
+    background: linear-gradient(135deg, rgba(25, 135, 84, 0.05) 0%, rgba(25, 135, 84, 0.02) 100%);
+    border-left: 4px solid var(--bs-success);
+}
+
+html.dark .summary-card-success {
+    background: linear-gradient(135deg, rgba(25, 135, 84, 0.15) 0%, rgba(25, 135, 84, 0.05) 100%);
+    border-left: 4px solid var(--bs-success);
+}
+
+html:not(.dark) .summary-card-info {
+    background: linear-gradient(135deg, rgba(13, 202, 240, 0.05) 0%, rgba(13, 202, 240, 0.02) 100%);
+    border-left: 4px solid var(--bs-info);
+}
+
+html.dark .summary-card-info {
+    background: linear-gradient(135deg, rgba(13, 202, 240, 0.15) 0%, rgba(13, 202, 240, 0.05) 100%);
+    border-left: 4px solid var(--bs-info);
+}
+
+/* Ensure summary cards have proper spacing and hover effects */
+.summary-card-primary,
+.summary-card-success,
+.summary-card-info {
+    transition: transform 0.2s ease-in-out, box-shadow 0.2s ease-in-out;
+}
+
+.summary-card-primary:hover,
+.summary-card-success:hover,
+.summary-card-info:hover {
+    transform: translateY(-2px);
+}
+
+html:not(.dark) .summary-card-primary:hover,
+html:not(.dark) .summary-card-success:hover,
+html:not(.dark) .summary-card-info:hover {
+    box-shadow: 0 4px 8px rgba(0, 0, 0, 0.1);
+}
+
+html.dark .summary-card-primary:hover,
+html.dark .summary-card-success:hover,
+html.dark .summary-card-info:hover {
+    box-shadow: 0 4px 8px rgba(255, 255, 255, 0.1);
+}
+
+/* =============================================================================
+   THEME-SPECIFIC ENHANCEMENTS (Non-conflicting)
+   ============================================================================= */
+
+/* Dark mode table enhancements (complementary to theme.css) */
+html.dark .table-hover > tbody > tr:hover > * {
+    background-color: rgba(255, 255, 255, 0.075);
+}
+
+/* Form enhancements (complementary to theme.css) */
+.form-floating > .form-control:focus ~ label {
+    color: #0d6efd;
+}
+
+/* =============================================================================
+   PRINT STYLES
+   ============================================================================= */
+
+@media print {
+    .btn, .navbar, .sidebar {
+        display: none !important;
+    }
+    
+    .card {
+        border: 1px solid #dee2e6 !important;
+        box-shadow: none !important;
+    }
+    
+    .table {
+        font-size: 0.8rem;
+    }
+}
+
+/* =============================================================================
+   CONSOLIDATED MOBILE OPTIMIZATIONS (from mobile-optimizations.css)
+   ============================================================================= */
+
+/* Enhanced Mobile Responsive Rules - Extends existing @media (max-width: 768px) */
+@media (max-width: 768px) {
+    /* Additional column stacking rules */
+    .row .col-md-3,
+    .row .col-md-4,
+    .row .col-md-6 {
+        margin-bottom: 1rem;
+    }
+    
+    /* Ensure full width on mobile for all Bootstrap columns */
+    .col-md-3,
+    .col-md-4,
+    .col-md-6,
+    .col-md-8,
+    .col-md-12,
+    .col-lg-6 {
+        width: 100% !important;
+        flex: 0 0 100% !important;
+        max-width: 100% !important;
+    }
+    
+    /* Enhanced form controls for touch */
+    .form-control,
+    .form-select {
+        min-height: 48px;
+        font-size: 16px; /* Prevents zoom on iOS */
+    }
+    
+    /* Enhanced button touch targets */
+    .btn {
+        min-height: 48px;
+        padding: 12px 20px;
+    }
+    
+    /* Enhanced table responsiveness */
+    .table-responsive {
+        font-size: 14px;
+    }
+    
+    .table th,
+    .table td {
+        padding: 0.5rem;
+        white-space: nowrap;
+    }
+    
+    /* Date range picker optimization */
+    #dashboard_range {
+        font-size: 14px;
+    }
+    
+    /* Navigation buttons */
+    #prev-week,
+    #next-week {
+        min-width: 40px;
+        padding: 8px;
+    }
+    
+    /* Classroom/Group selector */
+    #Classroom_Group {
+        font-size: 14px;
+    }
+    
+    /* Gauge charts optimization */
+    #pages-gauge,
+    #minutes-gauge {
+        min-height: 200px !important;
+    }
+    
+    /* Table toggle button */
+    #toggle-table {
+        width: 100%;
+        margin-bottom: 1rem;
+    }
+    
+    /* Admin quick actions */
+    .quick-actions .col-md-3 {
+        margin-bottom: 1rem;
+    }
+    
+    .quick-actions .card {
+        min-height: 120px;
+    }
+    
+    .quick-actions .card-body {
+        padding: 1rem 0.5rem;
+    }
+    
+    .quick-actions h6 {
+        font-size: 14px;
+    }
+    
+    .quick-actions small {
+        font-size: 11px;
+    }
+}
+
+/* Small mobile devices */
+@media (max-width: 576px) {
+    /* Quick log form adjustments */
+    #quick-log-form .row.g-3 {
+        gap: 0.75rem;
+    }
+    
+    #quick-log-form .col-md-4,
+    #quick-log-form .col-md-6 {
+        width: 100% !important;
+        flex: 0 0 100% !important;
+        max-width: 100% !important;
+    }
+    
+    /* Progress cards - stack in single column */
+    .progress-cards .col-md-3 {
+        margin-bottom: 0.75rem;
+    }
+    
+    /* Make rating select more touch-friendly */
+    #log-rating {
+        font-size: 16px;
+    }
+    
+    /* Compact recent logs table */
+    #recent-logs {
+        font-size: 12px;
+    }
+    
+    #recent-logs th:nth-child(3),
+    #recent-logs td:nth-child(3) {
+        display: none; /* Hide author on very small screens */
+    }
+    
+    /* Compact child card stats */
+    .child-stats .row {
+        margin: 0;
+    }
+    
+    .child-stats .col-6 {
+        padding: 0.25rem;
+    }
+    
+    /* Recent logs in child cards */
+    .list-group-item {
+        padding: 0.5rem 0;
+    }
+    
+    .badge {
+        font-size: 0.7em;
+    }
+}
+
+/* =============================================================================
+   TOUCH DEVICE OPTIMIZATIONS
+   ============================================================================= */
+
+/* Touch-first improvements */
+@media (hover: none) and (pointer: coarse) {
+    /* Better touch targets */
+    .nav-link {
+        min-height: 48px;
+        display: flex;
+        align-items: center;
+    }
+    
+    .list-group-item-action {
+        min-height: 48px;
+        display: flex;
+        align-items: center;
+    }
+    
+    /* Remove hover effects on touch devices */
+    .btn:hover,
+    .card:hover {
+        transform: none;
+    }
+}
+
+/* =============================================================================
+   ACCESSIBILITY & PREFERENCE SUPPORT
+   ============================================================================= */
+
+/* Reduce motion for accessibility */
+@media (prefers-reduced-motion: reduce) {
+    .progress-bar,
+    .spinner-border,
+    .fade {
+        animation: none;
+        transition: none;
+    }
+}
+
+/* High contrast mode support */
+@media (prefers-contrast: high) {
+    .card {
+        border: 2px solid #000;
+    }
+    
+    .btn {
+        border: 2px solid currentColor;
+    }
+    
+    .form-control,
+    .form-select {
+        border: 2px solid #000;
+    }
+}
+
+/* =============================================================================
+   ENHANCED PRINT STYLES
+   ============================================================================= */
+
+@media print {
+    /* Hide interactive elements */
+    .navbar,
+    .btn,
+    #quick-log-form {
+        display: none !important;
+    }
+    
+    /* Optimize card printing */
+    .card {
+        border: 1px solid #000;
+        page-break-inside: avoid;
+        box-shadow: none !important;
+    }
+    
+    /* Table optimization for print */
+    .table {
+        font-size: 12px;
+    }
+}
+
 /* prettier-ignore */
 /*# sourceMappingURL=user.css.map */

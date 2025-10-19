@@ -1,0 +1,191 @@
+---
+description: API development patterns for JSON endpoints, error handling, and security
+globs: ["**/views.py", "**/apis.py", "**/urls.py", "**/*api*"]
+alwaysApply: false
+---
+
+# API Development Patterns
+
+## Standard JSON Response Format
+
+### Success Response Structure
+```python
+{
+    "status": "success",
+    "data": {
+        # Response data here
+    },
+    "message": "Optional success message"
+}
+```
+
+### Error Response Structure
+```python
+{
+    "status": "error", 
+    "message": "Human-readable error message",
+    "code": "OPTIONAL_ERROR_CODE"
+}
+```
+
+## Authentication and Security Patterns
+
+### Required Decorators
+```python
+from django.contrib.auth.decorators import login_required
+from django.views.decorators.http import require_http_methods
+from django.views.decorators.csrf import csrf_exempt  # Only when needed
+
+@login_required
+@require_http_methods(["GET", "POST"])
+def api_endpoint(request):
+    # Implementation
+```
+
+### User Permission Validation
+```python
+# Always validate user permissions before data access
+if request.user.user_type == 'student':
+    # Student can only access their own data
+    logs = Log.objects.filter(student=request.user)
+elif request.user.user_type == 'teacher':
+    # Teacher can access their students' data
+    student_ids = request.user.teacher_students.values_list('id', flat=True)
+    logs = Log.objects.filter(student_id__in=student_ids)
+```
+
+## Input Validation Patterns
+
+### Date Range Validation
+```python
+try:
+    start_date = datetime.fromisoformat(request.GET.get('start')).date()
+    end_date = datetime.fromisoformat(request.GET.get('end')).date()
+except (ValueError, TypeError):
+    return JsonResponse({'status': 'error', 'message': 'Invalid date format'})
+```
+
+### Required Parameter Validation
+```python
+required_params = ['student_id', 'date_range']
+missing_params = [param for param in required_params if not request.GET.get(param)]
+if missing_params:
+    return JsonResponse({
+        'status': 'error',
+        'message': f'Missing required parameters: {", ".join(missing_params)}'
+    })
+```
+
+## Error Handling Standards
+
+### Database Error Handling
+```python
+from django.core.exceptions import ValidationError
+from django.db import transaction
+
+try:
+    with transaction.atomic():
+        # Database operations
+        pass
+except ValidationError as e:
+    return JsonResponse({'status': 'error', 'message': str(e)})
+except Exception as e:
+    logger.error(f'Unexpected error in {request.path}: {str(e)}')
+    return JsonResponse({'status': 'error', 'message': 'An unexpected error occurred'})
+```
+
+### User Not Found Handling
+```python
+from django.shortcuts import get_object_or_404
+
+try:
+    user = CustomUser.objects.get(id=user_id, school=request.user.school)
+except CustomUser.DoesNotExist:
+    return JsonResponse({'status': 'error', 'message': 'User not found'})
+```
+
+## Performance Optimization
+
+### Use Caching for Expensive Operations
+```python
+from django.views.decorators.cache import cache_page
+from django.views.decorators.vary import vary_on_headers
+from django.core.cache import cache
+
+@cache_page(60 * 5)  # Cache for 5 minutes
+@vary_on_headers('User-Agent')
+def analytics_endpoint(request):
+    # Expensive analytics calculation
+```
+
+### Database Query Optimization
+```python
+# Use select_related and prefetch_related
+logs = Log.objects.select_related('student', 'school')\
+                 .prefetch_related('student__classrooms')\
+                 .filter(date__range=(start_date, end_date))
+
+# Use aggregation instead of Python loops
+stats = logs.aggregate(
+    total_pages=Sum('pages'),
+    total_minutes=Sum('minutes'),
+    avg_rating=Avg('rating')
+)
+```
+
+## Security Logging
+
+### Log Security Events
+```python
+import logging
+logger = logging.getLogger('reading_logs.security')
+
+# Log unauthorized access attempts
+if not user.has_permission_for_student(student_id):
+    logger.warning(f'Unauthorized access attempt by user {user.id} for student {student_id}')
+    return JsonResponse({'status': 'error', 'message': 'Access denied'})
+
+# Log successful operations
+logger.info(f'User {user.id} accessed student data for {student_id}')
+```
+
+## Content Type and CORS
+
+### Set Proper Content Types
+```python
+from django.http import JsonResponse
+
+# JsonResponse automatically sets content-type
+return JsonResponse(data, safe=False)  # safe=False for lists
+
+# For custom responses
+response = HttpResponse(json.dumps(data), content_type='application/json')
+```
+
+## API Versioning Pattern
+
+### URL Structure
+```python
+# urls.py
+urlpatterns = [
+    path('api/v1/logs/', get_logs_by_date_range, name='api_logs_v1'),
+    path('api/v1/analytics/', analytics_endpoint, name='api_analytics_v1'),
+]
+```
+
+## Rate Limiting Considerations
+
+### Add Rate Limiting for Heavy Operations
+```python
+from django.views.decorators.cache import cache_page
+from django.core.cache import cache
+
+def rate_limited_endpoint(request):
+    user_key = f"api_limit_{request.user.id}"
+    current_requests = cache.get(user_key, 0)
+    
+    if current_requests >= 100:  # Max 100 requests per hour
+        return JsonResponse({'status': 'error', 'message': 'Rate limit exceeded'})
+    
+    cache.set(user_key, current_requests + 1, 3600)  # 1 hour timeout
+```

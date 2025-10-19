@@ -1,0 +1,52 @@
+{% comment %}
+BEFORE (Original repetitive navigation code - 7 lines per item):
+
+<li class="nav-item">
+    <a class="nav-link" href="{% url 'home' %}student/">
+        <div class="d-flex align-items-center">
+            <span class="nav-link-icon">
+                <span class="fas fa-graduation-cap"></span>
+            </span>
+            <span class="nav-link-text ps-1">Students</span>
+        </div>
+    </a>
+</li>
+
+AFTER (Using nav_item component - 1 line per item):
+
+{% include "components/navigation/nav_item.html" with url="user_list_page" url_params="student" icon="fas fa-graduation-cap" label="Students" %}
+
+REDUCTION: 85% fewer lines (7 lines → 1 line per navigation item)
+{% endcomment %}
+
+<!-- Example of refactored navigation using components -->
+<ul class="navbar-nav flex-column mb-3">
+    {% if user.user_type == 'administrator' %}
+        <!-- Administrator navigation - 85% reduction in code -->
+        {% include "components/navigation/nav_item.html" with url="user_list_page" url_params="student" icon="fas fa-graduation-cap" label="Students" %}
+        {% include "components/navigation/nav_item.html" with url="user_list_page" url_params="teacher" icon="fas fa-chalkboard-teacher" label="Teachers" %}
+        {% include "components/navigation/nav_item.html" with url="user_list_page" url_params="parent" icon="fas fa-users" label="Parents" %}
+        {% include "components/navigation/nav_item.html" with url="user_list_page" url_params="administrator" icon="fas fa-user-tie" label="Administrators" %}
+        {% include "components/navigation/nav_item.html" with url="classrooms" icon="fas fa-school" label="Classrooms" %}
+        {% include "components/navigation/nav_item.html" with url="reading_groups" icon="fas fa-book-reader" label="Reading Groups" %}
+        
+    {% elif user.user_type == 'teacher' %}
+        <!-- Teacher navigation -->
+        {% include "components/navigation/nav_item.html" with url="home" icon="fas fa-home" label="My Dashboard" %}
+        {% include "components/navigation/nav_item.html" with url="my_students" icon="fas fa-graduation-cap" label="My Students" %}
+        {% include "components/navigation/nav_item.html" with url="my_classrooms" icon="fas fa-door-open" label="My Classrooms" %}
+        {% include "components/navigation/nav_item.html" with url="reading_groups" icon="fas fa-book-reader" label="Reading Groups" %}
+        
+    {% elif user.user_type == 'student' %}
+        <!-- Student navigation -->
+        {% include "components/navigation/nav_item.html" with url="home" icon="fas fa-home" label="Dashboard" %}
+        {% include "components/navigation/nav_item.html" with url="record" icon="fas fa-book" label="Reading Log" %}
+        {% include "components/navigation/nav_item.html" with url="gamification_dashboard" icon="fas fa-trophy" label="Achievements" %}
+        
+    {% elif user.user_type == 'parent' %}
+        <!-- Parent navigation -->
+        {% include "components/navigation/nav_item.html" with url="home" icon="fas fa-home" label="Dashboard" %}
+        {% include "components/navigation/nav_item.html" with url="record" icon="fas fa-plus" label="Add Reading Log" %}
+    {% endif %}
+</ul>
+

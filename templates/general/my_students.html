@@ -1,6 +1,9 @@
 {% extends "general/nav_template.html" %}
 {% load static %}
 {% block title %}My Students | Teacher Dashboard{% endblock %}
+
+
+
 {% block content %}
 
 {% csrf_token %}
@@ -15,61 +18,46 @@
 
 <!-- Students Summary Cards -->
 <div class="row mb-4">
-    <div class="col-md-3">
-        <div class="card bg-primary text-white">
+    <div class="col-md-4">
+        <div class="card summary-card-primary">
             <div class="card-body">
                 <div class="d-flex align-items-center">
                     <div class="flex-grow-1">
-                        <h4 class="mb-0">{{ students.count }}</h4>
+                        <h4 class="mb-0 text-primary">{{ students.count }}</h4>
                         <p class="mb-0">Total Students</p>
                     </div>
                     <div class="ms-3">
-                        <i class="fas fa-graduation-cap fa-2x"></i>
+                        <i class="fas fa-graduation-cap fa-2x text-primary"></i>
                     </div>
                 </div>
             </div>
         </div>
     </div>
-    <div class="col-md-3">
-        <div class="card bg-success text-white">
+    <div class="col-md-4">
+        <div class="card summary-card-success">
             <div class="card-body">
                 <div class="d-flex align-items-center">
                     <div class="flex-grow-1">
-                        <h4 class="mb-0">{{ classrooms.count }}</h4>
+                        <h4 class="mb-0 text-success">{{ classrooms.count }}</h4>
                         <p class="mb-0">My Classrooms</p>
                     </div>
                     <div class="ms-3">
-                        <i class="fas fa-school fa-2x"></i>
+                        <i class="fas fa-school fa-2x text-success"></i>
                     </div>
                 </div>
             </div>
         </div>
     </div>
-    <div class="col-md-3">
-        <div class="card bg-info text-white">
+    <div class="col-md-4">
+        <div class="card summary-card-info">
             <div class="card-body">
                 <div class="d-flex align-items-center">
                     <div class="flex-grow-1">
-                        <h4 class="mb-0">{{ reading_groups.count }}</h4>
+                        <h4 class="mb-0 text-info">{{ reading_groups.count }}</h4>
                         <p class="mb-0">Reading Groups</p>
                     </div>
                     <div class="ms-3">
-                        <i class="fas fa-book-reader fa-2x"></i>
-                    </div>
-                </div>
-            </div>
-        </div>
-    </div>
-    <div class="col-md-3">
-        <div class="card bg-warning text-white">
-            <div class="card-body">
-                <div class="d-flex align-items-center">
-                    <div class="flex-grow-1">
-                        <h4 class="mb-0" id="students-with-parents">0</h4>
-                        <p class="mb-0">With Parents</p>
-                    </div>
-                    <div class="ms-3">
-                        <i class="fas fa-users fa-2x"></i>
+                        <i class="fas fa-book-reader fa-2x text-info"></i>
                     </div>
                 </div>
             </div>
@@ -139,10 +127,10 @@
                             </div>
                         </td>
                         <td>
-                            <div class="d-flex flex-wrap gap-1" id="parents-{{ student.id }}">
-                                {% for relation in student.children_relations.all %}
-                                    <span class="badge bg-success" data-parent-id="{{ relation.parent.id }}">
-                                        {{ relation.parent.first_name }} {{ relation.parent.last_initial }}
+                                                         <div class="d-flex flex-wrap gap-1" id="parents-{{ student.id }}">
+                                 {% for relation in student.parent_relations.all %}
+                                     <span class="badge bg-success" data-parent-id="{{ relation.parent.id }}">
+                                         {{ relation.parent.first_name }} {{ relation.parent.last_initial }}
                                         <button type="button" class="btn-close btn-close-white ms-1" 
                                                 onclick="removeParent({{ student.id }}, {{ relation.parent.id }})" 
                                                 aria-label="Remove parent"></button>
@@ -268,6 +256,11 @@
                         <input type="email" class="form-control" id="email" name="email" required>
                     </div>
                     <div class="mb-3">
+                        <label for="password" class="form-label">Password</label>
+                        <input type="password" class="form-control" id="password" name="password" required 
+                               placeholder="Set password for the student">
+                    </div>
+                    <div class="mb-3">
                         <label for="newClassroomSelect" class="form-label">Add to Classroom (Optional)</label>
                         <select class="form-select" id="newClassroomSelect" name="classroom_id">
                             <option value="">Choose a classroom...</option>
@@ -333,33 +326,7 @@
     </div>
 </div>
 
-<style>
-.avatar-name {
-    width: 32px;
-    height: 32px;
-    background-color: #0d6efd;
-    color: white;
-    display: flex;
-    align-items: center;
-    justify-content: center;
-    font-weight: bold;
-    font-size: 12px;
-}
 
-.badge .btn-close {
-    font-size: 0.65em;
-    background: none;
-    opacity: 0.8;
-}
-
-.badge .btn-close:hover {
-    opacity: 1;
-}
-
-.table td {
-    vertical-align: middle;
-}
-</style>
 
 <script>
 let currentStudentId = null;
@@ -424,8 +391,8 @@ function createStudent() {
     const formData = new FormData(form);
     
     // Basic validation
-    if (!formData.get('first_name') || !formData.get('last_initial') || !formData.get('email')) {
-        alert('Please fill in all required fields');
+    if (!formData.get('first_name') || !formData.get('last_initial') || !formData.get('email') || !formData.get('password')) {
+        alert('Please fill in all required fields (first name, last initial, email, and password)');
         return;
     }
     
@@ -440,7 +407,17 @@ function createStudent() {
     .then(response => response.json())
     .then(data => {
         if (data.success) {
-            location.reload(); // Refresh page to show new student
+            // Show success message
+            alert(`Student created successfully!\nEmail: ${data.student_email}`);
+            
+            // Close modal
+            const modal = bootstrap.Modal.getInstance(document.getElementById('createStudentModal'));
+            if (modal) {
+                modal.hide();
+            }
+            
+            // Refresh page to show new student
+            location.reload();
         } else {
             alert('Error: ' + data.message);
         }
@@ -451,18 +428,11 @@ function createStudent() {
     });
 }
 
-// Manage parents for a student
-function manageParents(studentId, studentName) {
-    currentStudentId = studentId;
-    document.getElementById('studentNameDisplay').textContent = `Managing parents for: ${studentName}`;
-    
-    // Load current parents
-    loadCurrentParents(studentId);
-    
-    // Show modal
-    const modal = new bootstrap.Modal(document.getElementById('manageParentsModal'));
-    modal.show();
-}
+  // Manage parents for a student
+  function manageParents(studentId, studentName) {
+     // Navigate to student profile settings tab
+     window.location.href = `/student/${studentId}/#settings`;
+  }
 
 // Load current parents for student
 function loadCurrentParents(studentId) {
@@ -608,12 +578,10 @@ function removeStudent(studentId, studentName) {
     });
 }
 
-// Update students with parents count on page load
+// Page initialization
 document.addEventListener('DOMContentLoaded', function() {
-    const studentsWithParents = document.querySelectorAll('[id^="parents-"] .badge').length;
-    document.getElementById('students-with-parents').textContent = 
-        document.querySelectorAll('#students-table-body tr[data-student-name]').length - 
-        document.querySelectorAll('#students-table-body tr[data-student-name] .text-muted').length;
+    // Page loaded successfully
+    console.log('My Students page loaded');
 });
 </script>
 

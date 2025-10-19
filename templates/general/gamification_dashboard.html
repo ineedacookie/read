@@ -39,7 +39,7 @@
                     </div>
                     <h4 id="total-points" class="mb-1">0</h4>
                     <small class="text-muted">Total Points</small>
-                    <div class="progress mt-2" style="height: 6px;">
+                    <div class="progress progress-thin mt-2">
                         <div id="level-progress" class="progress-bar bg-warning" style="width: 0%"></div>
                     </div>
                     <small id="points-to-next" class="text-muted">0 points to next level</small>
@@ -392,7 +392,7 @@ function getProgressBar(progress) {
     
     return `
         <div class="mt-2">
-            <div class="progress" style="height: 4px;">
+            <div class="progress progress-extra-thin">
                 <div class="progress-bar" style="width: ${progressData.percentage}%"></div>
             </div>
             <small class="text-muted">${progressData.current}/${progressData.target}</small>

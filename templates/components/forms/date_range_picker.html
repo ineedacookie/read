@@ -1,0 +1,80 @@
+{% load static %}
+{% comment %}
+Date Range Picker Component
+
+Usage:
+{% include "components/forms/date_range_picker.html" with 
+    id="dashboard_range" 
+    label="📅 Time Period" 
+    placeholder="Select date range..." 
+    container_class="col-md-6"
+    show_navigation=True
+    callback_function="loadDashboardData"
+%}
+
+Parameters:
+- id: Unique identifier for the input field (required)
+- label: Display label for the component (default: "📅 Date Range")
+- placeholder: Placeholder text for input (default: "Select date range...")
+- container_class: CSS class for container div (default: "col-md-6")
+- show_navigation: Whether to show prev/next buttons (default: True)
+- callback_function: JavaScript function to call on change (default: none)
+- initial_range: Initial date range value (default: current week)
+{% endcomment %}
+
+<div class="{{ container_class|default:'col-md-6' }}">
+    <label class="form-label fw-bold mb-2">{{ label|default:"📅 Date Range" }}</label>
+    <div class="d-flex align-items-center gap-2">
+        {% if show_navigation|default:True %}
+        <button class="btn btn-outline-secondary btn-sm" id="{{ id }}_prev" title="Previous Period">
+            <i class="fas fa-chevron-left"></i>
+        </button>
+        {% endif %}
+        
+        <input class="form-control datetimepicker" 
+               id="{{ id }}" 
+               type="text" 
+               placeholder="{{ placeholder|default:'Select date range...' }}"
+               data-options='{"mode":"range","dateFormat":"M j, Y","disableMobile":true,"position":"below"}'
+               {% if initial_range %}value="{{ initial_range }}"{% endif %}
+               readonly="readonly"/>
+        
+        {% if show_navigation|default:True %}
+        <button class="btn btn-outline-secondary btn-sm" id="{{ id }}_next" title="Next Period">
+            <i class="fas fa-chevron-right"></i>
+        </button>
+        {% endif %}
+    </div>
+</div>
+
+{% comment %}
+Load the date range picker JavaScript if not already loaded
+{% endcomment %}
+<script src="{% static 'assets/js/date-range-picker.js' %}" defer></script>
+
+{% comment %}
+Initialize this specific instance
+{% endcomment %}
+<script>
+document.addEventListener('DOMContentLoaded', function() {
+    // Ensure the date range picker script is loaded before initializing
+    if (typeof initializeDateRangePicker === 'function') {
+        initializeDateRangePicker('{{ id }}', {
+            showNavigation: {% if show_navigation|default:True %}true{% else %}false{% endif %},
+            callbackFunction: {% if callback_function %}'{{ callback_function }}'{% else %}null{% endif %},
+            initialRange: {% if initial_range %}'{{ initial_range }}'{% else %}null{% endif %}
+        });
+    } else {
+        // Retry after a short delay if script not loaded yet
+        setTimeout(function() {
+            if (typeof initializeDateRangePicker === 'function') {
+                initializeDateRangePicker('{{ id }}', {
+                    showNavigation: {% if show_navigation|default:True %}true{% else %}false{% endif %},
+                    callbackFunction: {% if callback_function %}'{{ callback_function }}'{% else %}null{% endif %},
+                    initialRange: {% if initial_range %}'{{ initial_range }}'{% else %}null{% endif %}
+                });
+            }
+        }, 500);
+    }
+});
+</script>

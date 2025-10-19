@@ -1,0 +1,484 @@
+---
+description: Testing patterns and standards for API testing, model testing, and comprehensive test coverage
+globs: ["**/tests/*", "**/test_*.py", "**/*_test.py"]
+alwaysApply: false
+---
+
+# Testing Standards and Patterns
+
+## Test Structure and Organization
+
+### Test File Organization
+```python
+# tests/
+#   __init__.py
+#   test_models.py      # Model tests
+#   test_views.py       # View/API tests  
+#   test_apis.py        # API endpoint tests
+#   test_gamification.py # Gamification system tests
+#   test_analytics.py    # Analytics tests
+#   factories.py         # Test data factories
+#   utils.py            # Test utilities
+```
+
+### Base Test Case Pattern
+```python
+from django.test import TestCase, Client
+from django.contrib.auth import get_user_model
+from django.urls import reverse
+from datetime import date, timedelta
+
+from users.models import School, CustomUser
+from reading_logs.models import Log, DailyGoal
+
+User = get_user_model()
+
+class BaseTestCase(TestCase):
+    """Base test case with common setup"""
+    
+    def setUp(self):
+        self.client = Client()
+        
+        # Create test school
+        self.school = School.objects.create(name="Test School")
+        
+        # Create test users for each role
+        self.administrator = self.create_user('admin', 'administrator')
+        self.teacher = self.create_user('teacher', 'teacher')
+        self.student = self.create_user('student', 'student')
+        self.parent = self.create_user('parent', 'parent')
+        
+    def create_user(self, username, user_type):
+        """Helper to create users with consistent pattern"""
+        return CustomUser.objects.create(
+            username=f"test{username}",
+            email=f"{username}@test.com",
+            user_type=user_type,
+            school=self.school,
+            first_name=f"Test {username.title()}",
+            last_initial="T"
+        )
+```
+
+## API Testing Patterns
+
+### Authentication Testing
+```python
+class APIAuthenticationTests(BaseTestCase):
+    def test_unauthenticated_access_denied(self):
+        """Test that unauthenticated users cannot access APIs"""
+        response = self.client.get('/api/logs/')
+        self.assertEqual(response.status_code, 302)  # Redirect to login
+        
+    def test_authenticated_access_allowed(self):
+        """Test that authenticated users can access appropriate APIs"""
+        self.client.force_login(self.student)
+        response = self.client.get('/api/logs/')
+        self.assertEqual(response.status_code, 200)
+```
+
+### Permission Testing Pattern
+```python
+class APIPermissionTests(BaseTestCase):
+    def setUp(self):
+        super().setUp()
+        
+        # Create test data for different users
+        self.student_log = Log.objects.create(
+            student=self.student,
+            school=self.school,
+            date=date.today(),
+            pages=10,
+            minutes=20
+        )
+        
+    def test_student_can_only_see_own_logs(self):
+        """Students should only see their own reading logs"""
+        self.client.force_login(self.student)
+        
+        response = self.client.get('/api/logs/')
+        data = response.json()
+        
+        self.assertEqual(response.status_code, 200)
+        self.assertEqual(len(data['logs']), 1)
+        self.assertEqual(data['logs'][0]['id'], self.student_log.id)
+        
+    def test_teacher_sees_student_logs_in_class(self):
+        """Teachers should see logs for students in their classes"""
+        # Add student to teacher's classroom
+        classroom = Classroom.objects.create(name="Test Class", school=self.school)
+        classroom.teachers.add(self.teacher)
+        classroom.students.add(self.student)
+        
+        self.client.force_login(self.teacher)
+        
+        response = self.client.get('/api/logs/')
+        data = response.json()
+        
+        self.assertEqual(response.status_code, 200)
+        self.assertGreater(len(data['logs']), 0)
+```
+
+### JSON Response Testing
+```python
+class APIResponseFormatTests(BaseTestCase):
+    def test_success_response_format(self):
+        """Test that successful API responses follow standard format"""
+        self.client.force_login(self.student)
+        
+        response = self.client.get('/api/logs/')
+        data = response.json()
+        
+        # Check standard response structure
+        self.assertIn('status', data)
+        self.assertEqual(data['status'], 'success')
+        self.assertIn('data', data)
+        
+    def test_error_response_format(self):
+        """Test that error responses follow standard format"""
+        response = self.client.get('/api/logs/invalid-id/')
+        data = response.json()
+        
+        self.assertIn('status', data)
+        self.assertEqual(data['status'], 'error')
+        self.assertIn('message', data)
+        self.assertIsInstance(data['message'], str)
+```
+
+## Model Testing Patterns
+
+### Model Validation Testing
+```python
+class LogModelTests(BaseTestCase):
+    def test_log_creation_with_valid_data(self):
+        """Test creating a log with valid data"""
+        log = Log.objects.create(
+            student=self.student,
+            school=self.school,
+            date=date.today(),
+            title="Test Book",
+            author="Test Author",
+            pages=10,
+            minutes=20,
+            rating=4.5
+        )
+        
+        self.assertEqual(log.student, self.student)
+        self.assertEqual(log.school, self.school)
+        self.assertEqual(log.pages, 10)
+        self.assertEqual(log.rating, 4.5)
+        
+    def test_negative_pages_validation(self):
+        """Test that negative pages are not allowed"""
+        with self.assertRaises(ValidationError):
+            log = Log(
+                student=self.student,
+                school=self.school,
+                date=date.today(),
+                pages=-5  # Invalid negative value
+            )
+            log.full_clean()  # Trigger validation
+            
+    def test_rating_range_validation(self):
+        """Test that ratings must be between 0 and 5"""
+        # Test invalid high rating
+        with self.assertRaises(ValidationError):
+            log = Log(
+                student=self.student,
+                school=self.school,
+                date=date.today(),
+                rating=6.0  # Invalid high rating
+            )
+            log.full_clean()
+```
+
+### Model Method Testing
+```python
+class LogMethodTests(BaseTestCase):
+    def test_str_representation(self):
+        """Test string representation of Log model"""
+        log = Log.objects.create(
+            student=self.student,
+            school=self.school,
+            date=date.today(),
+            title="Test Book",
+            pages=10
+        )
+        
+        expected = f"{self.student.name} - Test Book"
+        self.assertEqual(str(log), expected)
+        
+    def test_get_reading_time_display(self):
+        """Test custom method for displaying reading time"""
+        log = Log.objects.create(
+            student=self.student,
+            school=self.school,
+            date=date.today(),
+            minutes=75  # 1 hour 15 minutes
+        )
+        
+        expected = "1h 15m"
+        self.assertEqual(log.get_reading_time_display(), expected)
+```
+
+## Gamification Testing Patterns
+
+### Achievement Testing
+```python
+class GamificationTests(BaseTestCase):
+    def setUp(self):
+        super().setUp()
+        
+        # Create test badges
+        self.first_log_badge = Badge.objects.create(
+            name="First Steps",
+            description="Complete your first reading log",
+            category="milestone",
+            difficulty="bronze",
+            criteria={"type": "reading_logs_count", "threshold": 1}
+        )
+        
+    def test_first_log_badge_awarded(self):
+        """Test that first log badge is awarded correctly"""
+        # Initially no badges
+        self.assertEqual(self.student.studentbadge_set.count(), 0)
+        
+        # Create first log
+        log = Log.objects.create(
+            student=self.student,
+            school=self.school,
+            date=date.today(),
+            pages=10
+        )
+        
+        # Check badge was awarded
+        engine = GamificationEngine(self.student)
+        badges = engine.check_achievements_for_log(log)
+        
+        self.assertEqual(len(badges), 1)
+        self.assertEqual(badges[0].name, "First Steps")
+        self.assertEqual(self.student.studentbadge_set.count(), 1)
+        
+    def test_xp_calculation(self):
+        """Test XP calculation for reading logs"""
+        calculator = XPCalculator()
+        
+        # Test base XP calculation
+        xp = calculator.calculate_log_xp(pages=10, minutes=20)
+        expected_xp = (10 * 1) + (20 * 0.5)  # pages + minutes
+        self.assertEqual(xp, int(expected_xp))
+        
+        # Test rating multiplier
+        xp_with_rating = calculator.calculate_log_xp(pages=10, minutes=20, rating=5.0)
+        expected_xp_with_rating = expected_xp * 2.0  # 5-star multiplier
+        self.assertEqual(xp_with_rating, int(expected_xp_with_rating))
+```
+
+## Factory Pattern for Test Data
+
+### Model Factories
+```python
+# tests/factories.py
+import factory
+from datetime import date
+from django.contrib.auth import get_user_model
+
+from users.models import School
+from reading_logs.models import Log
+
+User = get_user_model()
+
+class SchoolFactory(factory.django.DjangoModelFactory):
+    class Meta:
+        model = School
+        
+    name = factory.Sequence(lambda n: f"Test School {n}")
+
+class UserFactory(factory.django.DjangoModelFactory):
+    class Meta:
+        model = User
+        
+    username = factory.Sequence(lambda n: f"testuser{n}")
+    email = factory.LazyAttribute(lambda obj: f"{obj.username}@test.com")
+    first_name = factory.Faker('first_name')
+    last_initial = factory.Faker('random_letter')
+    school = factory.SubFactory(SchoolFactory)
+    
+class StudentFactory(UserFactory):
+    user_type = 'student'
+    
+class TeacherFactory(UserFactory):
+    user_type = 'teacher'
+
+class LogFactory(factory.django.DjangoModelFactory):
+    class Meta:
+        model = Log
+        
+    student = factory.SubFactory(StudentFactory)
+    school = factory.SelfAttribute('student.school')
+    date = factory.LazyFunction(date.today)
+    title = factory.Faker('sentence', nb_words=3)
+    author = factory.Faker('name')
+    pages = factory.Faker('random_int', min=1, max=50)
+    minutes = factory.Faker('random_int', min=5, max=120)
+    rating = factory.Faker('pydecimal', left_digits=1, right_digits=2, positive=True, min_value=0, max_value=5)
+```
+
+### Using Factories in Tests
+```python
+class FactoryTestExample(TestCase):
+    def test_using_factories(self):
+        """Example of using factories for test data"""
+        # Create test data using factories
+        student = StudentFactory()
+        teacher = TeacherFactory(school=student.school)
+        
+        # Create multiple logs
+        logs = LogFactory.create_batch(5, student=student)
+        
+        self.assertEqual(Log.objects.count(), 5)
+        self.assertEqual(logs[0].student, student)
+```
+
+## Performance Testing Patterns
+
+### Query Count Testing
+```python
+from django.test.utils import override_settings
+from django.db import connection
+from django.test import TransactionTestCase
+
+class PerformanceTests(TransactionTestCase):
+    def test_student_dashboard_query_count(self):
+        """Test that student dashboard doesn't cause N+1 queries"""
+        student = StudentFactory()
+        LogFactory.create_batch(10, student=student)
+        
+        with self.assertNumQueries(3):  # Expected number of queries
+            response = self.client.get(
+                reverse('student_dashboard'),
+                HTTP_AUTHORIZATION=f'Bearer {student.auth_token}'
+            )
+            
+        self.assertEqual(response.status_code, 200)
+```
+
+## Integration Testing Patterns
+
+### End-to-End Workflow Testing
+```python
+class ReadingLogWorkflowTests(BaseTestCase):
+    def test_complete_reading_log_workflow(self):
+        """Test complete workflow from log creation to badge earning"""
+        self.client.force_login(self.student)
+        
+        # 1. Create reading log via API
+        log_data = {
+            'title': 'Test Book',
+            'author': 'Test Author',
+            'pages': 25,
+            'minutes': 30,
+            'rating': 4.0,
+            'date': date.today().isoformat()
+        }
+        
+        response = self.client.post('/api/logs/', data=log_data)
+        self.assertEqual(response.status_code, 201)
+        
+        # 2. Verify log was created
+        log = Log.objects.get(student=self.student)
+        self.assertEqual(log.title, 'Test Book')
+        self.assertEqual(log.pages, 25)
+        
+        # 3. Check if achievements were triggered
+        badges = self.student.studentbadge_set.all()
+        self.assertGreater(badges.count(), 0)
+        
+        # 4. Verify XP was awarded
+        profile = self.student.profile
+        self.assertGreater(profile.total_xp, 0)
+```
+
+## Mock and Patch Patterns
+
+### External Service Mocking
+```python
+from unittest.mock import patch, Mock
+
+class ExternalServiceTests(BaseTestCase):
+    @patch('reading_logs.services.email_service.send_notification')
+    def test_badge_notification_sent(self, mock_send_email):
+        """Test that email notification is sent when badge is earned"""
+        mock_send_email.return_value = True
+        
+        # Create log that triggers badge
+        log = Log.objects.create(
+            student=self.student,
+            school=self.school,
+            date=date.today(),
+            pages=10
+        )
+        
+        # Verify email service was called
+        mock_send_email.assert_called_once()
+        
+        # Check call arguments
+        call_args = mock_send_email.call_args
+        self.assertEqual(call_args[0][0], self.student.email)
+        self.assertIn('badge', call_args[0][1].lower())  # Subject contains 'badge'
+```
+
+## Test Data Cleanup
+
+### Proper Test Isolation
+```python
+class IsolatedTestCase(TestCase):
+    def setUp(self):
+        """Set up test data"""
+        self.school = SchoolFactory()
+        self.student = StudentFactory(school=self.school)
+        
+    def tearDown(self):
+        """Clean up after each test"""
+        # Django automatically rolls back test database
+        # Additional cleanup if needed
+        cache.clear()
+        
+    @classmethod
+    def setUpClass(cls):
+        """One-time setup for entire test class"""
+        super().setUpClass()
+        # Setup that's expensive and can be shared
+        
+    @classmethod
+    def tearDownClass(cls):
+        """One-time cleanup for entire test class"""
+        super().tearDownClass()
+        # Cleanup shared setup
+```
+
+## Assertion Patterns
+
+### Custom Assertions
+```python
+class CustomAssertionMixin:
+    def assertLogEqual(self, log, expected_data):
+        """Custom assertion for log objects"""
+        self.assertEqual(log.title, expected_data['title'])
+        self.assertEqual(log.pages, expected_data['pages'])
+        self.assertEqual(log.student.id, expected_data['student_id'])
+        
+    def assertBadgeEarned(self, student, badge_name):
+        """Assert that student earned specific badge"""
+        badges = student.studentbadge_set.filter(badge__name=badge_name)
+        self.assertTrue(badges.exists(), f"Student did not earn badge: {badge_name}")
+        
+    def assertValidJSONResponse(self, response, expected_status='success'):
+        """Assert valid JSON API response format"""
+        self.assertEqual(response.status_code, 200)
+        data = response.json()
+        self.assertIn('status', data)
+        self.assertEqual(data['status'], expected_status)
+        if expected_status == 'success':
+            self.assertIn('data', data)
+```

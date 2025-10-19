@@ -1,0 +1,88 @@
+{% comment %}
+Form Field Component
+
+Usage:
+{% include "components/forms/form_field.html" with 
+    type="text" 
+    id="log-title" 
+    label="Book Title" 
+    placeholder="What did you read?"
+    container_class="col-md-6"
+    required=False
+%}
+
+Parameters:
+- type: Input type (text, number, email, etc.) (default: "text")
+- id: Field ID (required)
+- name: Field name (default: same as id)
+- label: Field label (required)
+- placeholder: Placeholder text (default: None)
+- value: Field value (default: None)
+- container_class: CSS class for container (default: "col-12")
+- input_class: Additional CSS classes for input (default: "form-control")
+- required: Whether field is required (default: False)
+- min: Min value for number inputs (default: None)
+- max: Max value for number inputs (default: None)
+- help_text: Help text below field (default: None)
+- error_text: Error message to display (default: None)
+- readonly: Whether field is readonly (default: False)
+- disabled: Whether field is disabled (default: False)
+{% endcomment %}
+
+<div class="{{ container_class|default:'col-12' }}">
+    <label for="{{ id }}" class="form-label">
+        {{ label }}
+        {% if required %}<span class="text-danger">*</span>{% endif %}
+    </label>
+    
+    {% if type == "textarea" %}
+        <textarea class="{{ input_class|default:'form-control' }}{% if error_text %} is-invalid{% endif %}" 
+                  id="{{ id }}" 
+                  name="{{ name|default:id }}"
+                  {% if placeholder %}placeholder="{{ placeholder }}"{% endif %}
+                  {% if required %}required{% endif %}
+                  {% if readonly %}readonly{% endif %}
+                  {% if disabled %}disabled{% endif %}
+                  {% if rows %}rows="{{ rows }}"{% else %}rows="3"{% endif %}>{% if value %}{{ value }}{% endif %}</textarea>
+    
+    {% elif type == "select" %}
+        <select class="{{ input_class|default:'form-select' }}{% if error_text %} is-invalid{% endif %}" 
+                id="{{ id }}" 
+                name="{{ name|default:id }}"
+                {% if required %}required{% endif %}
+                {% if disabled %}disabled{% endif %}>
+            {% if placeholder %}
+                <option value="">{{ placeholder }}</option>
+            {% endif %}
+            {% if options %}
+                {% for option in options %}
+                    <option value="{{ option.value }}" {% if option.selected %}selected{% endif %}>
+                        {{ option.label }}
+                    </option>
+                {% endfor %}
+            {% endif %}
+        </select>
+    
+    {% else %}
+        <input type="{{ type }}" 
+               class="{{ input_class|default:'form-control' }}{% if error_text %} is-invalid{% endif %}" 
+               id="{{ id }}" 
+               name="{{ name|default:id }}"
+               {% if placeholder %}placeholder="{{ placeholder }}"{% endif %}
+               {% if value %}value="{{ value }}"{% endif %}
+               {% if required %}required{% endif %}
+               {% if readonly %}readonly{% endif %}
+               {% if disabled %}disabled{% endif %}
+               {% if min %}min="{{ min }}"{% endif %}
+               {% if max %}max="{{ max }}"{% endif %}>
+    {% endif %}
+    
+    {% if help_text %}
+        <div class="form-text">{{ help_text }}</div>
+    {% endif %}
+    
+    {% if error_text %}
+        <div class="invalid-feedback">{{ error_text }}</div>
+    {% endif %}
+</div>
+

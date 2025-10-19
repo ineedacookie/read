@@ -1,8 +1,31 @@
-{% autoescape off %}
-{{ user }} submitted the following feedback about TimeClick Online,
+{% extends "email/base_email.html" %}
 
-subject: {{ subject }}
-content: {{ content }}
+{% block email_content %}
+<p><strong>New Feedback Submitted</strong></p>
 
-Check it out by logging into TimeClick Online and going to feedback: https://{{ domain }}/tc-admin/feedback/feedback
-{% endautoescape %}
+<p>{{ user.first_name }} {{ user.last_initial|default:"" }} ({{ user.email }}) has submitted feedback about the Reading App.</p>
+
+<div class="content-box">
+    <p><strong>Subject:</strong> {{ subject }}</p>
+    <p><strong>Content:</strong></p>
+    <div class="content-box-inner">
+        {{ content|linebreaks }}
+    </div>
+</div>
+
+<p><strong>User Details:</strong></p>
+<ul>
+    <li>Name: {{ user.first_name }} {{ user.last_initial|default:"" }}</li>
+    <li>Email: {{ user.email }}</li>
+    <li>User Type: {{ user.user_type|capfirst }}</li>
+    <li>School: {{ user.school.name|default:"N/A" }}</li>
+</ul>
+
+<div style="text-align: center;">
+    <a href="https://{{ domain }}/io_admin/" class="email-button">
+        View in Admin Panel
+    </a>
+</div>
+
+<p><small>This feedback was submitted on {{ current_date|date:"F d, Y \a\t g:i A" }}.</small></p>
+{% endblock %}

@@ -1,0 +1,55 @@
+{% comment %}
+Action Button Component
+
+Usage:
+{% include "components/forms/action_button.html" with 
+    type="submit" 
+    text="Save Reading Log" 
+    icon="fas fa-save" 
+    class="btn-primary btn-lg"
+    id="save-btn"
+%}
+
+Parameters:
+- type: Button type (button, submit, reset) (default: "button")
+- text: Button text (required)
+- icon: FontAwesome icon class (default: None)
+- class: Button CSS classes (default: "btn-primary")
+- id: Button ID (default: None)
+- title: Button title/tooltip (default: None)
+- onclick: JavaScript onclick handler (default: None)
+- disabled: Whether button is disabled (default: False)
+- loading: Whether to show loading state (default: False)
+- loading_text: Text to show when loading (default: "Loading...")
+- container_class: CSS class for container (default: None)
+- data_attributes: Dictionary of data attributes (default: None)
+{% endcomment %}
+
+{% if container_class %}
+<div class="{{ container_class }}">
+{% endif %}
+
+<button type="{{ type|default:'button' }}" 
+        class="btn {{ class|default:'btn-primary' }}{% if loading %} disabled{% endif %}" 
+        {% if id %}id="{{ id }}"{% endif %}
+        {% if title %}title="{{ title }}"{% endif %}
+        {% if onclick and not loading %}onclick="{{ onclick }}"{% endif %}
+        {% if disabled or loading %}disabled{% endif %}
+        {% if data_attributes %}
+            {% for key, value in data_attributes.items %}
+                data-{{ key }}="{{ value }}"
+            {% endfor %}
+        {% endif %}>
+    
+    {% if loading %}
+        <span class="spinner-border spinner-border-sm me-2" role="status" aria-hidden="true"></span>
+        {{ loading_text|default:"Loading..." }}
+    {% else %}
+        {% if icon %}<i class="{{ icon }} me-2"></i>{% endif %}{{ text }}
+    {% endif %}
+</button>
+
+{% if container_class %}
+</div>
+{% endif %}
+

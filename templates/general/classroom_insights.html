@@ -1,0 +1,626 @@
+{% extends "general/nav_template.html" %}
+{% load static %}
+{% block title %}read | Classroom Insights{% endblock %}
+{% block content %}
+<div class="container mt-5">
+    <div class="row mb-4">
+        <div class="col-12">
+            <div class="d-flex justify-content-between align-items-center mb-3">
+                <div>
+                    <h2 class="mb-1"><i class="fas fa-lightbulb me-2 text-warning"></i>Classroom Insights</h2>
+                    <p class="text-muted mb-0">Share and discover effective reading strategies with fellow teachers</p>
+                </div>
+                <div class="d-flex gap-2">
+                    <button class="btn btn-outline-info" id="share-insights-btn" data-bs-toggle="modal" data-bs-target="#shareInsightsModal">
+                        <i class="fas fa-share-alt me-1"></i>Share My Insights
+                    </button>
+                    <button class="btn btn-outline-secondary" id="refresh-insights" title="Refresh Data">
+                        <i class="fas fa-sync-alt"></i>
+                    </button>
+                </div>
+            </div>
+        </div>
+    </div>
+
+    <!-- Privacy Notice -->
+    <div class="row mb-4">
+        <div class="col-12">
+            <div class="alert alert-info d-flex align-items-center">
+                <i class="fas fa-shield-alt me-3 fa-2x"></i>
+                <div>
+                    <strong>Privacy Protected:</strong> All classroom data is completely anonymized. No student names, classroom identifiers, or teacher information is shared. Only aggregated reading metrics and insights are visible to promote collaborative learning.
+                </div>
+            </div>
+        </div>
+    </div>
+
+    <!-- Insights Overview -->
+    <div class="row mb-4">
+        <div class="col-lg-3 col-md-6 mb-3">
+            <div class="card bg-primary text-white">
+                <div class="card-body">
+                    <div class="d-flex justify-content-between">
+                        <div>
+                            <h6 class="mb-0">Shared Insights</h6>
+                            <h3 class="mb-0" id="total-insights-count">-</h3>
+                        </div>
+                        <div>
+                            <i class="fas fa-share-alt fa-2x opacity-75"></i>
+                        </div>
+                    </div>
+                </div>
+            </div>
+        </div>
+        <div class="col-lg-3 col-md-6 mb-3">
+            <div class="card bg-success text-white">
+                <div class="card-body">
+                    <div class="d-flex justify-content-between">
+                        <div>
+                            <h6 class="mb-0">My Performance Rank</h6>
+                            <h3 class="mb-0" id="my-rank-display">-</h3>
+                        </div>
+                        <div>
+                            <i class="fas fa-medal fa-2x opacity-75"></i>
+                        </div>
+                    </div>
+                </div>
+            </div>
+        </div>
+        <div class="col-lg-3 col-md-6 mb-3">
+            <div class="card bg-info text-white">
+                <div class="card-body">
+                    <div class="d-flex justify-content-between">
+                        <div>
+                            <h6 class="mb-0">School Average</h6>
+                            <h3 class="mb-0" id="school-average-pages">-</h3>
+                            <small>pages/student</small>
+                        </div>
+                        <div>
+                            <i class="fas fa-school fa-2x opacity-75"></i>
+                        </div>
+                    </div>
+                </div>
+            </div>
+        </div>
+        <div class="col-lg-3 col-md-6 mb-3">
+            <div class="card bg-warning text-white">
+                <div class="card-body">
+                    <div class="d-flex justify-content-between">
+                        <div>
+                            <h6 class="mb-0">Top Classroom</h6>
+                            <h3 class="mb-0" id="top-classroom-pages">-</h3>
+                            <small>pages/student</small>
+                        </div>
+                        <div>
+                            <i class="fas fa-trophy fa-2x opacity-75"></i>
+                        </div>
+                    </div>
+                </div>
+            </div>
+        </div>
+    </div>
+
+    <!-- Performance Comparison Chart -->
+    <div class="row mb-4">
+        <div class="col-12">
+            <div class="card">
+                <div class="card-header">
+                    <h5 class="mb-0"><i class="fas fa-chart-bar me-2"></i>Anonymous Classroom Performance Comparison</h5>
+                </div>
+                <div class="card-body">
+                    <div class="row">
+                        <div class="col-md-8">
+                            <div id="classroom-comparison-chart" style="height: 400px;"></div>
+                        </div>
+                        <div class="col-md-4">
+                            <div class="card bg-light">
+                                <div class="card-body">
+                                    <h6><i class="fas fa-info-circle me-1"></i>Your Classroom</h6>
+                                    <div class="mb-3">
+                                        <div class="d-flex justify-content-between">
+                                            <span>Pages per Student:</span>
+                                            <strong id="my-pages-per-student">-</strong>
+                                        </div>
+                                        <div class="d-flex justify-content-between">
+                                            <span>Minutes per Student:</span>
+                                            <strong id="my-minutes-per-student">-</strong>
+                                        </div>
+                                        <div class="d-flex justify-content-between">
+                                            <span>Average Rating:</span>
+                                            <strong id="my-avg-rating">-</strong>
+                                        </div>
+                                        <div class="d-flex justify-content-between">
+                                            <span>Goal Achievement:</span>
+                                            <strong id="my-goal-achievement">-</strong>
+                                        </div>
+                                    </div>
+                                    <div class="progress mb-2">
+                                        <div id="my-performance-bar" class="progress-bar bg-primary" style="width: 0%"></div>
+                                    </div>
+                                    <small class="text-muted">Compared to school average</small>
+                                </div>
+                            </div>
+                        </div>
+                    </div>
+                </div>
+            </div>
+        </div>
+    </div>
+
+    <!-- Shared Insights and Best Practices -->
+    <div class="row mb-4">
+        <div class="col-lg-8">
+            <div class="card">
+                <div class="card-header d-flex justify-content-between align-items-center">
+                    <h5 class="mb-0"><i class="fas fa-users me-2"></i>Shared Teaching Insights</h5>
+                    <div class="d-flex gap-2">
+                        <select class="form-select form-select-sm" id="insights-filter" style="width: auto;">
+                            <option value="">All Insights</option>
+                            <option value="high_engagement">High Engagement</option>
+                            <option value="goal_achievement">Goal Achievement</option>
+                            <option value="reading_variety">Reading Variety</option>
+                            <option value="student_motivation">Student Motivation</option>
+                        </select>
+                    </div>
+                </div>
+                <div class="card-body">
+                    <div id="insights-list">
+                        <!-- Insights will be populated dynamically -->
+                    </div>
+                </div>
+            </div>
+        </div>
+        <div class="col-lg-4">
+            <div class="card">
+                <div class="card-header">
+                    <h5 class="mb-0"><i class="fas fa-chart-pie me-2"></i>Reading Patterns</h5>
+                </div>
+                <div class="card-body">
+                    <div id="reading-patterns-chart" style="height: 300px;"></div>
+                    <div class="mt-3">
+                        <h6>Popular Strategies:</h6>
+                        <div id="popular-strategies">
+                            <!-- Will be populated dynamically -->
+                        </div>
+                    </div>
+                </div>
+            </div>
+        </div>
+    </div>
+
+    <!-- Best Performing Practices -->
+    <div class="row">
+        <div class="col-12">
+            <div class="card">
+                <div class="card-header">
+                    <h5 class="mb-0"><i class="fas fa-star me-2"></i>Effective Teaching Practices</h5>
+                </div>
+                <div class="card-body">
+                    <div class="row" id="best-practices-grid">
+                        <!-- Best practices will be populated dynamically -->
+                    </div>
+                </div>
+            </div>
+        </div>
+    </div>
+
+    <!-- Share Insights Modal -->
+    <div class="modal fade" id="shareInsightsModal" tabindex="-1" aria-labelledby="shareInsightsModalLabel" aria-hidden="true">
+        <div class="modal-dialog modal-lg">
+            <div class="modal-content">
+                <div class="modal-header bg-info text-white">
+                    <h5 class="modal-title" id="shareInsightsModalLabel">
+                        <i class="fas fa-share-alt me-2"></i>Share Your Teaching Insights
+                    </h5>
+                    <button type="button" class="btn-close btn-close-white" data-bs-dismiss="modal" aria-label="Close"></button>
+                </div>
+                <div class="modal-body">
+                    <div class="alert alert-warning">
+                        <i class="fas fa-exclamation-triangle me-2"></i>
+                        <strong>Important:</strong> Only share insights that do not identify specific students. Focus on teaching strategies, classroom approaches, and general observations.
+                    </div>
+                    <form id="share-insights-form">
+                        {% csrf_token %}
+                        <div class="row">
+                            <div class="col-md-6">
+                                <div class="form-group mb-3">
+                                    <label for="insight-category" class="form-label">Category</label>
+                                    <select class="form-select" id="insight-category" name="category" required>
+                                        <option value="">Select a category...</option>
+                                        <option value="high_engagement">High Engagement Strategies</option>
+                                        <option value="goal_achievement">Goal Achievement Techniques</option>
+                                        <option value="reading_variety">Encouraging Reading Variety</option>
+                                        <option value="student_motivation">Student Motivation Methods</option>
+                                        <option value="classroom_management">Classroom Management</option>
+                                        <option value="progress_tracking">Progress Tracking</option>
+                                    </select>
+                                </div>
+                            </div>
+                            <div class="col-md-6">
+                                <div class="form-group mb-3">
+                                    <label for="success-metric" class="form-label">Success Metric</label>
+                                    <select class="form-select" id="success-metric" name="metric">
+                                        <option value="">What improved?</option>
+                                        <option value="pages_increase">Pages read increased</option>
+                                        <option value="engagement_increase">Student engagement increased</option>
+                                        <option value="goal_completion">Goal completion improved</option>
+                                        <option value="reading_frequency">Reading frequency increased</option>
+                                        <option value="book_variety">Book variety expanded</option>
+                                    </select>
+                                </div>
+                            </div>
+                        </div>
+                        <div class="form-group mb-3">
+                            <label for="insight-title" class="form-label">Insight Title</label>
+                            <input type="text" class="form-control" id="insight-title" name="title" 
+                                   placeholder="Brief, descriptive title for your insight" maxlength="100" required>
+                        </div>
+                        <div class="form-group mb-3">
+                            <label for="insight-description" class="form-label">Description</label>
+                            <textarea class="form-control" id="insight-description" name="description" rows="4" 
+                                      placeholder="Describe your teaching strategy, what you tried, and how it worked..." 
+                                      maxlength="1000" required></textarea>
+                            <small class="form-text text-muted">
+                                <span id="description-counter">0</span>/1000 characters
+                            </small>
+                        </div>
+                        <div class="form-group mb-3">
+                            <label for="implementation-tips" class="form-label">Implementation Tips (Optional)</label>
+                            <textarea class="form-control" id="implementation-tips" name="tips" rows="3" 
+                                      placeholder="Any specific tips for other teachers who want to try this approach..." 
+                                      maxlength="500"></textarea>
+                        </div>
+                        <div class="form-check mb-3">
+                            <input class="form-check-input" type="checkbox" id="allow-contact" name="allow_contact">
+                            <label class="form-check-label" for="allow-contact">
+                                Allow other teachers to message me about this insight (optional)
+                            </label>
+                        </div>
+                    </form>
+                </div>
+                <div class="modal-footer">
+                    <button type="button" class="btn btn-secondary" data-bs-dismiss="modal">Cancel</button>
+                    <button type="button" class="btn btn-info" id="btn-share-insight">
+                        <i class="fas fa-share-alt me-1"></i>Share Insight
+                    </button>
+                </div>
+            </div>
+        </div>
+    </div>
+</div>
+
+<script>
+$(document).ready(function() {
+    let myClassroomData = null;
+    let schoolWideData = null;
+    
+    // Initialize page
+    loadInsightsData();
+    loadClassroomComparison();
+    
+    // Character counter for description
+    $('#insight-description').on('input', function() {
+        const length = $(this).val().length;
+        $('#description-counter').text(length);
+        
+        if (length > 900) {
+            $('#description-counter').addClass('text-warning');
+        } else {
+            $('#description-counter').removeClass('text-warning');
+        }
+    });
+    
+    // Filter insights
+    $('#insights-filter').on('change', function() {
+        loadInsightsData();
+    });
+    
+    // Refresh button
+    $('#refresh-insights').on('click', function() {
+        loadInsightsData();
+        loadClassroomComparison();
+    });
+    
+    function loadInsightsData() {
+        const filter = $('#insights-filter').val();
+        
+        $.ajax({
+            url: '{% url "api_classroom_insights" %}',
+            method: 'GET',
+            data: { category: filter },
+            success: function(response) {
+                if (response.success) {
+                    updateInsightsDisplay(response.data);
+                } else {
+                    showNotification('error', 'Failed to load insights');
+                }
+            },
+            error: function() {
+                showNotification('error', 'Network error loading insights');
+            }
+        });
+    }
+    
+    function loadClassroomComparison() {
+        $.ajax({
+            url: '{% url "api_classroom_comparison" %}',
+            method: 'GET',
+            success: function(response) {
+                if (response.success) {
+                    myClassroomData = response.data.my_classroom;
+                    schoolWideData = response.data.school_data;
+                    updateComparisonDisplay(response.data);
+                    createComparisonChart(response.data);
+                } else {
+                    showNotification('error', 'Failed to load comparison data');
+                }
+            },
+            error: function() {
+                showNotification('error', 'Network error loading comparison data');
+            }
+        });
+    }
+    
+    function updateInsightsDisplay(data) {
+        $('#total-insights-count').text(data.total_insights);
+        
+        const insightsList = $('#insights-list');
+        insightsList.empty();
+        
+        if (data.insights.length === 0) {
+            insightsList.html(`
+                <div class="text-center text-muted py-4">
+                    <i class="fas fa-lightbulb fa-3x mb-3"></i>
+                    <p>No insights shared yet. Be the first to share your teaching strategies!</p>
+                </div>
+            `);
+            return;
+        }
+        
+        data.insights.forEach(insight => {
+            const timeAgo = formatTimeAgo(insight.created_at);
+            const categoryBadge = getCategoryBadge(insight.category);
+            const successMetric = insight.metric ? `<small class="text-success"><i class="fas fa-arrow-up me-1"></i>${insight.metric}</small>` : '';
+            
+            const insightHtml = `
+                <div class="card mb-3 border-start border-primary border-3">
+                    <div class="card-body">
+                        <div class="d-flex justify-content-between align-items-start mb-2">
+                            <h6 class="mb-0">${insight.title}</h6>
+                            <div class="d-flex gap-2">
+                                ${categoryBadge}
+                                <small class="text-muted">${timeAgo}</small>
+                            </div>
+                        </div>
+                        <p class="mb-2">${insight.description}</p>
+                        ${insight.tips ? `<div class="alert alert-light p-2 mb-2"><strong>💡 Tip:</strong> ${insight.tips}</div>` : ''}
+                        <div class="d-flex justify-content-between align-items-center">
+                            <div class="d-flex gap-3">
+                                ${successMetric}
+                                <small class="text-muted">
+                                    <i class="fas fa-thumbs-up me-1"></i>${insight.helpful_count} helpful
+                                </small>
+                            </div>
+                            <div class="btn-group btn-group-sm">
+                                <button class="btn btn-outline-success" onclick="markHelpful(${insight.id})" title="Mark as helpful">
+                                    <i class="fas fa-thumbs-up"></i>
+                                </button>
+                                ${insight.allow_contact ? `<button class="btn btn-outline-primary" onclick="contactTeacher(${insight.id})" title="Ask questions">
+                                    <i class="fas fa-comment"></i>
+                                </button>` : ''}
+                            </div>
+                        </div>
+                    </div>
+                </div>
+            `;
+            
+            insightsList.append(insightHtml);
+        });
+    }
+    
+    function updateComparisonDisplay(data) {
+        const myData = data.my_classroom;
+        const schoolData = data.school_data;
+        
+        // Update overview cards
+        $('#my-rank-display').text(`#${myData.rank} of ${schoolData.total_classrooms}`);
+        $('#school-average-pages').text(Math.round(schoolData.avg_pages_per_student));
+        $('#top-classroom-pages').text(Math.round(schoolData.top_pages_per_student));
+        
+        // Update my classroom stats
+        $('#my-pages-per-student').text(Math.round(myData.pages_per_student));
+        $('#my-minutes-per-student').text(Math.round(myData.minutes_per_student));
+        $('#my-avg-rating').text(myData.avg_rating.toFixed(1));
+        $('#my-goal-achievement').text(`${Math.round(myData.goal_achievement)}%`);
+        
+        // Update performance bar
+        const performancePercent = Math.min((myData.pages_per_student / schoolData.avg_pages_per_student) * 100, 150);
+        $('#my-performance-bar').css('width', `${performancePercent}%`);
+        
+        if (performancePercent >= 120) {
+            $('#my-performance-bar').removeClass('bg-primary').addClass('bg-success');
+        } else if (performancePercent >= 90) {
+            $('#my-performance-bar').removeClass('bg-primary bg-success').addClass('bg-warning');
+        }
+        
+        // Update popular strategies
+        updatePopularStrategies(data.popular_strategies);
+    }
+    
+    function createComparisonChart(data) {
+        const ctx = document.getElementById('classroom-comparison-chart');
+        if (!ctx) return;
+        
+        // Create anonymized classroom data for chart
+        const anonymizedData = data.anonymous_classrooms.map((classroom, index) => ({
+            label: `Classroom ${String.fromCharCode(65 + index)}`, // A, B, C, etc.
+            pages: classroom.pages_per_student,
+            minutes: classroom.minutes_per_student,
+            isMe: classroom.is_current_user
+        }));
+        
+        // Sort by pages read
+        anonymizedData.sort((a, b) => b.pages - a.pages);
+        
+        const chartData = {
+            labels: anonymizedData.map(d => d.label),
+            datasets: [{
+                label: 'Pages per Student',
+                data: anonymizedData.map(d => d.pages),
+                backgroundColor: anonymizedData.map(d => d.isMe ? '#007bff' : '#6c757d'),
+                borderColor: anonymizedData.map(d => d.isMe ? '#0056b3' : '#495057'),
+                borderWidth: 2
+            }]
+        };
+        
+        const chart = new Chart(ctx, {
+            type: 'bar',
+            data: chartData,
+            options: {
+                responsive: true,
+                maintainAspectRatio: false,
+                plugins: {
+                    legend: {
+                        display: false
+                    },
+                    title: {
+                        display: true,
+                        text: 'Anonymous Classroom Performance (Your classroom highlighted)'
+                    }
+                },
+                scales: {
+                    y: {
+                        beginAtZero: true,
+                        title: {
+                            display: true,
+                            text: 'Pages per Student'
+                        }
+                    }
+                }
+            }
+        });
+    }
+    
+    function updatePopularStrategies(strategies) {
+        const container = $('#popular-strategies');
+        container.empty();
+        
+        strategies.forEach(strategy => {
+            const percentage = ((strategy.usage_count / schoolWideData.total_classrooms) * 100).toFixed(0);
+            container.append(`
+                <div class="d-flex justify-content-between align-items-center mb-2">
+                    <span class="small">${strategy.name}</span>
+                    <div class="d-flex align-items-center">
+                        <div class="progress me-2" style="width: 60px; height: 8px;">
+                            <div class="progress-bar bg-info" style="width: ${percentage}%"></div>
+                        </div>
+                        <small class="text-muted">${percentage}%</small>
+                    </div>
+                </div>
+            `);
+        });
+    }
+    
+    function getCategoryBadge(category) {
+        const badges = {
+            'high_engagement': '<span class="badge bg-success">High Engagement</span>',
+            'goal_achievement': '<span class="badge bg-primary">Goal Achievement</span>',
+            'reading_variety': '<span class="badge bg-info">Reading Variety</span>',
+            'student_motivation': '<span class="badge bg-warning">Motivation</span>',
+            'classroom_management': '<span class="badge bg-secondary">Management</span>',
+            'progress_tracking': '<span class="badge bg-dark">Progress Tracking</span>'
+        };
+        return badges[category] || '<span class="badge bg-light text-dark">General</span>';
+    }
+    
+    function formatTimeAgo(dateString) {
+        const date = new Date(dateString);
+        const now = new Date();
+        const diffInHours = Math.floor((now - date) / (1000 * 60 * 60));
+        
+        if (diffInHours < 24) {
+            return `${diffInHours}h ago`;
+        } else {
+            const diffInDays = Math.floor(diffInHours / 24);
+            return `${diffInDays}d ago`;
+        }
+    }
+    
+    // Share insight form submission
+    $('#btn-share-insight').on('click', function() {
+        const formData = new FormData($('#share-insights-form')[0]);
+        
+        $.ajax({
+            url: '{% url "api_share_insight" %}',
+            method: 'POST',
+            data: formData,
+            processData: false,
+            contentType: false,
+            headers: {
+                'X-CSRFToken': $('[name=csrfmiddlewaretoken]').val()
+            },
+            success: function(response) {
+                if (response.success) {
+                    $('#shareInsightsModal').modal('hide');
+                    $('#share-insights-form')[0].reset();
+                    $('#description-counter').text('0');
+                    showNotification('success', 'Your insight has been shared successfully!');
+                    loadInsightsData(); // Refresh insights
+                } else {
+                    showNotification('error', response.message || 'Failed to share insight');
+                }
+            },
+            error: function() {
+                showNotification('error', 'Network error. Please try again.');
+            }
+        });
+    });
+    
+    // Global functions for inline buttons
+    window.markHelpful = function(insightId) {
+        $.ajax({
+            url: '{% url "api_mark_helpful" %}',
+            method: 'POST',
+            data: JSON.stringify({ insight_id: insightId }),
+            contentType: 'application/json',
+            headers: {
+                'X-CSRFToken': $('[name=csrfmiddlewaretoken]').val()
+            },
+            success: function(response) {
+                if (response.success) {
+                    showNotification('success', 'Marked as helpful!');
+                    loadInsightsData(); // Refresh to show updated count
+                }
+            }
+        });
+    };
+    
+    window.contactTeacher = function(insightId) {
+        // TODO: Implement teacher messaging system
+        showNotification('info', 'Messaging feature coming soon!');
+    };
+    
+    // Helper function for notifications
+    function showNotification(type, message) {
+        const alertClass = type === 'success' ? 'alert-success' : type === 'error' ? 'alert-danger' : 'alert-info';
+        const iconClass = type === 'success' ? 'fa-check-circle' : type === 'error' ? 'fa-exclamation-circle' : 'fa-info-circle';
+        
+        const notification = $(`
+            <div class="alert ${alertClass} alert-dismissible fade show position-fixed" style="top: 20px; right: 20px; z-index: 9999;">
+                <i class="fas ${iconClass} me-2"></i>${message}
+                <button type="button" class="btn-close" data-bs-dismiss="alert"></button>
+            </div>
+        `);
+        
+        $('body').append(notification);
+        
+        setTimeout(() => {
+            notification.alert('close');
+        }, 5000);
+    }
+});
+</script>
+
+<script src="https://cdn.jsdelivr.net/npm/chart.js"></script>
+{% endblock %}
+

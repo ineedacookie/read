@@ -45,6 +45,10 @@
                             </div>
                         </th>
                         <th class="text-800 sort align-middle ps-2">Name</th>
+                        <th class="text-800 sort align-middle ps-2">Role</th>
+                        <th class="text-800 sort align-middle ps-2">Collaborators</th>
+                        <th class="text-800 sort align-middle ps-2">Students</th>
+                        <th class="text-800 sort align-middle ps-2">Actions</th>
                     </tr>
                     </thead>
                     <tbody class="list" id="reading-groups-table-body">
@@ -72,11 +76,19 @@
                             <input type="text" class="form-control" id="reading-group-name" name="name" required>
                         </div>
                         <div class="form-group">
-                            <label for="reading-group-teachers">{% if user.user_type == 'teacher' %}Additional {% endif %}Teachers</label>
+                            <label for="reading-group-teachers">
+                                <i class="fas fa-users me-1"></i>
+                                {% if user.user_type == 'teacher' %}Invite Collaborating {% endif %}Teachers
+                                <small class="text-muted">(Teachers who can manage this reading group)</small>
+                            </label>
                             <select multiple class="form-control" id="reading-group-teachers" name="managers"
                                     style="width: 100%;" required>
                                 <!-- Options will be populated dynamically -->
                             </select>
+                            <small class="form-text text-muted">
+                                <i class="fas fa-info-circle me-1"></i>
+                                Selected teachers will be notified and can view/edit this reading group
+                            </small>
                         </div>
                         <div class="form-group">
                             <label for="reading-group-students">Students</label>
@@ -91,6 +103,48 @@
                     <button type="button" class="btn btn-secondary" id="btn-cancel" data-bs-dismiss="modal">Cancel
                     </button>
                     <button type="submit" class="btn btn-primary" id="btn-save-reading-group">Save Reading Group
+                    </button>
+                </div>
+            </div>
+        </div>
+    </div>
+
+    <!-- Quick Collaborate Modal -->
+    <div class="modal fade" id="collaborateModal" tabindex="-1" aria-labelledby="collaborateModalLabel" aria-hidden="true">
+        <div class="modal-dialog">
+            <div class="modal-content">
+                <div class="modal-header bg-primary text-white">
+                    <h5 class="modal-title" id="collaborateModalLabel">
+                        <i class="fas fa-handshake me-2"></i>Invite Teacher to Collaborate
+                    </h5>
+                    <button type="button" class="btn-close btn-close-white" data-bs-dismiss="modal" aria-label="Close"></button>
+                </div>
+                <div class="modal-body">
+                    <div class="alert alert-info">
+                        <i class="fas fa-info-circle me-2"></i>
+                        Invited teachers will be able to view and manage this reading group, add/remove students, and track progress.
+                    </div>
+                    <form id="collaborate-form">
+                        {% csrf_token %}
+                        <input type="hidden" id="collaborate-group-id" name="group_id">
+                        <div class="form-group mb-3">
+                            <label for="collaborate-teacher" class="form-label">Select Teacher to Invite</label>
+                            <select class="form-control" id="collaborate-teacher" name="teacher_id" required>
+                                <option value="">Choose a teacher...</option>
+                                <!-- Options will be populated dynamically -->
+                            </select>
+                        </div>
+                        <div class="form-group mb-3">
+                            <label for="collaborate-message" class="form-label">Personal Message (Optional)</label>
+                            <textarea class="form-control" id="collaborate-message" name="message" rows="3" 
+                                      placeholder="Hi! I'd like to invite you to collaborate on this reading group..."></textarea>
+                        </div>
+                    </form>
+                </div>
+                <div class="modal-footer">
+                    <button type="button" class="btn btn-secondary" data-bs-dismiss="modal">Cancel</button>
+                    <button type="button" class="btn btn-primary" id="btn-send-invite">
+                        <i class="fas fa-paper-plane me-1"></i>Send Invitation
                     </button>
                 </div>
             </div>
@@ -207,6 +261,84 @@
 
         function fetchReadingGroups() {
             $.ajax({
+                url: '{% url "api_reading_groups_detailed" %}',
+                method: 'GET',
+                success: function(data) {
+                    $('#reading-groups-table-body').empty();
+                    data.forEach(readingGroup => {
+                        // Determine role badge
+                        const isCreator = readingGroup.created_by_current_user;
+                        const roleBadge = isCreator ? 
+                            '<span class="badge bg-success"><i class="fas fa-crown me-1"></i>Creator</span>' : 
+                            '<span class="badge bg-info"><i class="fas fa-handshake me-1"></i>Collaborator</span>';
+                        
+                        // Create collaborators display
+                        let collaboratorsHtml = '';
+                        if (readingGroup.managers && readingGroup.managers.length > 0) {
+                            const otherManagers = readingGroup.managers.filter(m => m.id !== {{ user.id }});
+                            if (otherManagers.length > 0) {
+                                collaboratorsHtml = otherManagers.slice(0, 2).map(m => `<small class="text-muted">${m.name}</small>`).join('<br>');
+                                if (otherManagers.length > 2) {
+                                    collaboratorsHtml += `<br><small class="text-muted">+${otherManagers.length - 2} more</small>`;
+                                }
+                            } else {
+                                collaboratorsHtml = '<small class="text-muted">No collaborators</small>';
+                            }
+                        }
+                        
+                        // Student count
+                        const studentCount = readingGroup.student_count || 0;
+                        
+                        // Action buttons
+                        const actionButtons = `
+                            <div class="btn-group btn-group-sm" role="group">
+                                <button class="btn btn-outline-primary btn-sm" onclick="editReadingGroup(${readingGroup.id})" title="Edit">
+                                    <i class="fas fa-edit"></i>
+                                </button>
+                                <button class="btn btn-outline-success btn-sm" onclick="inviteCollaborator(${readingGroup.id}, '${readingGroup.name}')" title="Invite Collaborator">
+                                    <i class="fas fa-plus"></i>
+                                </button>
+                                <button class="btn btn-outline-info btn-sm" onclick="viewGroup(${readingGroup.id})" title="View Details">
+                                    <i class="fas fa-eye"></i>
+                                </button>
+                            </div>
+                        `;
+                        
+                        $('#reading-groups-table-body').append(
+                            `<tr>
+                                <td class="align-middle fs-9 py-3">
+                                  <div class="form-check mb-0">
+                                    <input class="form-check-input" type="checkbox" data-id="${readingGroup.id}" data-bulk-select-row="data-bulk-select-row" />
+                                  </div>
+                                </td>
+                                <td class="align-middle">
+                                    <div class="d-flex align-items-center">
+                                        <div>
+                                            <a href="/groups/${readingGroup.id}/" class="fw-bold text-decoration-none">${readingGroup.name}</a>
+                                            <br><small class="text-muted">Created ${readingGroup.created_date}</small>
+                                        </div>
+                                    </div>
+                                </td>
+                                <td class="align-middle">${roleBadge}</td>
+                                <td class="align-middle">${collaboratorsHtml}</td>
+                                <td class="align-middle">
+                                    <span class="badge bg-secondary">${studentCount} student${studentCount !== 1 ? 's' : ''}</span>
+                                </td>
+                                <td class="align-middle">${actionButtons}</td>
+                            </tr>`
+                        );
+                    });
+                    handleCheckboxChange();
+                },
+                error: function() {
+                    // Fallback to basic API if detailed doesn't exist yet
+                    fetchBasicReadingGroups();
+                }
+            });
+        }
+        
+        function fetchBasicReadingGroups() {
+            $.ajax({
                 url: '{% url "api_reading_groups" %}',
                 method: 'GET',
                 success: function(data) {
@@ -220,6 +352,14 @@
                                   </div>
                                 </td>
                                 <td class="align-middle"><a href="/groups/${readingGroup.id}/">${readingGroup.name}</a></td>
+                                <td class="align-middle">-</td>
+                                <td class="align-middle">-</td>
+                                <td class="align-middle">-</td>
+                                <td class="align-middle">
+                                    <button class="btn btn-outline-primary btn-sm" onclick="editReadingGroup(${readingGroup.id})">
+                                        <i class="fas fa-edit"></i>
+                                    </button>
+                                </td>
                             </tr>`
                         );
                     });
@@ -337,7 +477,117 @@
         $('#reading-group-teachers').on('select2:select select2:unselect', function() {
             $('#reading-group-teachers').select2('close');
             $('#reading-group-teachers').select2('open');
-        });;
+        });
+
+        // Collaboration functions
+        window.inviteCollaborator = function(groupId, groupName) {
+            $('#collaborate-group-id').val(groupId);
+            $('#collaborateModalLabel').html(`<i class="fas fa-handshake me-2"></i>Invite Teacher to Collaborate on "${groupName}"`);
+            
+            // Populate teacher dropdown (exclude current user and existing managers)
+            $('#collaborate-teacher').empty().append('<option value="">Choose a teacher...</option>');
+            
+            // Get current group managers to exclude them
+            $.ajax({
+                url: `/api/reading-groups/${groupId}/`,
+                method: 'GET',
+                success: function(groupData) {
+                    const existingManagerIds = groupData.managers ? groupData.managers.map(m => m.id) : [];
+                    
+                    allTeachers.forEach(teacher => {
+                        if (teacher.id != {{ user.id }} && !existingManagerIds.includes(teacher.id)) {
+                            $('#collaborate-teacher').append(`<option value="${teacher.id}">${teacher.name}</option>`);
+                        }
+                    });
+                    
+                    $('#collaborateModal').modal('show');
+                }
+            });
+        };
+
+        window.editReadingGroup = function(groupId) {
+            // Load group data and populate form for editing
+            $.ajax({
+                url: `/api/reading-groups/${groupId}/`,
+                method: 'GET',
+                success: function(data) {
+                    $('#reading-group-name').val(data.name);
+                    $('#form-title').text('Edit Reading Group');
+                    
+                    // Set selected teachers
+                    const managerIds = data.managers ? data.managers.map(m => m.id.toString()) : [];
+                    $('#reading-group-teachers').val(managerIds).trigger('change');
+                    
+                    // Set selected students  
+                    const studentIds = data.students ? data.students.map(s => s.id.toString()) : [];
+                    $('#reading-group-students').val(studentIds).trigger('change');
+                    
+                    // Add group ID for updating
+                    $('#reading-group-form').attr('data-group-id', groupId);
+                    
+                    $('#addEditReadingGroupModal').modal('show');
+                }
+            });
+        };
+
+        window.viewGroup = function(groupId) {
+            window.location.href = `/groups/${groupId}/`;
+        };
+
+        // Handle collaboration invitation
+        $('#btn-send-invite').on('click', function() {
+            const formData = new FormData($('#collaborate-form')[0]);
+            const csrfToken = document.querySelector('[name=csrfmiddlewaretoken]').value;
+            
+            $.ajax({
+                url: '{% url "api_reading_group_invite" %}',
+                method: 'POST',
+                data: formData,
+                processData: false,
+                contentType: false,
+                headers: {
+                    'X-CSRFToken': csrfToken
+                },
+                success: function(response) {
+                    if (response.success) {
+                        $('#collaborateModal').modal('hide');
+                        $('#collaborate-form')[0].reset();
+                        
+                        // Show success message
+                        const teacherName = $('#collaborate-teacher option:selected').text();
+                        showNotification('success', `Collaboration invitation sent to ${teacherName}!`);
+                        
+                        // Refresh the reading groups list
+                        fetchReadingGroups();
+                    } else {
+                        showNotification('error', response.message || 'Failed to send invitation');
+                    }
+                },
+                error: function() {
+                    showNotification('error', 'Network error. Please try again.');
+                }
+            });
+        });
+
+        // Helper function to show notifications
+        function showNotification(type, message) {
+            const alertClass = type === 'success' ? 'alert-success' : 'alert-danger';
+            const iconClass = type === 'success' ? 'fa-check-circle' : 'fa-exclamation-circle';
+            
+            const notification = $(`
+                <div class="alert ${alertClass} alert-dismissible fade show position-fixed" style="top: 20px; right: 20px; z-index: 9999;">
+                    <i class="fas ${iconClass} me-2"></i>${message}
+                    <button type="button" class="btn-close" data-bs-dismiss="alert"></button>
+                </div>
+            `);
+            
+            $('body').append(notification);
+            
+            // Auto-dismiss after 5 seconds
+            setTimeout(() => {
+                notification.alert('close');
+            }, 5000);
+        }
     });
 </script>
 {% endblock %}

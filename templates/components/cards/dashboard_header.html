@@ -1,0 +1,64 @@
+{% comment %}
+Dashboard Header Component
+
+Usage:
+{% include "components/cards/dashboard_header.html" with 
+    title="📚 Teacher Dashboard" 
+    subtitle="Real-time insights into your students' reading progress"
+    actions=header_actions
+    show_refresh=True
+    show_export=True
+%}
+
+Parameters:
+- title: Main dashboard title (required)
+- subtitle: Subtitle or description (default: None)
+- actions: List of action buttons (default: None)
+- show_refresh: Whether to show refresh button (default: False)
+- show_export: Whether to show export button (default: False)
+- container_class: CSS class for container (default: "row mb-4")
+- custom_actions_html: Custom HTML for actions section (default: None)
+{% endcomment %}
+
+<div class="{{ container_class|default:'row mb-4' }}">
+    <div class="col-12">
+        <div class="d-flex justify-content-between align-items-center mb-3">
+            <div>
+                <h2 class="mb-1">{{ title }}</h2>
+                {% if subtitle %}
+                    <p class="text-muted mb-0">{{ subtitle }}</p>
+                {% endif %}
+            </div>
+            <div class="d-flex gap-2">
+                {% if show_refresh %}
+                    <button class="btn btn-outline-secondary btn-sm" id="refresh-dashboard" title="Refresh Data">
+                        <i class="fas fa-sync-alt"></i>
+                    </button>
+                {% endif %}
+                
+                {% if show_export %}
+                    <button class="btn btn-outline-info btn-sm" id="export-data" title="Export Report">
+                        <i class="fas fa-download"></i> Export
+                    </button>
+                {% endif %}
+                
+                {% if actions %}
+                    {% for action in actions %}
+                        <button class="btn {{ action.class|default:'btn-outline-primary' }} btn-sm" 
+                                {% if action.id %}id="{{ action.id }}"{% endif %}
+                                {% if action.title %}title="{{ action.title }}"{% endif %}
+                                {% if action.onclick %}onclick="{{ action.onclick }}"{% endif %}>
+                            {% if action.icon %}<i class="{{ action.icon }}"></i>{% endif %}
+                            {% if action.text %}{{ action.text }}{% endif %}
+                        </button>
+                    {% endfor %}
+                {% endif %}
+                
+                {% if custom_actions_html %}
+                    {{ custom_actions_html|safe }}
+                {% endif %}
+            </div>
+        </div>
+    </div>
+</div>
+

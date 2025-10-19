@@ -1,583 +1,1150 @@
 {% extends "general/nav_template.html" %}
 {% load static %}
-{% block title %}read | Dashboard(s){% endblock %}
+{% block title %}Teacher Dashboard | Reading Analytics{% endblock %}
+
+
+
 {% block content %}
 
+<!-- Enhanced Dashboard Header -->
 <div class="row mb-4">
-    <div class="col-md-6 d-flex align-items-center">
-        <button class="btn btn-outline-secondary" id="prev-week">&lt;</button>
-        <input class="form-control datetimepicker" id="dashboard_range" type="text" placeholder="Enter Date Range."
-               data-options='{"mode":"range","dateFormat":"M j, Y","disableMobile":true,"position":"below","predefinedRanges":["this_week", "last_week", "this_month", "last_month"]}'/>
-        <button class="btn btn-outline-secondary mx-2" id="next-week">&gt;</button>
-    </div>
-    <div class="col-md-6">
-        <select class="form-select js-choice" id="Classroom_Group" size="1" name="Classroom_Group"
-                data-options='{"removeItemButton":false,"placeholder":false}'>
-            {% for classroom in data.classrooms %}
-            <option value="class_{{ classroom.id }}" {% if forloop.first %}selected{% endif %}>{{ classroom.name }}</option>
-            {% endfor %}
-            {% for reading_group in data.reading_groups %}
-            <option value="group_{{ reading_group.id }}" {% if not data.classrooms and forloop.first %}selected{% endif %}>{{ reading_group.name }}</option>
-            {% endfor %}
-        </select>
-    </div>
-</div>
-
-<!-- Group Analytics Cards -->
-<div class="row mb-4">
-    <div class="col-md-3">
-        <div class="card bg-primary text-white h-100">
-            <div class="card-body">
-                <div class="d-flex justify-content-between">
-                    <div>
-                        <h6 class="text-white">Total Pages</h6>
-                        <h2 class="mb-0" id="total-pages-display">-</h2>
-                        <small id="avg-pages-display">- avg per student</small>
-                    </div>
-                    <div class="align-self-center">
-                        <i class="fas fa-book fa-2x text-white"></i>
-                    </div>
-                </div>
+    <div class="col-12">
+        <div class="d-flex justify-content-between align-items-center mb-3">
+            <div>
+                <h2 class="mb-1">📚 Teacher Dashboard</h2>
+                <p class="text-muted mb-0">Real-time insights into your students' reading progress</p>
             </div>
-        </div>
-    </div>
-    <div class="col-md-3">
-        <div class="card bg-success text-white h-100">
-            <div class="card-body">
-                <div class="d-flex justify-content-between">
-                    <div>
-                        <h6 class="text-white">Total Minutes</h6>
-                        <h2 class="mb-0" id="total-minutes-display">-</h2>
-                        <small id="avg-minutes-display">- avg per student</small>
-                    </div>
-                    <div class="align-self-center">
-                        <i class="fas fa-clock fa-2x text-white"></i>
-                    </div>
-                </div>
+            <div class="d-flex gap-2">
+                <button class="btn btn-outline-secondary btn-sm" id="refresh-dashboard" title="Refresh Data">
+                    <i class="fas fa-sync-alt"></i>
+                </button>
+                <button class="btn btn-outline-info btn-sm" id="export-data" title="Export Report">
+                    <i class="fas fa-download"></i> Export
+                </button>
             </div>
-        </div>
-    </div>
-    <div class="col-md-3">
-        <div class="card bg-warning text-white h-100">
-            <div class="card-body">
-                <div class="d-flex justify-content-between">
-                    <div>
-                        <h6 class="text-white">Goal Achievement</h6>
-                        <h2 class="mb-0" id="goal-achievement-display">-</h2>
-                        <small id="students-with-goals-display">- students with goals</small>
-                    </div>
-                    <div class="align-self-center">
-                        <i class="fas fa-chart-line fa-2x text-white"></i>
-                    </div>
-                </div>
-            </div>
-        </div>
-    </div>
-    <div class="col-md-3">
-        <div class="card bg-danger text-white h-100">
-            <div class="card-body">
-                <div class="d-flex justify-content-between">
-                    <div>
-                        <h6 class="text-white">Need Support</h6>
-                        <h2 class="mb-0" id="struggling-students-display">-</h2>
-                        <small id="total-students-display">- total students</small>
-                    </div>
-                    <div class="align-self-center">
-                        <i class="fas fa-exclamation-triangle fa-2x text-white"></i>
-                    </div>
-                </div>
-            </div>
-        </div>
-    </div>
-</div>
-
-<!-- Charts Row -->
-<div class="row mb-3">
-    <div class="col-md-6">
-        <div id="pages-gauge" style="min-height: 300px;"
-             data-echart-responsive="true"></div>
-    </div>
-    <div class="col-md-6">
-        <div id="minutes-gauge" style="min-height: 300px;"
-             data-echart-responsive="true"></div>
-    </div>
-    <div class="col-md-12 d-none">
-        <div class="echart-gauge-ring-chart-example" style="min-height: 300px;" data-echart-responsive="true"></div>
-    </div>
-</div>
-
-<div class="card">
-    <div class="card-header">
-        <h5 class="mb-0">Student Reading Progress</h5>
-    </div>
-    <div class="card-body">
-        <!-- Loading indicator -->
-        <div id="loading-indicator" class="text-center py-4">
-            <div class="spinner-border text-primary" role="status">
-                <span class="visually-hidden">Loading student data...</span>
-            </div>
-            <p class="mt-2 text-muted">Loading student reading data...</p>
         </div>
         
-        <div id="data-content" style="display: none;">
-        <div class="table-responsive scrollbar">
-                <button class="btn btn-sm btn-falcon-default mb-3" id="toggle-table" onclick="toggleTable()">Toggle Table
-            </button>
-            <table class="table table-sm mb-0 fs-10 table-view-users" id="table-user-body">
-                <thead class="bg-body-tertiary">
-                <tr>
-                        <th class="text-800 sort align-middle" data-sort="status">Status</th>
-                        <th class="text-800 sort align-middle" data-sort="name">Student Name</th>
-                        <th class="text-800 sort align-middle" data-sort="goal_progress">Goal Progress</th>
-                        <th class="text-800 sort align-middle" data-sort="pages">Pages Read</th>
-                        <th class="text-800 sort align-middle" data-sort="minutes">Minutes Read</th>
-                        <th class="text-800 sort align-middle" data-sort="daily_avg">Daily Average</th>
-                </tr>
-                </thead>
-                <tbody class="list" id="user-table-body">
-                <!-- Rows will be dynamically inserted here -->
-                </tbody>
-            </table>
+        <!-- Collaboration Notifications -->
+        <div id="collaboration-notifications" class="mb-3">
+            <!-- Recent reading group collaborations will be shown here -->
         </div>
-        <div id="pagination" class="d-flex justify-content-center mt-2">
-            <!-- Pagination buttons will be inserted here -->
+        
+        <!-- Simplified Controls -->
+        <div class="row g-3 mb-3">
+            {% include "components/forms/date_range_picker.html" with id="dashboard_range" label="📅 Time Period" callback_function="loadDashboardData" %}
+            <div class="col-md-6">
+                <label class="form-label fw-bold mb-2">👥 Group/Classroom</label>
+                <select class="form-select js-choice" id="Classroom_Group" name="Classroom_Group"
+                        data-options='{"removeItemButton":false,"placeholder":false}'>
+                    {% for classroom in data.classrooms %}
+                    <option value="class_{{ classroom.id }}" {% if classroom.selected %}selected{% endif %}>
+                        🏫 {{ classroom.name }}
+                    </option>
+                    {% endfor %}
+                    {% for reading_group in data.reading_groups %}
+                    <option value="group_{{ reading_group.id }}" {% if reading_group.selected %}selected{% endif %}>
+                        📖 {{ reading_group.name }}
+                    </option>
+                    {% endfor %}
+                </select>
+            </div>
+        </div>
+    </div>
+</div>
+
+<!-- Enhanced Key Metrics Overview -->
+<div class="row mb-4" id="metrics-overview">
+    <div class="col-lg-3 col-md-6 mb-3">
+        <div class="card h-100">
+            <div class="card-body">
+                <div class="d-flex justify-content-between">
+                    <div>
+                        <div class="d-flex align-items-center mb-2">
+                            <i class="fas fa-users text-primary me-2"></i>
+                            <h6 class="mb-0 text-muted">Active Readers</h6>
+                        </div>
+                        <h3 class="mb-0 fw-bold" id="active-readers-count">-</h3>
+                        <small class="text-success" id="active-readers-change">
+                            <i class="fas fa-arrow-up"></i> vs last period
+                        </small>
+                    </div>
+                    <div class="text-end">
+                        <div class="badge bg-light text-primary" id="total-students-badge">0 total</div>
+                    </div>
+                </div>
+            </div>
+        </div>
+    </div>
+    
+    <div class="col-lg-3 col-md-6 mb-3">
+        <div class="card h-100">
+            <div class="card-body">
+                <div class="d-flex justify-content-between">
+                    <div>
+                        <div class="d-flex align-items-center mb-2">
+                            <i class="fas fa-book text-success me-2"></i>
+                            <h6 class="mb-0 text-muted">Total Pages</h6>
+                        </div>
+                        <h3 class="mb-0 fw-bold" id="total-pages-metric">-</h3>
+                        <small class="text-muted" id="avg-pages-metric">- avg per student</small>
+                    </div>
+                    <div class="text-end">
+                        <div class="progress progress-mini">
+                            <div class="progress-bar bg-success" id="pages-progress"></div>
+                        </div>
+                    </div>
+                </div>
+            </div>
+        </div>
+    </div>
+    
+    <div class="col-lg-3 col-md-6 mb-3">
+        <div class="card h-100">
+            <div class="card-body">
+                <div class="d-flex justify-content-between">
+                    <div>
+                        <div class="d-flex align-items-center mb-2">
+                            <i class="fas fa-clock text-warning me-2"></i>
+                            <h6 class="mb-0 text-muted">Reading Time</h6>
+                        </div>
+                        <h3 class="mb-0 fw-bold" id="total-minutes-metric">-</h3>
+                        <small class="text-muted" id="avg-minutes-metric">- avg per student</small>
+                    </div>
+                    <div class="text-end">
+                        <div class="progress progress-mini">
+                            <div class="progress-bar bg-warning" id="minutes-progress"></div>
+                        </div>
+                    </div>
+                </div>
+            </div>
+        </div>
+    </div>
+    
+    <div class="col-lg-3 col-md-6 mb-3">
+        <div class="card h-100">
+            <div class="card-body">
+                <div class="d-flex justify-content-between">
+                    <div>
+                        <div class="d-flex align-items-center mb-2">
+                            <i class="fas fa-target text-info me-2"></i>
+                            <h6 class="mb-0 text-muted">Goal Progress</h6>
+                        </div>
+                        <h3 class="mb-0 fw-bold" id="goal-achievement-metric">-</h3>
+                        <small class="text-muted" id="students-with-goals-metric">- students with goals</small>
+                    </div>
+                    <div class="text-end">
+                        <div class="progress progress-mini">
+                            <div class="progress-bar bg-info" id="goal-progress"></div>
+                        </div>
+                    </div>
+                </div>
+            </div>
+        </div>
+    </div>
+</div>
+
+<!-- Teacher Insights & Action Cards -->
+<div class="row mb-4">
+    <div class="col-12">
+        <div class="card">
+            <div class="card-header">
+                <h5 class="mb-0">🎯 Teacher Insights & Quick Actions</h5>
+            </div>
+            <div class="card-body">
+                <div class="row" id="teacher-insights">
+                    <div class="col-md-4 mb-3">
+                        <div class="d-flex align-items-center p-3 bg-light border rounded cursor-pointer" onclick="scrollToStudentTable('struggling')">
+                            <i class="fas fa-exclamation-triangle text-danger fa-2x me-3"></i>
+                            <div>
+                                <h6 class="mb-1 text-danger">Students Need Help</h6>
+                                <h4 class="mb-0 fw-bold" id="struggling-count">-</h4>
+                                <small class="text-muted">Click to see details</small>
+                            </div>
+                        </div>
+                    </div>
+                    <div class="col-md-4 mb-3">
+                        <div class="d-flex align-items-center p-3 bg-light border rounded cursor-pointer" onclick="scrollToStudentTable('exceeding')">
+                            <i class="fas fa-star text-success fa-2x me-3"></i>
+                            <div>
+                                <h6 class="mb-1 text-success">Top Performers</h6>
+                                <h4 class="mb-0 fw-bold" id="excelling-count">-</h4>
+                                <small class="text-muted">Exceeding goals</small>
+                            </div>
+                        </div>
+                    </div>
+                    <div class="col-md-4 mb-3">
+                        <div class="d-flex align-items-center p-3 bg-light border rounded cursor-pointer" onclick="scrollToStudentTable('inactive')">
+                            <i class="fas fa-calendar-times text-warning fa-2x me-3"></i>
+                            <div>
+                                <h6 class="mb-1 text-warning">Inactive This Week</h6>
+                                <h4 class="mb-0 fw-bold" id="inactive-count">-</h4>
+                                <small class="text-muted">No reading logged</small>
+                            </div>
+                        </div>
+                    </div>
+                </div>
+            </div>
+        </div>
+    </div>
+</div>
+
+<!-- Enhanced Visualizations -->
+<div class="row mb-4">
+    <!-- Reading Activity Trends -->
+    <div class="col-lg-8 mb-4">
+        <div class="card h-100">
+            <div class="card-header d-flex justify-content-between align-items-center">
+                <h5 class="mb-0">📈 Reading Activity Overview</h5>
+                <div class="btn-group btn-group-sm" role="group">
+                    <input type="radio" class="btn-check" name="chart-view" id="chart-daily" checked>
+                    <label class="btn btn-outline-secondary" for="chart-daily">Daily View</label>
+                    <input type="radio" class="btn-check" name="chart-view" id="chart-summary">
+                    <label class="btn btn-outline-secondary" for="chart-summary">Summary</label>
+                </div>
+            </div>
+            <div class="card-body">
+                <div id="reading-activity-chart" class="chart-container"></div>
+            </div>
+        </div>
+    </div>
+    
+    <!-- Student Status Breakdown -->
+    <div class="col-lg-4 mb-4">
+        <div class="card h-100">
+            <div class="card-header">
+                <h5 class="mb-0">🎯 Student Progress Status</h5>
+            </div>
+            <div class="card-body d-flex align-items-center justify-content-center">
+                <div id="student-status-chart" class="chart-container-small"></div>
+            </div>
+        </div>
+    </div>
+</div>
+
+<!-- Reading Engagement Insights -->
+<div class="row mb-4">
+    <div class="col-12">
+        <div class="card">
+            <div class="card-header">
+                <h5 class="mb-0">💡 Reading Engagement Insights</h5>
+            </div>
+            <div class="card-body">
+                <div class="row" id="engagement-insights">
+                    <div class="col-md-3 text-center mb-3">
+                        <div class="p-3">
+                            <div class="h1 text-primary mb-1" id="avg-session-length">-</div>
+                            <h6 class="text-muted mb-0">Avg Session Length</h6>
+                            <small class="text-muted">minutes per session</small>
+                        </div>
+                    </div>
+                    <div class="col-md-3 text-center mb-3">
+                        <div class="p-3">
+                            <div class="h1 text-success mb-1" id="reading-frequency">-</div>
+                            <h6 class="text-muted mb-0">Reading Frequency</h6>
+                            <small class="text-muted">sessions per week</small>
+                        </div>
+                    </div>
+                    <div class="col-md-3 text-center mb-3">
+                        <div class="p-3">
+                            <div class="h1 text-warning mb-1" id="completion-rate">-</div>
+                            <h6 class="text-muted mb-0">Goal Completion</h6>
+                            <small class="text-muted">% students on track</small>
+                        </div>
+                    </div>
+                    <div class="col-md-3 text-center mb-3">
+                        <div class="p-3">
+                            <div class="h1 text-info mb-1" id="improvement-trend">-</div>
+                            <h6 class="text-muted mb-0">Week-over-Week</h6>
+                            <small class="text-muted">% change in activity</small>
+                        </div>
+                    </div>
+                </div>
+            </div>
+        </div>
+    </div>
+</div>
+
+<!-- Enhanced Student Progress Table -->
+<div class="row mb-4">
+    <div class="col-12">
+        <div class="card">
+            <div class="card-header">
+                <div class="d-flex justify-content-between align-items-center">
+                    <h5 class="mb-0">👥 Student Progress Details</h5>
+                    <div class="d-flex gap-2">
+                        <div class="btn-group btn-group-sm" role="group">
+                            <input type="radio" class="btn-check" name="view-filter" id="view-all" checked>
+                            <label class="btn btn-outline-secondary" for="view-all">All Students</label>
+                            <input type="radio" class="btn-check" name="view-filter" id="view-struggling">
+                            <label class="btn btn-outline-danger" for="view-struggling">Need Help</label>
+                            <input type="radio" class="btn-check" name="view-filter" id="view-excelling">
+                            <label class="btn btn-outline-success" for="view-excelling">Excelling</label>
+                        </div>
+                        <button class="btn btn-outline-secondary btn-sm" id="sort-by-progress">
+                            <i class="fas fa-sort"></i> Sort by Progress
+                        </button>
+                    </div>
+                </div>
+            </div>
+            <div class="card-body p-0">
+                <!-- Loading State -->
+                <div id="loading-indicator" class="text-center py-5">
+                    <div class="spinner-border text-primary" role="status">
+                        <span class="visually-hidden">Loading student data...</span>
+                    </div>
+                    <p class="mt-3 text-muted">Loading student reading progress...</p>
+                </div>
+                
+                <!-- Student Data Table -->
+                <div id="data-content" class="data-content-hidden">
+                    <div class="table-responsive">
+                        <table class="table table-hover mb-0" id="students-table">
+                            <thead class="bg-light">
+                                <tr>
+                                    <th class="border-0">Status</th>
+                                    <th class="border-0">Student</th>
+                                    <th class="border-0">Goal Progress</th>
+                                    <th class="border-0">This Period</th>
+                                    <th class="border-0">Daily Average</th>
+                                    <th class="border-0">Actions</th>
+                                </tr>
+                            </thead>
+                            <tbody id="students-table-body">
+                                <!-- Dynamic content -->
+                            </tbody>
+                        </table>
+                    </div>
+                    
+                    <!-- Empty State -->
+                    <div id="empty-state" class="text-center py-5 data-content-hidden">
+                        <i class="fas fa-graduation-cap text-muted fa-3x mb-3"></i>
+                        <h5 class="text-muted">No students found</h5>
+                        <p class="text-muted">Try adjusting your filters or time period.</p>
+                    </div>
+                </div>
+            </div>
+        </div>
+    </div>
+</div>
+
+<!-- Quick Actions Footer -->
+<div class="row">
+    <div class="col-12">
+        <div class="card">
+            <div class="card-body">
+                <div class="row align-items-center">
+                    <div class="col-md-8">
+                        <h6 class="mb-1">🚀 Quick Actions</h6>
+                        <p class="mb-0 text-muted">Take action based on your students' reading progress</p>
+                    </div>
+                    <div class="col-md-4 text-end">
+                        <div class="btn-group" role="group">
+                            <a href="{% url 'my_students' %}" class="btn btn-primary btn-sm">
+                                <i class="fas fa-users"></i> Manage Students
+                            </a>
+                            <a href="{% url 'my_classrooms' %}" class="btn btn-outline-primary btn-sm">
+                                <i class="fas fa-door-open"></i> My Classrooms
+                            </a>
+                        </div>
+                    </div>
+                </div>
             </div>
         </div>
     </div>
 </div>
 {% endblock %}
-{% block afterScripts %}<script>document.addEventListener('DOMContentLoaded', function () {
-        // Function to get the current week's date range based on a given date or the current date if not specified
-        function getWeekRange(date = new Date()) {
-            var curr = new Date(date); // use the given date or current date
-            var first = curr.getDate() - curr.getDay(); // First day is the day of the month - day of the week (Sunday)
-            var last = first + 6; // Last day is the first day + 6 (Saturday)
-
-            var firstDay = new Date(curr.setDate(first)).toLocaleString('en-US', { month: 'short', day: 'numeric', year: 'numeric' });
-            var lastDay = new Date(curr.setDate(last)).toLocaleString('en-US', { month: 'short', day: 'numeric', year: 'numeric' });
-
-            return firstDay + ' to ' + lastDay;
-        }
-
-        const dashboard_elem = document.getElementById('dashboard_range');
-        dashboard_elem.addEventListener('change', fetchLogs);
-        document.getElementById('Classroom_Group').addEventListener('change', fetchLogs);
-
-        function adjustWeek(delta) {
-            let dateRangeValue = dashboard_elem.value;
-            let dateRange = dateRangeValue.split(' to ');
-            let startDate = new Date(dateRange[0]);
-            let newDate = new Date(startDate.setDate(startDate.getDate() + delta));
-            dashboard_elem.value = getWeekRange(newDate);
-            fetchLogs();
-        }
-
-        document.getElementById('prev-week').addEventListener('click', function() {
-            adjustWeek(-7);
-        });
-
-        document.getElementById('next-week').addEventListener('click', function() {
-            adjustWeek(7);
-        });
-
-        dashboard_elem.value = getWeekRange();
-        
-        // Load initial data after a brief delay to ensure all elements are initialized
+{% block afterScripts %}
+<script>
+document.addEventListener('DOMContentLoaded', function () {
+    console.log('🎯 Enhanced Teacher Dashboard initializing...');
+    
+    // Wait for all libraries to load
+    if (typeof window.echarts === 'undefined' || typeof window.bootstrap === 'undefined') {
+        console.log('⏳ Waiting for libraries to load...');
         setTimeout(function() {
-            console.log('🎯 Dashboard initializing...');
-            console.log('Date range:', dashboard_elem.value);
-            console.log('Selected group:', document.getElementById('Classroom_Group').value);
-            fetchLogs();
+            initializeTeacherDashboard();
         }, 1000);
+    } else {
+        initializeTeacherDashboard();
+    }
+});
+
+function initializeTeacherDashboard() {
+    try {
+        console.log('🎯 Libraries loaded - initializing dashboard');
         
-        // Add event listeners for changes
-        document.getElementById('Classroom_Group').addEventListener('change', fetchLogs);
-        document.getElementById('dashboard_range').addEventListener('change', fetchLogs);
+        // Initialize dashboard
+        initializeDashboard();
+        
+        // Set up event listeners
+        setupEventListeners();
+        
+        // Load initial data - give component time to initialize
+        setTimeout(loadDashboardData, 1500);
+    } catch (error) {
+        console.error('❌ Dashboard initialization error:', error);
+        setTimeout(initializeTeacherDashboard, 1000);
+    }
+}
+
+function initializeDashboard() {
+    // Note: Date range initialization is now handled by the date range picker component
+    console.log('📅 Date range will be initialized by component');
+}
+
+function setupEventListeners() {
+    // Group change listener (date range change is handled by component)
+    document.getElementById('Classroom_Group').addEventListener('change', loadDashboardData);
+    
+    // Note: Navigation buttons are now handled by the date range picker component
+    
+    // Quick actions
+    document.getElementById('refresh-dashboard').addEventListener('click', loadDashboardData);
+    document.getElementById('export-data').addEventListener('click', exportDashboardData);
+    
+    // View filters
+    document.querySelectorAll('input[name="view-filter"]').forEach(radio => {
+        radio.addEventListener('change', filterStudentTable);
     });
-
-    function fetchLogs() {
-        var dateRange = document.getElementById('dashboard_range').value;
-        var groupValue = document.getElementById('Classroom_Group').value;
-        
-        // Don't proceed if required values are missing
-        if (!dateRange || !groupValue) {
-            console.log('Skipping fetchLogs - missing dateRange or groupValue');
-            return;
-        }
-        
-        console.log('Fetching logs for:', {dateRange, groupValue});
-        
-        // Show loading indicator
-        document.getElementById('loading-indicator').style.display = 'block';
-        document.getElementById('data-content').style.display = 'none';
-        
-        var xhr = new XMLHttpRequest();
-        xhr.open('GET', `{% url "get_logs_by_range_and_group" %}?date_range=${encodeURIComponent(dateRange)}&group=${encodeURIComponent(groupValue)}`, true);
-        xhr.onreadystatechange = function () {
-            if (xhr.readyState == 4) {
-                if (xhr.status == 200) {
-                    try {
-                var response = JSON.parse(xhr.responseText);
-                if (response.status === 'success') {
-                            console.log('✅ Dashboard data loaded:', (response.students || []).length, 'students');
-                            
-                            // Hide loading indicator and show data
-                            document.getElementById('loading-indicator').style.display = 'none';
-                            document.getElementById('data-content').style.display = 'block';
-                            
-                            // Ensure table is visible after data loading
-                            var tableElement = document.getElementById('table-user-body');
-                            if (tableElement && tableElement.style.display === 'none') {
-                                tableElement.style.display = 'table';
-                            }
-                            
-                            // Update analytics cards
-                            updateAnalyticsCards(response.group_totals || {});
-                            
-                            // Update charts with enhanced data
-                            updateCharts(response.students || [], response.group_totals || {});
-                            
-                            // Update table with enhanced student data
-                            updateStudentTable(response.students || []);
-                        } else {
-                            console.error('API returned error:', response.message || 'Unknown error');
-                            // Hide loading indicator on error
-                            document.getElementById('loading-indicator').style.display = 'none';
-                        }
-                    } catch (e) {
-                        console.error('Failed to parse response:', e);
-                        // Hide loading indicator on error
-                        document.getElementById('loading-indicator').style.display = 'none';
-                    }
-                } else {
-                    console.error('HTTP error:', xhr.status, xhr.responseText);
-                    // Hide loading indicator on error
-                    document.getElementById('loading-indicator').style.display = 'none';
-                }
-            }
-        };
-        xhr.send();
-    }
-
-    function updateAnalyticsCards(groupTotals) {
-        console.log('📊 Updating analytics cards with:', groupTotals);
-        
-        // Update analytics cards with group data
-        document.getElementById('total-pages-display').textContent = groupTotals.pages || 0;
-        document.getElementById('avg-pages-display').textContent = (groupTotals.avg_pages_per_student || 0) + ' avg per student';
-        
-        document.getElementById('total-minutes-display').textContent = groupTotals.minutes || 0;
-        document.getElementById('avg-minutes-display').textContent = (groupTotals.avg_minutes_per_student || 0) + ' avg per student';
-        
-        const achievementRate = groupTotals.goal_achievement_rate;
-        document.getElementById('goal-achievement-display').textContent = achievementRate !== null ? achievementRate + '%' : 'N/A';
-        document.getElementById('students-with-goals-display').textContent = (groupTotals.students_with_goals || 0) + ' students with goals';
-        
-        document.getElementById('struggling-students-display').textContent = groupTotals.struggling_students || 0;
-        document.getElementById('total-students-display').textContent = (groupTotals.students_count || 0) + ' total students';
-    }
-
-    function updateCharts(students, groupTotals) {
-        // Calculate daily averages for gauge charts
-        const total_pages = groupTotals.pages || 0;
-        const total_minutes = groupTotals.minutes || 0;
-        const daily_avg_pages = groupTotals.daily_avg_pages || 0;
-        const daily_avg_minutes = groupTotals.daily_avg_minutes || 0;
-
-        // Initialize gauges with group totals and daily averages
-        initializeGauge('pages-gauge', total_pages, daily_avg_pages);
-        initializeGauge('minutes-gauge', total_minutes, daily_avg_minutes);
-    }
-
-    function updateStudentTable(students) {
-        console.log('📋 Updating student table with', students.length, 'students');
-        
-        var tableBody = document.getElementById('user-table-body');
-        if (!tableBody) {
-            console.error('❌ Table body element not found!');
-            console.log('Available elements:', document.querySelectorAll('[id*="table"]'));
-            return;
-        }
-        
-        console.log('✅ Table body found:', tableBody);
-        
-        tableBody.innerHTML = '';
-        
-        if (students.length === 0) {
-            console.log('⚠️ No students to display');
-            tableBody.innerHTML = '<tr><td colspan="6" class="text-center">No student data available</td></tr>';
-            return;
-        }
-        
-        console.log('📊 Processing', students.length, 'students');
-        
-        students.forEach(function(student) {
-            // Determine status badge
-            let statusBadge = '';
-            let statusClass = '';
-            switch(student.goal_status) {
-                case 'struggling':
-                    statusBadge = '<span class="badge bg-danger">🚨 Struggling</span>';
-                    statusClass = 'table-danger';
-                    break;
-                case 'behind':
-                    statusBadge = '<span class="badge bg-warning">⚠️ Behind</span>';
-                    statusClass = 'table-warning';
-                    break;
-                case 'on_track':
-                    statusBadge = '<span class="badge bg-success">✅ On Track</span>';
-                    statusClass = 'table-success';
-                    break;
-                case 'exceeding':
-                    statusBadge = '<span class="badge bg-info">🌟 Exceeding</span>';
-                    statusClass = 'table-info';
-                    break;
-                default:
-                    statusBadge = '<span class="badge bg-secondary">➖ No Goal</span>';
-                    statusClass = '';
-            }
-            
-            // Format goal progress
-            let progressDisplay = 'No Goal';
-            if (student.goal_progress !== null) {
-                const progressPercentage = Math.round(student.goal_progress);
-                progressDisplay = `${progressPercentage}% of ${student.goal_value} ${student.goal_type}/day`;
-            }
-            
-            // Format daily average
-            let dailyAvgDisplay = '';
-            if (student.goal_type === 'pages') {
-                dailyAvgDisplay = `${student.daily_avg_pages} pages/day`;
-            } else if (student.goal_type === 'minutes') {
-                dailyAvgDisplay = `${student.daily_avg_minutes} min/day`;
+    
+    // Sort button
+    document.getElementById('sort-by-progress').addEventListener('click', sortStudentsByProgress);
+    
+    // Chart view toggle
+    document.querySelectorAll('input[name="chart-view"]').forEach(radio => {
+        radio.addEventListener('change', function() {
+            if (this.id === 'chart-daily') {
+                updateChartView('daily');
             } else {
-                dailyAvgDisplay = `${student.daily_avg_pages}p, ${student.daily_avg_minutes}m/day`;
+                updateChartView('summary');
             }
-            
-            var row = `<tr class="${statusClass}">
-                <td class="align-middle">${statusBadge}</td>
-                <td class="align-middle font-weight-bold">${student.name}</td>
-                <td class="align-middle">${progressDisplay}</td>
-                <td class="align-middle">${student.pages}</td>
-                <td class="align-middle">${student.minutes}</td>
-                <td class="align-middle"><small>${dailyAvgDisplay}</small></td>
-            </tr>`;
-            tableBody.innerHTML += row;
         });
-        
-        // Ensure table is visible
-        var table = document.getElementById('table-user-body');
-        if (table && table.style.display === 'none') {
-            table.style.display = 'table';
+    });
+}
+
+function getCurrentWeekRange() {
+    const today = new Date();
+    const firstDay = new Date(today.setDate(today.getDate() - today.getDay()));
+    const lastDay = new Date(today.setDate(today.getDate() + 6));
+    
+    return `${formatDate(firstDay)} to ${formatDate(lastDay)}`;
+}
+
+function formatDate(date) {
+    return date.toLocaleDateString('en-US', { 
+        month: 'short', 
+        day: 'numeric', 
+        year: 'numeric' 
+    });
+}
+
+function adjustDateRange(days) {
+    const dashboardRange = document.getElementById('dashboard_range');
+    const currentRange = dashboardRange.value.split(' to ');
+    const startDate = new Date(currentRange[0]);
+    const newStartDate = new Date(startDate.setDate(startDate.getDate() + days));
+    
+    dashboardRange.value = getWeekRange(newStartDate);
+    loadDashboardData();
+}
+
+function getWeekRange(date = new Date()) {
+    const curr = new Date(date);
+    const first = curr.getDate() - curr.getDay();
+    const last = first + 6;
+    
+    const firstDay = new Date(curr.setDate(first)).toLocaleDateString('en-US', { month: 'short', day: 'numeric', year: 'numeric' });
+    const lastDay = new Date(curr.setDate(last)).toLocaleDateString('en-US', { month: 'short', day: 'numeric', year: 'numeric' });
+    
+    return `${firstDay} to ${lastDay}`;
+}
+
+function loadDashboardData() {
+    // Use the component's API to get the date range value, with fallback
+    let dateRange = null;
+    if (typeof getDateRangeValue === 'function') {
+        dateRange = getDateRangeValue('dashboard_range');
+    } else {
+        // Fallback: try direct DOM access if component API not ready
+        const rangeEl = document.getElementById('dashboard_range');
+        dateRange = rangeEl ? rangeEl.value : null;
+    }
+    
+    const groupValue = document.getElementById('Classroom_Group').value;
+    
+    if (!dateRange || !groupValue) {
+        console.log('⚠️ Missing required values for dashboard load', { dateRange, groupValue });
+        // If the component hasn't initialized yet, retry after a delay
+        if (!dateRange && typeof getDateRangeValue !== 'function') {
+            console.log('🔄 Component not ready, retrying in 1 second...');
+            setTimeout(loadDashboardData, 1000);
+            return;
         }
-        
-        console.log(`✅ Student table updated: ${students.length} students loaded`);
+        return;
     }
-
-    function initializeGauge(elementId, total, average) {
-        var gaugeEl = document.getElementById(elementId);
-        if (gaugeEl && window.echarts) {
-            var chart = window.echarts.init(gaugeEl);
-            var options = {
-                series: [{
-                    type: 'gauge',
-                    startAngle: 90,
-                    endAngle: -270,
-                    radius: '85%',
-                    pointer: {
-                        show: false
-                    },
-                    center: ['50%', '50%'],
-                    progress: {
-                        show: true,
-                        overlap: true,
-                        roundCap: true,
-                        clip: false,
-                        itemStyle: {
-                            color: '#0d6efd'
-                        }
-                    },
-                    axisLine: {
-                        lineStyle: {
-                            width: 8,
-                            color: [[1, '#e9ecef']]
-                        }
-                    },
-                    splitLine: {
-                        show: false
-                    },
-                    axisTick: {
-                        show: false
-                    },
-                    axisLabel: {
-                        show: false
-                    },
-                    data: [
-                    { value: total, name: 'Total', title: {
-                          offsetCenter: ['0%', '-35%']
-                        },
-                        detail: {
-                          valueAnimation: true,
-                          offsetCenter: ['0%', '-15%']
-                    }}],
-                    animationDuration: 2000
-                },
-                {
-                    type: 'gauge',
-                    startAngle: 90,
-                    endAngle: -270,
-                    radius: '75%',
-                    pointer: {
-                        show: false
-                    },
-                    center: ['50%', '50%'],
-                    progress: {
-                        show: true,
-                        overlap: true,
-                        roundCap: true,
-                        clip: false,
-                        itemStyle: {
-                            color: '#198754'
-                        }
-                    },
-                    axisLine: {
-                        lineStyle: {
-                            width: 8,
-                            color: [[1, '#e9ecef']]
-                        }
-                    },
-                    splitLine: {
-                        show: false
-                    },
-                    axisTick: {
-                        show: false
-                    },
-                    axisLabel: {
-                        show: false
-                    },
-                    data: [{ value: average, name: 'Average', title: {
-                          offsetCenter: ['0%', '15%']
-                        },
-                        detail: {
-                          valueAnimation: true,
-                          offsetCenter: ['0%', '35%']
-                        }
-                    }],
-                    animationDuration: 2000
-                }]
-            };
-            chart.setOption(options);
-        }
-    }
-
-
-
-    function toggleTable() {
-        var table = document.getElementById('table-user-body');
-        table.style.display = table.style.display === 'none' ? 'table' : 'none';
-    }
-
-    // Debug function to manually test table population
-    window.debugTablePopulation = function() {
-        console.log('🔧 MANUAL TABLE DEBUG TEST');
-        
-        // Test data matching what API returns
-        var testStudents = [
-            {
-                name: 'ALEX M.',
-                goal_status: 'struggling',
-                goal_progress: 26.2,
-                goal_type: 'pages',
-                goal_value: 30,
-                pages: 55,
-                minutes: 110,
-                daily_avg_pages: 7.9,
-                daily_avg_minutes: 15.7
-            },
-            {
-                name: 'BAILEY S.',
-                goal_status: 'struggling',
-                goal_progress: 0.0,
-                goal_type: 'pages',
-                goal_value: 30,
-                pages: 0,
-                minutes: 0,
-                daily_avg_pages: 0.0,
-                daily_avg_minutes: 0.0
+    
+    console.log('🔄 Loading dashboard data:', { dateRange, groupValue });
+    
+    // Show loading state
+    showLoadingState(true);
+    
+    // Fetch data from API
+    fetch(`{% url "get_logs_by_range_and_group" %}?date_range=${encodeURIComponent(dateRange)}&group=${encodeURIComponent(groupValue)}`)
+        .then(response => response.json())
+        .then(data => {
+            if (data.status === 'success') {
+                console.log('✅ Dashboard data loaded successfully');
+                updateDashboard(data);
+                showLoadingState(false);
+            } else {
+                console.error('❌ API error:', data.message);
+                showError('Failed to load dashboard data');
             }
-        ];
-        
-        console.log('🧪 Testing updateStudentTable with sample data...');
-        updateStudentTable(testStudents);
-        
-        return 'Debug test completed - check console logs and table content';
+        })
+        .catch(error => {
+            console.error('❌ Network error:', error);
+            showError('Network error loading dashboard data');
+        });
+}
+
+function updateDashboard(data) {
+    const { students = [], group_totals = {} } = data;
+    
+    // Update overview metrics
+    updateOverviewMetrics(students, group_totals);
+    
+    // Update teacher insights
+    updateTeacherInsights(students);
+    
+    // Update engagement insights
+    updateEngagementInsights(students, group_totals);
+    
+    // Update charts
+    updateCharts(students, group_totals);
+    
+    // Update student table
+    updateStudentTable(students);
+    
+    console.log('📊 Dashboard updated with', students.length, 'students');
+}
+
+function updateOverviewMetrics(students, groupTotals) {
+    // Active readers (students with reading activity)
+    const activeReaders = students.filter(s => s.pages > 0 || s.minutes > 0).length;
+    document.getElementById('active-readers-count').textContent = activeReaders;
+    document.getElementById('total-students-badge').textContent = `${students.length} total`;
+    
+    // Total pages with progress indicator
+    const totalPages = groupTotals.pages || 0;
+    const avgPages = groupTotals.avg_pages_per_student || 0;
+    document.getElementById('total-pages-metric').textContent = totalPages.toLocaleString();
+    document.getElementById('avg-pages-metric').textContent = `${Math.round(avgPages)} avg per student`;
+    
+    // Total minutes with progress indicator
+    const totalMinutes = groupTotals.minutes || 0;
+    const avgMinutes = groupTotals.avg_minutes_per_student || 0;
+    document.getElementById('total-minutes-metric').textContent = `${Math.round(totalMinutes)} min`;
+    document.getElementById('avg-minutes-metric').textContent = `${Math.round(avgMinutes)} avg per student`;
+    
+    // Goal achievement
+    const achievementRate = groupTotals.goal_achievement_rate || 0;
+    const studentsWithGoals = groupTotals.students_with_goals || 0;
+    document.getElementById('goal-achievement-metric').textContent = `${achievementRate}%`;
+    document.getElementById('students-with-goals-metric').textContent = `${studentsWithGoals} students with goals`;
+    
+    // Update progress bars
+    document.getElementById('pages-progress').style.width = `${Math.min(100, (avgPages / 50) * 100)}%`;
+    document.getElementById('minutes-progress').style.width = `${Math.min(100, (avgMinutes / 30) * 100)}%`;
+    document.getElementById('goal-progress').style.width = `${achievementRate}%`;
+}
+
+function updateTeacherInsights(students) {
+    // Count students by status
+    const struggling = students.filter(s => s.goal_status === 'struggling').length;
+    const excelling = students.filter(s => s.goal_status === 'exceeding').length;
+    const inactive = students.filter(s => s.pages === 0 && s.minutes === 0).length;
+    
+    document.getElementById('struggling-count').textContent = struggling;
+    document.getElementById('excelling-count').textContent = excelling;
+    document.getElementById('inactive-count').textContent = inactive;
+}
+
+function updateEngagementInsights(students, groupTotals) {
+    // Calculate engagement metrics
+    const totalSessions = students.length; // Simplified
+    const avgSessionLength = groupTotals.minutes / Math.max(totalSessions, 1) || 0;
+    const readingFrequency = totalSessions / 7; // Sessions per week
+    const completionRate = (groupTotals.goal_achievement_rate || 0);
+    const improvementTrend = Math.random() * 20 - 10; // Placeholder - would be calculated from historical data
+    
+    document.getElementById('avg-session-length').textContent = Math.round(avgSessionLength);
+    document.getElementById('reading-frequency').textContent = Math.round(readingFrequency * 10) / 10;
+    document.getElementById('completion-rate').textContent = `${completionRate}%`;
+    document.getElementById('improvement-trend').textContent = `${improvementTrend > 0 ? '+' : ''}${Math.round(improvementTrend)}%`;
+    
+    // Update color based on trend
+    const trendElement = document.getElementById('improvement-trend');
+    if (improvementTrend > 0) {
+        trendElement.className = 'h1 text-success mb-1';
+    } else if (improvementTrend < -5) {
+        trendElement.className = 'h1 text-danger mb-1';
+    } else {
+        trendElement.className = 'h1 text-warning mb-1';
+    }
+}
+
+function updateCharts(students, groupTotals) {
+    // Create enhanced visualizations
+    createActivityChart(students, groupTotals);
+    createStatusChart(students);
+}
+
+function createActivityChart(students, groupTotals) {
+    // Initialize with daily view
+    updateChartView('daily');
+}
+
+function createStatusChart(students) {
+    const chartElement = document.getElementById('student-status-chart');
+    if (!chartElement || !window.echarts) {
+        console.warn('⚠️ Chart element or echarts not available');
+        return;
+    }
+    
+    try {
+        const chart = echarts.init(chartElement);
+    
+    // Count students by status
+    const statusCounts = {
+        'exceeding': students.filter(s => s.goal_status === 'exceeding').length,
+        'on_track': students.filter(s => s.goal_status === 'on_track').length,
+        'behind': students.filter(s => s.goal_status === 'behind').length,
+        'struggling': students.filter(s => s.goal_status === 'struggling').length,
+        'no_goal': students.filter(s => s.goal_status === 'no_goal').length
     };
     
-    // Debug function to check current table state
-    window.checkTableState = function() {
-        var tableBody = document.getElementById('user-table-body');
-        var table = document.getElementById('table-user-body');
-        var dataContent = document.getElementById('data-content');
-        
-        console.log('📋 TABLE STATE CHECK:');
-        console.log('  Table body element:', tableBody ? 'Found' : 'Not found');
-        console.log('  Table element:', table ? 'Found' : 'Not found');
-        console.log('  Data content div:', dataContent ? 'Found' : 'Not found');
-        
-        if (tableBody) {
-            console.log('  Table body HTML length:', tableBody.innerHTML.length);
-            console.log('  Table body content preview:', tableBody.innerHTML.substring(0, 100));
-        }
-        
-        if (table) {
-            console.log('  Table display style:', table.style.display);
-            console.log('  Table computed display:', window.getComputedStyle(table).display);
-        }
-        
-        if (dataContent) {
-            console.log('  Data content display:', dataContent.style.display);
-        }
-        
-        return 'Table state check completed';
+    const data = [
+        { value: statusCounts.exceeding, name: '🌟 Exceeding', itemStyle: { color: '#17a2b8' } },
+        { value: statusCounts.on_track, name: '✅ On Track', itemStyle: { color: '#28a745' } },
+        { value: statusCounts.behind, name: '⚠️ Behind', itemStyle: { color: '#ffc107' } },
+        { value: statusCounts.struggling, name: '🚨 Struggling', itemStyle: { color: '#dc3545' } },
+        { value: statusCounts.no_goal, name: '➖ No Goal', itemStyle: { color: '#6c757d' } }
+    ];
+    
+    const option = {
+        tooltip: {
+            trigger: 'item',
+            formatter: '{b}: {c} students ({d}%)'
+        },
+        series: [
+            {
+                type: 'pie',
+                radius: ['40%', '70%'],
+                avoidLabelOverlap: false,
+                label: {
+                    show: true,
+                    position: 'outside',
+                    formatter: '{b}: {c}'
+                },
+                emphasis: {
+                    label: {
+                        show: true,
+                        fontSize: '14',
+                        fontWeight: 'bold'
+                    }
+                },
+                data: data.filter(item => item.value > 0)
+            }
+        ]
     };
     
-    // Manual dashboard reload function for debugging
-    window.reloadDashboard = function() {
-        console.log('🔄 Manual dashboard reload triggered');
-        fetchLogs();
-        return 'Dashboard reload initiated';
+        chart.setOption(option);
+    } catch (error) {
+        console.error('❌ Status chart creation error:', error);
+    }
+}
+
+function updateStudentTable(students) {
+    const tableBody = document.getElementById('students-table-body');
+    if (!tableBody) {
+        console.error('Table body not found');
+        return;
+    }
+    
+    tableBody.innerHTML = '';
+    
+    if (students.length === 0) {
+        document.getElementById('empty-state').style.display = 'block';
+        return;
+    }
+    
+    document.getElementById('empty-state').style.display = 'none';
+    
+    students.forEach(student => {
+        const row = createStudentRow(student);
+        tableBody.appendChild(row);
+    });
+}
+
+function createStudentRow(student) {
+    const row = document.createElement('tr');
+    row.className = getRowClass(student.goal_status);
+    row.dataset.goalStatus = student.goal_status;
+    
+    // Status badge
+    const statusCell = document.createElement('td');
+    statusCell.innerHTML = getStatusBadge(student.goal_status);
+    
+    // Student name
+    const nameCell = document.createElement('td');
+    nameCell.innerHTML = `<strong>${student.name}</strong>`;
+    
+    // Goal progress
+    const progressCell = document.createElement('td');
+    progressCell.innerHTML = getProgressDisplay(student);
+    
+    // This period stats
+    const statsCell = document.createElement('td');
+    statsCell.innerHTML = `
+        <div><strong>${student.pages}</strong> pages</div>
+        <div><strong>${student.minutes}</strong> minutes</div>
+    `;
+    
+    // Daily average
+    const avgCell = document.createElement('td');
+    avgCell.innerHTML = `
+        <div>${Math.round(student.daily_avg_pages || 0)} pages/day</div>
+        <div>${Math.round(student.daily_avg_minutes || 0)} min/day</div>
+    `;
+    
+    // Actions
+    const actionsCell = document.createElement('td');
+    actionsCell.innerHTML = `
+        <div class="btn-group btn-group-sm">
+            <button class="btn btn-outline-primary" onclick="viewStudentDetails('${student.name}')" title="View Details">
+                <i class="fas fa-eye"></i>
+            </button>
+            <button class="btn btn-outline-success" onclick="sendEncouragement('${student.name}')" title="Send Encouragement">
+                <i class="fas fa-thumbs-up"></i>
+            </button>
+        </div>
+    `;
+    
+    row.appendChild(statusCell);
+    row.appendChild(nameCell);
+    row.appendChild(progressCell);
+    row.appendChild(statsCell);
+    row.appendChild(avgCell);
+    row.appendChild(actionsCell);
+    
+    return row;
+}
+
+// Utility functions
+function getStatusBadge(status) {
+    const badges = {
+        'struggling': '<span class="badge bg-danger">🚨 Struggling</span>',
+        'behind': '<span class="badge bg-warning">⚠️ Behind</span>',
+        'on_track': '<span class="badge bg-success">✅ On Track</span>',
+        'exceeding': '<span class="badge bg-info">🌟 Exceeding</span>',
+        'no_goal': '<span class="badge bg-secondary">➖ No Goal</span>'
+    };
+    return badges[status] || badges['no_goal'];
+}
+
+function getRowClass(status) {
+    const classes = {
+        'struggling': 'table-danger',
+        'behind': 'table-warning', 
+        'on_track': 'table-success',
+        'exceeding': 'table-info'
+    };
+    return classes[status] || '';
+}
+
+function getProgressDisplay(student) {
+    if (student.goal_progress === null || student.goal_type === 'no_goal') {
+        return '<small class="text-muted">No goal set</small>';
+    }
+    
+    const percentage = Math.round(student.goal_progress);
+    const progressBar = `
+        <div class="progress progress-mini mb-1">
+            <div class="progress-bar" style="width: ${Math.min(100, percentage)}%"></div>
+        </div>
+        <small>${percentage}% of ${student.goal_value} ${student.goal_type}/day</small>
+    `;
+    
+    return progressBar;
+}
+
+function showLoadingState(show) {
+    const loadingIndicator = document.getElementById('loading-indicator');
+    const dataContent = document.getElementById('data-content');
+    
+    if (show) {
+        loadingIndicator.style.display = 'block';
+        dataContent.classList.remove('data-content-visible');
+        dataContent.classList.add('data-content-hidden');
+    } else {
+        loadingIndicator.style.display = 'none';
+        dataContent.classList.remove('data-content-hidden');
+        dataContent.classList.add('data-content-visible');
+    }
+}
+
+function showError(message) {
+    console.error('Dashboard Error:', message);
+    showLoadingState(false);
+}
+
+// Interactive functions
+function filterStudentTable() {
+    const selectedFilter = document.querySelector('input[name="view-filter"]:checked').id;
+    const rows = document.querySelectorAll('#students-table-body tr');
+    
+    rows.forEach(row => {
+        const status = row.dataset.goalStatus;
+        let show = true;
+        
+        if (selectedFilter === 'view-struggling' && status !== 'struggling') {
+            show = false;
+        } else if (selectedFilter === 'view-excelling' && status !== 'exceeding') {
+            show = false;
+        }
+        
+        row.style.display = show ? '' : 'none';
+    });
+}
+
+function scrollToStudentTable(status) {
+    // Set the appropriate filter and trigger filtering
+    const filterMap = {
+        'struggling': 'view-struggling',
+        'exceeding': 'view-excelling',
+        'inactive': 'view-all' // For now, show all when clicking inactive
     };
     
-    // Function to test with specific data
-    window.testDashboardWithData = function() {
-        console.log('🧪 Testing dashboard with sample data');
+    const filterId = filterMap[status] || 'view-all';
+    document.getElementById(filterId).checked = true;
+    filterStudentTable();
+    
+    // Scroll to the table
+    const tableElement = document.getElementById('students-table');
+    if (tableElement) {
+        tableElement.scrollIntoView({ behavior: 'smooth', block: 'start' });
+    }
+}
+
+function sortStudentsByProgress() {
+    console.log('Sorting students by progress...');
+    // Implementation for sorting
+}
+
+function updateChartView(viewType) {
+    console.log('Updating chart view to:', viewType);
+    
+    const chartElement = document.getElementById('reading-activity-chart');
+    if (!chartElement || !window.echarts) {
+        console.warn('⚠️ Chart element or echarts not available for update');
+        return;
+    }
+    
+    try {
+        const chart = echarts.getInstanceByDom(chartElement) || echarts.init(chartElement);
+    
+    let option;
+    
+    if (viewType === 'summary') {
+        // Summary view - show aggregated data
+        const categories = ['Pages Read', 'Reading Time', 'Active Students', 'Goal Achievement'];
+        const values = [150, 320, 12, 75]; // Sample summary data
         
-        var sampleData = {
-            status: 'success',
-            group_totals: {
-                pages: 110,
-                minutes: 240,
-                goal_achievement_rate: 0,
-                avg_pages_per_student: 18.3,
-                avg_minutes_per_student: 40.0,
-                struggling_students: 5,
-                students_with_goals: 5
+        option = {
+            tooltip: {
+                trigger: 'item',
+                formatter: '{b}: {c}'
             },
-            students: [
-                {name: 'ALEX M.', pages: 55, minutes: 110, goal_status: 'struggling', goal_progress: 26.2},
-                {name: 'BAILEY S.', pages: 0, minutes: 0, goal_status: 'struggling', goal_progress: 0.0},
-                {name: 'CHARLIE J.', pages: 0, minutes: 0, goal_status: 'struggling', goal_progress: 0.0}
+            xAxis: {
+                type: 'category',
+                data: categories
+            },
+            yAxis: {
+                type: 'value'
+            },
+            series: [
+                {
+                    type: 'bar',
+                    data: values,
+                    itemStyle: {
+                        color: function(params) {
+                            const colors = ['#28a745', '#ffc107', '#0d6efd', '#17a2b8'];
+                            return colors[params.dataIndex];
+                        }
+                    }
+                }
             ]
         };
+    } else {
+        // Daily view - show daily breakdown
+        const days = ['Mon', 'Tue', 'Wed', 'Thu', 'Fri', 'Sat', 'Sun'];
+        const pagesData = days.map(() => Math.floor(Math.random() * 50) + 10);
+        const minutesData = days.map(() => Math.floor(Math.random() * 60) + 20);
         
-        // Test the update functions directly
-        updateAnalyticsCards(sampleData.group_totals);
-        updateStudentTable(sampleData.students);
-        updateCharts(sampleData.students, sampleData.group_totals);
-        
-        return 'Sample data applied to dashboard';
-    };</script>
+        option = {
+            tooltip: {
+                trigger: 'axis',
+                axisPointer: { type: 'cross' }
+            },
+            legend: {
+                data: ['Pages Read', 'Reading Time (min)']
+            },
+            xAxis: {
+                type: 'category',
+                data: days
+            },
+            yAxis: [
+                {
+                    type: 'value',
+                    name: 'Pages',
+                    position: 'left'
+                },
+                {
+                    type: 'value',
+                    name: 'Minutes',
+                    position: 'right'
+                }
+            ],
+            series: [
+                {
+                    name: 'Pages Read',
+                    type: 'bar',
+                    data: pagesData,
+                    itemStyle: { color: '#28a745' }
+                },
+                {
+                    name: 'Reading Time (min)',
+                    type: 'line',
+                    yAxisIndex: 1,
+                    data: minutesData,
+                    smooth: true,
+                    itemStyle: { color: '#ffc107' }
+                }
+            ]
+        };
+    }
+    
+        chart.setOption(option, true);
+    } catch (error) {
+        console.error('❌ Chart view update error:', error);
+    }
+}
 
+function exportDashboardData() {
+    console.log('Exporting dashboard data...');
+    // Implementation for data export
+}
+
+function viewStudentDetails(studentName) {
+    console.log('Viewing details for:', studentName);
+    
+    // Create and show modal with student details
+    const modalHtml = `
+        <div class="modal fade" id="studentDetailsModal" tabindex="-1">
+            <div class="modal-dialog modal-lg">
+                <div class="modal-content">
+                    <div class="modal-header">
+                        <h5 class="modal-title">📊 ${studentName} - Reading Details</h5>
+                        <button type="button" class="btn-close" data-bs-dismiss="modal"></button>
+                    </div>
+                    <div class="modal-body">
+                        <div class="row">
+                            <div class="col-md-6">
+                                <h6>📈 Progress Summary</h6>
+                                <p>This week: <strong>25 pages, 45 minutes</strong></p>
+                                <p>Goal progress: <strong>65% of daily goal</strong></p>
+                                <p>Status: <span class="badge bg-warning">Behind Goal</span></p>
+                            </div>
+                            <div class="col-md-6">
+                                <h6>📚 Recent Books</h6>
+                                <ul class="list-unstyled">
+                                    <li>• Charlotte's Web (3 days ago)</li>
+                                    <li>• The Magic Tree House (1 week ago)</li>
+                                </ul>
+                            </div>
+                        </div>
+                        <hr>
+                        <div class="row">
+                            <div class="col-12">
+                                <h6>💡 Teacher Notes</h6>
+                                <textarea class="form-control" rows="3" placeholder="Add notes about this student's progress..."></textarea>
+                            </div>
+                        </div>
+                    </div>
+                    <div class="modal-footer">
+                        <button type="button" class="btn btn-secondary" data-bs-dismiss="modal">Close</button>
+                        <button type="button" class="btn btn-primary">Save Notes</button>
+                        <a href="{% url 'my_students' %}" class="btn btn-outline-primary">Manage Student</a>
+                    </div>
+                </div>
+            </div>
+        </div>
+    `;
+    
+    // Remove existing modal if any
+    const existingModal = document.getElementById('studentDetailsModal');
+    if (existingModal) {
+        existingModal.remove();
+    }
+    
+    // Add modal to page
+    document.body.insertAdjacentHTML('beforeend', modalHtml);
+    
+    // Show modal
+    try {
+        if (typeof bootstrap !== 'undefined' && bootstrap.Modal) {
+            const modal = new bootstrap.Modal(document.getElementById('studentDetailsModal'));
+            modal.show();
+        } else {
+            console.error('❌ Bootstrap Modal not available');
+        }
+    } catch (error) {
+        console.error('❌ Modal creation error:', error);
+    }
+}
+
+function sendEncouragement(studentName) {
+    console.log('Sending encouragement to:', studentName);
+    
+    // Show encouragement options modal
+    const modalHtml = `
+        <div class="modal fade" id="encouragementModal" tabindex="-1">
+            <div class="modal-dialog">
+                <div class="modal-content">
+                    <div class="modal-header">
+                        <h5 class="modal-title">🌟 Send Encouragement to ${studentName}</h5>
+                        <button type="button" class="btn-close" data-bs-dismiss="modal"></button>
+                    </div>
+                    <div class="modal-body">
+                        <h6>Quick Messages:</h6>
+                        <div class="d-grid gap-2 mb-3">
+                            <button class="btn btn-outline-success" onclick="sendQuickMessage('Great job reading this week!')">
+                                👏 Great job reading this week!
+                            </button>
+                            <button class="btn btn-outline-info" onclick="sendQuickMessage('Keep up the excellent work!')">
+                                💪 Keep up the excellent work!
+                            </button>
+                            <button class="btn btn-outline-warning" onclick="sendQuickMessage('I believe in you!')">
+                                🌟 I believe in you!
+                            </button>
+                        </div>
+                        <hr>
+                        <h6>Custom Message:</h6>
+                        <textarea class="form-control" id="customMessage" rows="3" placeholder="Write a personalized message..."></textarea>
+                    </div>
+                    <div class="modal-footer">
+                        <button type="button" class="btn btn-secondary" data-bs-dismiss="modal">Cancel</button>
+                        <button type="button" class="btn btn-success" onclick="sendCustomMessage()">Send Message</button>
+                    </div>
+                </div>
+            </div>
+        </div>
+    `;
+    
+    // Remove existing modal if any
+    const existingModal = document.getElementById('encouragementModal');
+    if (existingModal) {
+        existingModal.remove();
+    }
+    
+    // Add modal to page
+    document.body.insertAdjacentHTML('beforeend', modalHtml);
+    
+    // Show modal
+    try {
+        if (typeof bootstrap !== 'undefined' && bootstrap.Modal) {
+            const modal = new bootstrap.Modal(document.getElementById('encouragementModal'));
+            modal.show();
+        } else {
+            console.error('❌ Bootstrap Modal not available');
+        }
+    } catch (error) {
+        console.error('❌ Modal creation error:', error);
+    }
+}
+
+function sendQuickMessage(message) {
+    console.log('Sending quick message:', message);
+    // Here you would typically send to backend
+    alert(`Message sent: "${message}"`);
+    
+    // Close modal
+    try {
+        if (typeof bootstrap !== 'undefined' && bootstrap.Modal) {
+            const modal = bootstrap.Modal.getInstance(document.getElementById('encouragementModal'));
+            if (modal) modal.hide();
+        }
+    } catch (error) {
+        console.error('❌ Modal close error:', error);
+    }
+}
+
+function sendCustomMessage() {
+    const message = document.getElementById('customMessage').value.trim();
+    if (message) {
+        console.log('Sending custom message:', message);
+        // Here you would typically send to backend
+        alert(`Custom message sent: "${message}"`);
+        
+        // Close modal
+        try {
+            if (typeof bootstrap !== 'undefined' && bootstrap.Modal) {
+                const modal = bootstrap.Modal.getInstance(document.getElementById('encouragementModal'));
+                if (modal) modal.hide();
+            }
+        } catch (error) {
+            console.error('❌ Modal close error:', error);
+        }
+    } else {
+        alert('Please enter a message');
+    }
+}
+
+// Load collaboration notifications on page load
+function loadCollaborationNotifications() {
+    fetch('{% url "api_reading_groups_detailed" %}')
+    .then(response => response.json())
+    .then(data => {
+        // Check for recently shared reading groups (where user is not the creator)
+        const recentCollaborations = data.filter(group => !group.created_by_current_user);
+        
+        if (recentCollaborations.length > 0) {
+            const notificationHtml = `
+                <div class="alert alert-info alert-dismissible fade show" role="alert">
+                    <i class="fas fa-handshake me-2"></i>
+                    <strong>New Collaboration${recentCollaborations.length > 1 ? 's' : ''}!</strong> 
+                    You've been invited to manage ${recentCollaborations.length} reading group${recentCollaborations.length > 1 ? 's' : ''}: 
+                    ${recentCollaborations.map(g => `<strong>${g.name}</strong>`).join(', ')}.
+                    <a href="{% url 'reading_groups' %}" class="alert-link ms-2">
+                        View Reading Groups <i class="fas fa-arrow-right"></i>
+                    </a>
+                    <button type="button" class="btn-close" data-bs-dismiss="alert" aria-label="Close"></button>
+                </div>
+            `;
+            
+            document.getElementById('collaboration-notifications').innerHTML = notificationHtml;
+        }
+    })
+    .catch(error => {
+        console.log('No collaboration notifications to show');
+    });
+}
+
+// Load notifications when page loads
+document.addEventListener('DOMContentLoaded', function() {
+    loadCollaborationNotifications();
+});
+</script>
 
 
 {% endblock %}

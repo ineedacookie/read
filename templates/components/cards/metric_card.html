@@ -1,0 +1,68 @@
+{% comment %}
+Metric Card Component
+
+Usage:
+{% include "components/cards/metric_card.html" with 
+    icon="fas fa-users" 
+    icon_color="text-primary" 
+    title="Active Readers" 
+    value="25" 
+    subtitle="This week" 
+    change="+12%" 
+    change_type="positive"
+    container_class="col-lg-3 col-md-6 mb-3"
+%}
+
+Parameters:
+- icon: FontAwesome icon class (required)
+- icon_color: CSS class for icon color (default: "text-primary")
+- title: Card title/label (required)
+- value: Main metric value to display (required)
+- subtitle: Subtitle or description (default: None)
+- change: Change indicator text like "+12%" (default: None)
+- change_type: "positive", "negative", or "neutral" (default: "neutral")
+- container_class: CSS class for container div (default: "col-lg-3 col-md-6 mb-3")
+- card_class: Additional CSS classes for the card (default: "h-100")
+- loading: Whether to show loading state (default: False)
+{% endcomment %}
+
+<div class="{{ container_class|default:'col-lg-3 col-md-6 mb-3' }}">
+    <div class="card {{ card_class|default:'h-100' }}">
+        <div class="card-body">
+            {% if loading %}
+                <div class="d-flex justify-content-center align-items-center" style="min-height: 80px;">
+                    <div class="spinner-border text-primary" role="status">
+                        <span class="visually-hidden">Loading...</span>
+                    </div>
+                </div>
+            {% else %}
+                <div class="d-flex justify-content-between">
+                    <div>
+                        <div class="d-flex align-items-center mb-2">
+                            <i class="{{ icon }} {{ icon_color|default:'text-primary' }} me-2"></i>
+                            <h6 class="mb-0 text-muted">{{ title }}</h6>
+                        </div>
+                        <div class="metric-value mb-1">
+                            <h3 class="mb-0 fw-bold">{{ value }}</h3>
+                        </div>
+                        {% if subtitle %}
+                            <small class="text-muted">{{ subtitle }}</small>
+                        {% endif %}
+                    </div>
+                    {% if change %}
+                        <div class="text-end">
+                            <span class="badge 
+                                {% if change_type == 'positive' %}bg-success
+                                {% elif change_type == 'negative' %}bg-danger
+                                {% else %}bg-secondary
+                                {% endif %}">
+                                {{ change }}
+                            </span>
+                        </div>
+                    {% endif %}
+                </div>
+            {% endif %}
+        </div>
+    </div>
+</div>
+

@@ -1,8 +1,18 @@
 from django.contrib.auth.forms import UserCreationForm, UserChangeForm, AdminPasswordChangeForm, PasswordChangeForm
-from django.forms import SelectMultiple, EmailField, ModelForm, BooleanField, CharField, PasswordInput, CheckboxSelectMultiple, ModelMultipleChoiceField
+from django.forms import SelectMultiple, EmailField, ModelForm, BooleanField, CharField, PasswordInput, CheckboxSelectMultiple, ModelMultipleChoiceField, ValidationError
 
 from .models import CustomUser, School, Classroom, StudentParentRelation, ReadingGroup
 from .utils import send_email_with_link
+from read.utils.form_helpers import (
+    apply_form_control_styling,
+    setup_school_filtered_querysets,
+    setup_initial_values_for_instance,
+    handle_user_type_clean,
+    handle_password_validation_for_new_user,
+    save_user_with_password,
+    update_many_to_many_relationships,
+    FormMixin
+)
 
 
 class SchoolForm(ModelForm):
@@ -21,9 +31,7 @@ class CustomUserCreationForm(UserCreationForm):
 
     def __init__(self, *args, **kwargs):
         super().__init__(*args, **kwargs)
-
-        for name in self.fields:
-            self.fields[name].widget.attrs["class"] = "form-control"
+        apply_form_control_styling(self)
 
 
 class CustomUserChangeForm(UserChangeForm):
@@ -36,9 +44,7 @@ class CustomUserChangeForm(UserChangeForm):
 
     def __init__(self, *args, **kwargs):
         super().__init__(*args, **kwargs)
-
-        for name in self.fields:
-            self.fields[name].widget.attrs["class"] = "form-control"
+        apply_form_control_styling(self)
 
 
 class OverriddenAdminPasswordChangeForm(AdminPasswordChangeForm):
@@ -46,8 +52,7 @@ class OverriddenAdminPasswordChangeForm(AdminPasswordChangeForm):
         super(OverriddenAdminPasswordChangeForm, self).__init__(*args, **kwargs)
         if 'usable_password' in self.fields:
             self.fields.pop('usable_password')
-        for name in self.fields:
-            self.fields[name].widget.attrs["class"] = "form-control"
+        apply_form_control_styling(self)
 
     def clean(self):
         cleaned_data = super().clean()
@@ -58,9 +63,7 @@ class OverriddenAdminPasswordChangeForm(AdminPasswordChangeForm):
 class OverriddenPasswordChangeForm(PasswordChangeForm):
     def __init__(self, *args, **kwargs):
         super(OverriddenPasswordChangeForm, self).__init__(*args, **kwargs)
-
-        for name in self.fields:
-            self.fields[name].widget.attrs["class"] = "form-control"
+        apply_form_control_styling(self)
 
 
 class UserForm(ModelForm):
@@ -75,9 +78,7 @@ class UserForm(ModelForm):
 
     def __init__(self, *args, **kwargs):
         super().__init__(*args, **kwargs)
-
-        for name in self.fields:
-            self.fields[name].widget.attrs["class"] = "form-control"
+        apply_form_control_styling(self)
 
 
 class RegisterUserForm(ModelForm):
@@ -93,9 +94,7 @@ class RegisterUserForm(ModelForm):
 
     def __init__(self, *args, **kwargs):
         super().__init__(*args, **kwargs)
-
-        for name in self.fields:
-            self.fields[name].widget.attrs["class"] = "form-control"
+        apply_form_control_styling(self)
 
 
 class InviteUsersForm(ModelForm):
@@ -112,14 +111,17 @@ class InviteUsersForm(ModelForm):
 
     def __init__(self, *args, **kwargs):
         super().__init__(*args, **kwargs)
+        apply_form_control_styling(self)
 
-        for name in self.fields:
-            self.fields[name].widget.attrs["class"] = "form-control"
-
-    def save(self, commit=False):
-        instance = super().save(commit=True)
-
-        if not commit:
+    def save(self, commit=True):
+        # Create user without password - they'll set it during activation
+        instance = super().save(commit=False)
+        
+        # Accounts start as inactive until they complete invitation process
+        instance.is_active = False
+        
+        if commit:
+            instance.save()
             # Send invitation email after saving the user
             send_email_with_link(instance, type='invitation')
 
@@ -144,19 +146,21 @@ class InviteParentForm(ModelForm):
     def __init__(self, *args, **kwargs):
         logged_in_user = kwargs.pop('logged_in_user', None)
         super().__init__(*args, **kwargs)
-
-        for name in self.fields:
-            self.fields[name].widget.attrs["class"] = "form-control"
+        apply_form_control_styling(self)
 
     def clean(self):
         cleaned_data = super().clean()
-        cleaned_data['user_type'] = 'parent'
-        return cleaned_data
+        return handle_user_type_clean(cleaned_data, 'parent')
 
-    def save(self, commit=False):
-        instance = super().save(commit=True)
-
-        if not commit:
+    def save(self, commit=True):
+        # Create parent user without password - they'll set it during activation
+        instance = super().save(commit=False)
+        
+        # Parent accounts start as inactive until they complete invitation process
+        instance.is_active = False
+        
+        if commit:
+            instance.save()
             # Send invitation email after saving the user
             send_email_with_link(instance, type='invitation')
 
@@ -179,13 +183,11 @@ class InviteStudentsForm(ModelForm):
 
     def __init__(self, *args, **kwargs):
         super().__init__(*args, **kwargs)
-
-        for name in self.fields:
-            self.fields[name].widget.attrs["class"] = "form-control"
+        apply_form_control_styling(self)
 
     def clean(self):
         cleaned_data = super().clean()
-        cleaned_data['user_type'] = 'student'
+        cleaned_data = handle_user_type_clean(cleaned_data, 'student')
         cleaned_data['verified'] = True
         return cleaned_data
 
@@ -212,6 +214,7 @@ class InviteCombinedForm(ModelForm, AdminPasswordChangeForm):
         self.fields.update(AdminPasswordChangeForm.base_fields)
         self.initial.update(AdminPasswordChangeForm(user).initial)
 
+        # Apply styling to password fields
         for name in ["password1", "password2"]:
             self.fields[name].widget.attrs["class"] = "form-control"
 
@@ -253,6 +256,8 @@ class StudentParentRelationForm(ModelForm):
 
 
 class CustomStudentForm(ModelForm):
+    password = CharField(widget=PasswordInput, required=False, help_text='Set password for new students. Leave blank when editing existing students.')
+    
     class Meta:
         model = CustomUser
         fields = ['username', 'first_name', 'last_initial', 'email']
@@ -279,86 +284,36 @@ class CustomStudentForm(ModelForm):
         logged_in_user = kwargs.pop('logged_in_user', None)
         super().__init__(*args, **kwargs)
 
+        # Apply common form styling
+        apply_form_control_styling(self)
+
+        # Set up querysets and initial values if instance has school
         if self.instance and self.instance.school:
-            school = self.instance.school
-
-            self.fields['classrooms'].queryset = Classroom.objects.filter(school=school)
-            self.fields['reading_groups'].queryset = ReadingGroup.objects.filter(school=school)
-            self.fields['parents'].queryset = CustomUser.objects.filter(school=school, user_type='parent')
-
-            if self.instance and self.instance.pk:
-                self.fields['classrooms'].initial = Classroom.objects.filter(school=school, students=self.instance)
-                self.fields['reading_groups'].initial = ReadingGroup.objects.filter(school=school, students=self.instance)
-                self.fields['parents'].initial = CustomUser.objects.filter(
-                    school=school, 
-                    user_type='parent',
-                    children_relations__student=self.instance
-                )
-
-            if logged_in_user and logged_in_user.user_type == 'teacher':
-                self.fields['classrooms'].queryset = self.fields['classrooms'].queryset.filter(teachers=logged_in_user)
-                self.fields['reading_groups'].queryset = self.fields['reading_groups'].queryset.filter(
-                    managers=logged_in_user)
-
-        for name in self.fields:
-            self.fields[name].widget.attrs["class"] = "form-control"
+            setup_school_filtered_querysets(self, self.instance.school, logged_in_user)
+            setup_initial_values_for_instance(self, self.instance, self.instance.school)
 
     def clean(self):
         cleaned_data = super().clean()
-        cleaned_data['user_type'] = 'student'
+        cleaned_data = handle_user_type_clean(cleaned_data, 'student')
+        cleaned_data = handle_password_validation_for_new_user(self, cleaned_data)
         return cleaned_data
 
     def save(self, commit=True):
         instance = super().save(commit=False)
+        
+        # Handle password using helper
+        instance = save_user_with_password(self, instance, commit=False)
 
         if commit:
-
             instance.save()
             self.save_m2m()
 
             school = instance.school
 
-            # Update Classroom's students field
-            current_classrooms = set(self.cleaned_data['classrooms'])
-            original_classrooms = set(Classroom.objects.filter(school=school, students=self.instance))
-            for classroom in current_classrooms - original_classrooms:
-                classroom.students.add(instance)
-            for classroom in original_classrooms - current_classrooms:
-                classroom.students.remove(instance)
-
-            # Update ReadingGroup's students field
-            current_reading_groups = set(self.cleaned_data['reading_groups'])
-            original_reading_groups = set(ReadingGroup.objects.filter(school=school, students=self.instance))
-            for reading_group in current_reading_groups - original_reading_groups:
-                reading_group.students.add(instance)
-            for reading_group in original_reading_groups - current_reading_groups:
-                reading_group.students.remove(instance)
-
-            # Update Parent-Student relationships
-            current_parents = set(self.cleaned_data['parents'])
-            original_parents = set(CustomUser.objects.filter(
-                school=school, 
-                user_type='parent',
-                children_relations__student=self.instance
-            ))
-            
-            # Add new parent-student relationships
-            for parent in current_parents - original_parents:
-                from .models import StudentParentRelation
-                StudentParentRelation.objects.get_or_create(
-                    school=school,
-                    student=instance,
-                    parent=parent
-                )
-            
-            # Remove old parent-student relationships
-            for parent in original_parents - current_parents:
-                from .models import StudentParentRelation
-                StudentParentRelation.objects.filter(
-                    school=school,
-                    student=instance,
-                    parent=parent
-                ).delete()
+            # Update many-to-many relationships using helpers
+            update_many_to_many_relationships(instance, 'classrooms', self.cleaned_data['classrooms'], school)
+            update_many_to_many_relationships(instance, 'reading_groups', self.cleaned_data['reading_groups'], school)
+            update_many_to_many_relationships(instance, 'parents', self.cleaned_data['parents'], school)
 
         return instance
 
@@ -384,29 +339,17 @@ class CustomTeacherForm(ModelForm):
         logged_in_user = kwargs.pop('logged_in_user', None)
         super().__init__(*args, **kwargs)
 
+        # Apply common form styling
+        apply_form_control_styling(self)
+
+        # Set up querysets and initial values if instance has school
         if self.instance and self.instance.school:
-            school = self.instance.school
-
-            self.fields['classrooms'].queryset = Classroom.objects.filter(school=school)
-            self.fields['reading_groups'].queryset = ReadingGroup.objects.filter(school=school)
-
-            if self.instance and self.instance.pk:
-                self.fields['classrooms'].initial = Classroom.objects.filter(school=school, teachers=self.instance)
-                self.fields['reading_groups'].initial = ReadingGroup.objects.filter(school=school,
-                                                                                    managers=self.instance)
-
-            if logged_in_user and logged_in_user.user_type == 'teacher':
-                self.fields['classrooms'].queryset = self.fields['classrooms'].queryset.filter(teachers=logged_in_user)
-                self.fields['reading_groups'].queryset = self.fields['reading_groups'].queryset.filter(
-                    managers=logged_in_user)
-
-        for name in self.fields:
-            self.fields[name].widget.attrs["class"] = "form-control"
+            setup_school_filtered_querysets(self, self.instance.school, logged_in_user)
+            setup_initial_values_for_instance(self, self.instance, self.instance.school)
 
     def clean(self):
         cleaned_data = super().clean()
-        cleaned_data['user_type'] = 'teacher'
-        return cleaned_data
+        return handle_user_type_clean(cleaned_data, 'teacher')
 
     def save(self, commit=True):
         instance = super().save(commit=False)
@@ -417,21 +360,9 @@ class CustomTeacherForm(ModelForm):
 
             school = instance.school
 
-            # Update Classroom's teachers field
-            current_classrooms = set(self.cleaned_data['classrooms'])
-            original_classrooms = set(Classroom.objects.filter(school=school, teachers=self.instance))
-            for classroom in current_classrooms - original_classrooms:
-                classroom.teachers.add(instance)
-            for classroom in original_classrooms - current_classrooms:
-                classroom.teachers.remove(instance)
-
-            # Update ReadingGroup's managers field
-            current_reading_groups = set(self.cleaned_data['reading_groups'])
-            original_reading_groups = set(ReadingGroup.objects.filter(school=school, managers=self.instance))
-            for reading_group in current_reading_groups - original_reading_groups:
-                reading_group.managers.add(instance)
-            for reading_group in original_reading_groups - current_reading_groups:
-                reading_group.managers.remove(instance)
+            # Update many-to-many relationships using helpers
+            update_many_to_many_relationships(instance, 'classrooms', self.cleaned_data['classrooms'], school)
+            update_many_to_many_relationships(instance, 'reading_groups', self.cleaned_data['reading_groups'], school)
 
         return instance
 
@@ -451,22 +382,17 @@ class CustomAdministratorForm(ModelForm):
         logged_in_user = kwargs.pop('logged_in_user', None)
         super().__init__(*args, **kwargs)
 
+        # Apply common form styling
+        apply_form_control_styling(self)
+
+        # Set up querysets and initial values if instance has school
         if self.instance and self.instance.school:
-            school = self.instance.school
-
-            self.fields['reading_groups'].queryset = ReadingGroup.objects.filter(school=school)
-
-            if self.instance and self.instance.pk:
-                self.fields['reading_groups'].initial = ReadingGroup.objects.filter(school=school,
-                                                                                    managers=self.instance)
-
-        for name in self.fields:
-            self.fields[name].widget.attrs["class"] = "form-control"
+            setup_school_filtered_querysets(self, self.instance.school, logged_in_user)
+            setup_initial_values_for_instance(self, self.instance, self.instance.school)
 
     def clean(self):
         cleaned_data = super().clean()
-        cleaned_data['user_type'] = 'administrator'
-        return cleaned_data
+        return handle_user_type_clean(cleaned_data, 'administrator')
 
     def save(self, commit=True):
         instance = super().save(commit=False)
@@ -477,13 +403,8 @@ class CustomAdministratorForm(ModelForm):
 
             school = instance.school
 
-            # Update ReadingGroup's managers field
-            current_reading_groups = set(self.cleaned_data['reading_groups'])
-            original_reading_groups = set(ReadingGroup.objects.filter(school=school, managers=self.instance))
-            for reading_group in current_reading_groups - original_reading_groups:
-                reading_group.managers.add(instance)
-            for reading_group in original_reading_groups - current_reading_groups:
-                reading_group.managers.remove(instance)
+            # Update many-to-many relationships using helpers
+            update_many_to_many_relationships(instance, 'reading_groups', self.cleaned_data['reading_groups'], school)
 
         return instance
 
@@ -499,14 +420,11 @@ class CustomParentForm(ModelForm):
     def __init__(self, *args, **kwargs):
         logged_in_user = kwargs.pop('logged_in_user', None)
         super().__init__(*args, **kwargs)
-
-        for name in self.fields:
-            self.fields[name].widget.attrs["class"] = "form-control"
+        apply_form_control_styling(self)
 
     def clean(self):
         cleaned_data = super().clean()
-        cleaned_data['user_type'] = 'parent'
-        return cleaned_data
+        return handle_user_type_clean(cleaned_data, 'parent')
 
     def save(self, commit=True):
         instance = super().save(commit=False)
@@ -538,18 +456,13 @@ class CustomClassroomForm(ModelForm):
         logged_in_user = kwargs.pop('logged_in_user', None)
         super().__init__(*args, **kwargs)
 
+        # Apply common form styling
+        apply_form_control_styling(self)
+
+        # Set up querysets and initial values if instance has school
         if self.instance and self.instance.school:
-            school = self.instance.school
-
-            self.fields['students'].queryset = CustomUser.objects.filter(school=school, user_type='student')
-            self.fields['teachers'].queryset = CustomUser.objects.filter(school=school, user_type='teacher')
-
-            if self.instance and self.instance.pk:
-                self.fields['students'].initial = self.instance.students.all()
-                self.fields['teachers'].initial = self.instance.teachers.all()
-
-        for name in self.fields:
-            self.fields[name].widget.attrs["class"] = "form-control"
+            setup_school_filtered_querysets(self, self.instance.school, logged_in_user)
+            setup_initial_values_for_instance(self, self.instance, self.instance.school)
 
     def save(self, commit=True):
         instance = super().save(commit=False)
@@ -582,18 +495,13 @@ class CustomReadingGroupForm(ModelForm):
         logged_in_user = kwargs.pop('logged_in_user', None)
         super().__init__(*args, **kwargs)
 
+        # Apply common form styling
+        apply_form_control_styling(self)
+
+        # Set up querysets and initial values if instance has school
         if self.instance and self.instance.school:
-            school = self.instance.school
-
-            self.fields['students'].queryset = CustomUser.objects.filter(school=school, user_type='student')
-            self.fields['managers'].queryset = CustomUser.objects.filter(school=school, user_type='teacher')
-
-            if self.instance and self.instance.pk:
-                self.fields['students'].initial = self.instance.students.all()
-                self.fields['managers'].initial = self.instance.managers.all()
-
-        for name in self.fields:
-            self.fields[name].widget.attrs["class"] = "form-control"
+            setup_school_filtered_querysets(self, self.instance.school, logged_in_user)
+            setup_initial_values_for_instance(self, self.instance, self.instance.school)
 
     def save(self, commit=True):
         instance = super().save(commit=False)

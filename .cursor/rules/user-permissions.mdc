@@ -1,0 +1,96 @@
+---
+alwaysApply: true
+---
+# User Role Permissions and Access Control
+
+## Role Definitions
+
+### Administrator Role
+- **Full system access**: Can view and manage everything
+- Can view all students, teachers, parents, and reading logs
+- Can edit any reading log or user data
+- Access to analytics and reporting for entire system
+- Can manage all user relationships and assignments
+
+### Teacher Role
+- **Class-restricted access**: Only students in their classrooms/reading groups
+- Can view and edit reading logs for their assigned students only
+- Can manage parent-student relationships for their students
+- Can access analytics dashboard filtered to their students
+- **Cannot view**: Other teachers' students or system-wide data
+
+### Student Role
+- **Self-only access**: Can only view their own data
+- Can submit new reading logs for themselves
+- Can view their own reading history and progress
+- **Cannot view**: Other students' data
+- **Cannot edit/delete**: Submitted reading logs
+
+### Parent Role
+- **Child-restricted access**: Only their assigned children
+- Can view their children's reading logs and progress
+- Can submit reading logs on behalf of their children
+- **Cannot view**: Other children's data
+- **Cannot edit**: Existing reading logs (only submit new ones)
+
+## Implementation Guidelines
+
+### Database Queries and Views
+- **Always filter** queries based on user relationships
+- **Implement permission checks** in views before data access
+- **Use Django's** `@login_required` and custom permission decorators
+- **Filter querysets** by user associations (teacher-student, parent-child)
+
+### Reading Log Management Permissions
+```python
+# Students: Create only, view own
+if user.user_type == 'student':
+    logs = ReadingLog.objects.filter(student=user)
+
+# Teachers: CRUD for their students only
+if user.user_type == 'teacher':
+    student_ids = user.teacher_students.values_list('id', flat=True)
+    logs = ReadingLog.objects.filter(student_id__in=student_ids)
+
+# Parents: Create for children, view existing
+if user.user_type == 'parent':
+    child_ids = user.children.values_list('id', flat=True)
+    logs = ReadingLog.objects.filter(student_id__in=child_ids)
+
+# Administrators: Full access
+if user.user_type == 'administrator':
+    logs = ReadingLog.objects.all()
+```
+
+### Navigation and UI Rules
+- **Show only relevant** menu items per user type
+- **Hide admin functions** from non-admin users
+- **Display contextual actions** based on user permissions
+- **Use role-based** template conditionals
+
+### Template Permission Patterns
+```django
+{% if user.user_type == 'teacher' %}
+    <!-- Teacher-only content -->
+{% elif user.user_type == 'administrator' %}
+    <!-- Admin-only content -->
+{% endif %}
+
+{% if user.user_type in 'teacher,administrator' %}
+    <!-- Teacher and admin content -->
+{% endif %}
+```
+
+## Security Requirements
+
+### Data Isolation
+- **Never expose** data from users outside permission scope
+- **Validate relationships** before allowing access
+- **Use Django's** `get_object_or_404` with filtered querysets
+- **Implement** proper error handling for unauthorized access
+
+### Form and API Security
+- **Validate user permissions** before processing forms
+- **Filter dropdown options** based on user relationships
+- **Sanitize input** and validate against user's allowed data
+- **Use CSRF protection** on all forms

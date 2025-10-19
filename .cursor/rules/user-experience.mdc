@@ -1,0 +1,164 @@
+---
+description: User experience principles focused on simplicity and consistency
+globs: ["templates/**/*", "static/**/*"]
+alwaysApply: true
+---
+
+# User Experience Principles
+
+## Simplicity First
+
+### Interface Guidelines
+- **Keep interfaces** clean and intuitive
+- **Minimize clicks** required to complete tasks
+- **Use consistent patterns** across the application
+- **Prioritize** mobile-friendly responsive design
+- **Reduce cognitive load** with clear hierarchies
+
+### Navigation Simplicity
+- **Role-based menus**: Show only relevant options per user type
+- **Clear labeling**: Use descriptive, action-oriented labels
+- **Logical grouping**: Group related functions together
+- **Consistent placement**: Keep navigation elements in expected locations
+
+## Responsive Design Requirements
+
+### Mobile-First Approach
+- **Design for mobile** screens first, then scale up
+- **Touch-friendly** button sizes and spacing
+- **Readable text** at small screen sizes
+- **Simplified navigation** for mobile devices
+
+### Responsive Patterns
+```css
+/* Use existing responsive utilities */
+@media (max-width: 768px) {
+    .btn-group {
+        flex-direction: column;
+        width: 100%;
+    }
+    
+    .card-body {
+        padding: 1rem;
+    }
+}
+```
+
+## Consistent UI Patterns
+
+### Card Layouts
+- **Consistent card structure** across all pages
+- **Predictable content** organization within cards
+- **Standard spacing** and padding
+- **Uniform action** button placement
+
+### Form Patterns
+- **Consistent validation** messages and styling
+- **Standard field** grouping and spacing
+- **Clear error states** and success feedback
+- **Logical tab order** for accessibility
+
+### Loading States
+```django
+<!-- Use consistent loading patterns -->
+<div id="loading-indicator" class="text-center py-5">
+    <div class="spinner-border text-primary" role="status">
+        <span class="visually-hidden">Loading...</span>
+    </div>
+    <p class="mt-3 text-muted">Loading data...</p>
+</div>
+```
+
+## Feedback and Communication
+
+### User Feedback Patterns
+- **Immediate feedback** for user actions
+- **Clear success/error** messages
+- **Progress indicators** for long operations
+- **Contextual help** when needed
+
+### Message Types
+```javascript
+// Use consistent alert patterns
+showAlert('success', 'Reading log saved successfully!');
+showAlert('warning', 'Please check your input.');
+showAlert('error', 'Unable to save reading log.');
+showAlert('info', 'Your data is being processed.');
+```
+
+## Task Flow Optimization
+
+### Reading Log Entry
+- **Quick log** entry on dashboard
+- **Minimal required** fields
+- **Auto-save** drafts when possible
+- **One-click** submission for common books
+
+### Student Management (Teachers)
+- **Bulk operations** for common tasks
+- **Quick filters** to find students
+- **Contextual actions** in student lists
+- **Easy assignment** to groups/classes
+
+### Progress Viewing
+- **Visual progress** indicators
+- **Quick summaries** on dashboards
+- **Drill-down** details when needed
+- **Export options** for data
+
+## Accessibility Guidelines
+
+### Basic Accessibility
+- **Proper heading** hierarchy (h1, h2, h3...)
+- **Alt text** for images and icons
+- **Keyboard navigation** support
+- **Color contrast** compliance
+- **Screen reader** friendly markup
+
+### Form Accessibility
+```html
+<!-- Use proper labeling -->
+<label for="book-title" class="form-label">Book Title</label>
+<input type="text" id="book-title" class="form-control" required>
+
+<!-- Associate errors with fields -->
+<div id="title-error" class="invalid-feedback">
+    Please enter a book title.
+</div>
+```
+
+## Performance and Speed
+
+### Fast Loading
+- **Minimize** page load times
+- **Lazy load** heavy content when appropriate
+- **Cache** frequently accessed data
+- **Optimize** images and assets
+
+### Perceived Performance
+- **Show loading** states immediately
+- **Progressive** content loading
+- **Smooth transitions** between states
+- **Instant feedback** for user interactions
+
+## Data Display Patterns
+
+### Tables and Lists
+- **Consistent column** ordering
+- **Logical sorting** options
+- **Clear row** selection indicators
+- **Pagination** for large datasets
+
+### Charts and Visualizations
+- **Simple, clear** chart types
+- **Consistent color** schemes
+- **Readable labels** and legends
+- **Interactive** tooltips for details
+
+## Error Handling
+
+### User-Friendly Errors
+- **Plain language** error messages
+- **Specific guidance** on how to fix issues
+- **Fallback options** when features fail
+- **Graceful degradation** for older browsers

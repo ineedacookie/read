@@ -1,0 +1,67 @@
+---
+description: Theme and asset management guidelines for CSS and JavaScript
+globs: ["static/**/*", "templates/**/*"]
+alwaysApply: true
+---
+
+# Theme and Asset Management
+
+## CSS Guidelines
+
+### Primary CSS Location
+- **Always use**: `static/assets/css/user.css` for all CSS changes
+- **Never create**: New CSS files - consolidate everything into user.css
+- **Production files**: `user.min.css` and `user-rtl.min.css` are auto-generated
+
+### Dark/Light Mode Compatibility
+- Use CSS custom properties when possible for theme variables
+- Test styles with both `html.dark` and `html:not(.dark)` selectors
+- Prefer relative colors (rgba, hsla) over absolute hex values
+- Example:
+  ```css
+  .card {
+    background-color: rgba(255, 255, 255, 0.9);
+    border-color: rgba(0, 0, 0, 0.1);
+  }
+  html.dark .card {
+    background-color: rgba(255, 255, 255, 0.05);
+    border-color: rgba(255, 255, 255, 0.1);
+  }
+  ```
+
+## JavaScript Guidelines
+
+### Check Existing Files First
+1. **Always examine** `static/assets/js/theme.js` before adding new JavaScript
+2. **Search existing** JS files in `static/assets/js/` for utility functions
+3. **Only create new** JS if absolutely necessary
+
+### Theme Component Priority
+- Use existing theme components over creating new ones
+- Check Bootstrap utilities and theme patterns first
+- Extend existing functionality rather than duplicating
+
+### JavaScript File Hierarchy
+1. Theme core: `static/assets/js/theme.js`
+2. Existing utilities: Other files in `static/assets/js/`
+3. Page-specific: Add to template `{% block afterScripts %}`
+4. New files: Only as last resort
+
+## Asset Organization
+
+### File Structure
+```
+static/assets/
+├── css/
+│   ├── user.css (source - make changes here)
+│   ├── user.min.css (auto-generated)
+│   └── user-rtl.min.css (auto-generated)
+└── js/
+    ├── theme.js (check this first)
+    └── other utility files
+```
+
+### Template Integration
+- CSS automatically loaded via `fluid_template.html`
+- No need to add separate `<link>` tags for user.css
+- JavaScript should integrate with existing theme patterns

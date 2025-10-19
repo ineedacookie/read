@@ -1,0 +1,385 @@
+"""
+Permission and security helper functions to standardize access control.
+Reduces code duplication for user type checks, rate limiting, and security logging.
+"""
+
+from django.core.cache import cache
+from django.core.exceptions import PermissionDenied
+from django.contrib.auth import get_user_model
+from functools import wraps
+import logging
+
+logger = logging.getLogger('reading_logs.security')
+
+
+def check_user_type(user, allowed_types):
+    """
+    Check if user's type is in the list of allowed types.
+    
+    Args:
+        user: Django User object
+        allowed_types: List of allowed user types or single user type string
+    
+    Returns:
+        bool: True if user type is allowed
+    
+    Raises:
+        PermissionDenied: If user type is not allowed
+    """
+    if isinstance(allowed_types, str):
+        allowed_types = [allowed_types]
+    
+    if user.user_type not in allowed_types:
+        logger.warning(f"Access denied: User {user.id} (type: {user.user_type}) attempted to access resource requiring {allowed_types}")
+        raise PermissionDenied(f"Access denied. Required user type: {' or '.join(allowed_types)}")
+    
+    return True
+
+
+def check_rate_limit(user_id, action_type, max_requests=10, window_seconds=60):
+    """
+    Check if user has exceeded rate limit for a specific action.
+    
+    Args:
+        user_id: User ID to check
+        action_type: Type of action being rate limited
+        max_requests: Maximum requests allowed in the window
+        window_seconds: Time window in seconds
+    
+    Returns:
+        bool: True if within rate limit
+    
+    Raises:
+        PermissionDenied: If rate limit exceeded
+    """
+    cache_key = f"{action_type}_rate_limit_{user_id}"
+    current_requests = cache.get(cache_key, 0)
+    
+    if current_requests >= max_requests:
+        logger.warning(f"Rate limit exceeded: User {user_id} for action {action_type}")
+        raise PermissionDenied("Too many requests. Please wait.")
+    
+    # Increment counter
+    cache.set(cache_key, current_requests + 1, window_seconds)
+    return True
+
+
+def verify_school_access(user, resource):
+    """
+    Verify that user and resource belong to the same school.
+    
+    Args:
+        user: Django User object
+        resource: Resource object with school field
+    
+    Returns:
+        bool: True if access is allowed
+    
+    Raises:
+        PermissionDenied: If schools don't match
+    """
+    if hasattr(resource, 'school') and user.school != resource.school:
+        logger.warning(f"Cross-school access attempt: User {user.id} (school {user.school_id}) "
+                      f"tried to access resource from school {resource.school_id}")
+        raise PermissionDenied("Access denied - resource not in your school")
+    
+    return True
+
+
+def verify_parent_child_relationship(parent, child):
+    """
+    Verify that a parent has access to a specific child.
+    
+    Args:
+        parent: Parent user object
+        child: Student user object
+    
+    Returns:
+        bool: True if relationship exists
+    
+    Raises:
+        PermissionDenied: If no relationship exists
+    """
+    if parent.user_type != 'parent':
+        raise PermissionDenied("User is not a parent")
+    
+    if child not in parent.children.all():
+        logger.warning(f"Parent {parent.id} attempted to access non-child user {child.id}")
+        raise PermissionDenied("Access denied - not your child")
+    
+    return True
+
+
+def verify_teacher_student_access(teacher, student):
+    """
+    Verify that a teacher has access to a specific student.
+    
+    Args:
+        teacher: Teacher user object
+        student: Student user object
+    
+    Returns:
+        bool: True if teacher has access
+    
+    Raises:
+        PermissionDenied: If teacher doesn't have access to student
+    """
+    if teacher.user_type != 'teacher':
+        raise PermissionDenied("User is not a teacher")
+    
+    # Check if student is in any of teacher's classrooms or reading groups
+    from users.models import Classroom, ReadingGroup
+    
+    teacher_students = set()
+    
+    # Get students from teacher's classrooms
+    classrooms = Classroom.objects.filter(school=teacher.school, teachers=teacher)
+    for classroom in classrooms:
+        teacher_students.update(classroom.students.values_list('id', flat=True))
+    
+    # Get students from teacher's reading groups
+    reading_groups = ReadingGroup.objects.filter(school=teacher.school, managers=teacher)
+    for group in reading_groups:
+        teacher_students.update(group.students.values_list('id', flat=True))
+    
+    if student.id not in teacher_students:
+        logger.warning(f"Teacher {teacher.id} attempted to access non-assigned student {student.id}")
+        raise PermissionDenied("Access denied - student not in your classes")
+    
+    return True
+
+
+def get_accessible_students(user):
+    """
+    Get all students accessible to a user based on their role.
+    
+    Args:
+        user: Django User object
+    
+    Returns:
+        QuerySet: Students accessible to the user
+    """
+    if user.user_type == 'administrator':
+        return get_user_model().objects.filter(school=user.school, user_type='student')
+    
+    elif user.user_type == 'teacher':
+        from users.models import Classroom, ReadingGroup
+        student_ids = set()
+        
+        # Get students from teacher's classrooms
+        classrooms = Classroom.objects.filter(school=user.school, teachers=user)
+        for classroom in classrooms:
+            student_ids.update(classroom.students.values_list('id', flat=True))
+        
+        # Get students from teacher's reading groups
+        reading_groups = ReadingGroup.objects.filter(school=user.school, managers=user)
+        for group in reading_groups:
+            student_ids.update(group.students.values_list('id', flat=True))
+        
+        return get_user_model().objects.filter(id__in=student_ids, user_type='student')
+    
+    elif user.user_type == 'parent':
+        return user.children.all()
+    
+    elif user.user_type == 'student':
+        return get_user_model().objects.filter(id=user.id)
+    
+    else:
+        return get_user_model().objects.none()
+
+
+def get_accessible_reading_logs(user, student=None):
+    """
+    Get reading logs accessible to a user based on their role.
+    
+    Args:
+        user: Django User object
+        student: Optional specific student to filter logs for
+    
+    Returns:
+        QuerySet: Reading logs accessible to the user
+    """
+    from reading_logs.models import Log
+    
+    if student:
+        # Verify user has access to this specific student
+        if user.user_type == 'administrator':
+            verify_school_access(user, student)
+        elif user.user_type == 'teacher':
+            verify_teacher_student_access(user, student)
+        elif user.user_type == 'parent':
+            verify_parent_child_relationship(user, student)
+        elif user.user_type == 'student':
+            if user != student:
+                raise PermissionDenied("Access denied - can only view your own logs")
+        
+        return Log.objects.filter(student=student, school=user.school)
+    
+    else:
+        # Return all accessible logs
+        accessible_students = get_accessible_students(user)
+        return Log.objects.filter(
+            student__in=accessible_students,
+            school=user.school
+        )
+
+
+# Decorators for common permission checks
+def require_user_types(allowed_types):
+    """
+    Decorator to require specific user types.
+    
+    Args:
+        allowed_types: List of allowed user types or single user type string
+    """
+    def decorator(view_func):
+        @wraps(view_func)
+        def wrapper(request, *args, **kwargs):
+            check_user_type(request.user, allowed_types)
+            return view_func(request, *args, **kwargs)
+        return wrapper
+    return decorator
+
+
+def require_rate_limit(action_type, max_requests=10, window_seconds=60):
+    """
+    Decorator to enforce rate limiting.
+    
+    Args:
+        action_type: Type of action being rate limited
+        max_requests: Maximum requests allowed in the window
+        window_seconds: Time window in seconds
+    """
+    def decorator(view_func):
+        @wraps(view_func)
+        def wrapper(request, *args, **kwargs):
+            check_rate_limit(request.user.id, action_type, max_requests, window_seconds)
+            return view_func(request, *args, **kwargs)
+        return wrapper
+    return decorator
+
+
+def require_same_school(resource_getter):
+    """
+    Decorator to ensure user and resource are in the same school.
+    
+    Args:
+        resource_getter: Function that returns the resource from request/args
+    """
+    def decorator(view_func):
+        @wraps(view_func)
+        def wrapper(request, *args, **kwargs):
+            resource = resource_getter(request, *args, **kwargs)
+            verify_school_access(request.user, resource)
+            return view_func(request, *args, **kwargs)
+        return wrapper
+    return decorator
+
+
+# Security audit logging functions
+def log_successful_action(user_id, action, resource_type=None, resource_id=None):
+    """
+    Log successful user action for audit trail.
+    
+    Args:
+        user_id: User ID performing the action
+        action: Description of the action
+        resource_type: Type of resource affected
+        resource_id: ID of resource affected
+    """
+    log_message = f"User {user_id} {action}"
+    if resource_type and resource_id:
+        log_message += f" {resource_type} {resource_id}"
+    
+    logger.info(log_message)
+
+
+def log_permission_denied(user_id, attempted_action, reason=None):
+    """
+    Log permission denied attempt for security monitoring.
+    
+    Args:
+        user_id: User ID that was denied
+        attempted_action: Description of attempted action
+        reason: Optional reason for denial
+    """
+    log_message = f"Permission denied: User {user_id} attempted {attempted_action}"
+    if reason:
+        log_message += f" - {reason}"
+    
+    logger.warning(log_message)
+
+
+def log_security_event(user_id, event_type, details=None):
+    """
+    Log security-related events.
+    
+    Args:
+        user_id: User ID involved in the event
+        event_type: Type of security event
+        details: Optional additional details
+    """
+    log_message = f"Security event - {event_type}: User {user_id}"
+    if details:
+        log_message += f" - {details}"
+    
+    logger.warning(log_message)
+
+
+# Helper functions for common access patterns
+def can_edit_reading_log(user, log):
+    """
+    Check if user can edit a specific reading log.
+    
+    Args:
+        user: Django User object
+        log: Reading log object
+    
+    Returns:
+        bool: True if user can edit the log
+    """
+    try:
+        if user.user_type == 'administrator':
+            verify_school_access(user, log)
+            return True
+        elif user.user_type == 'teacher':
+            verify_teacher_student_access(user, log.student)
+            return True
+        elif user.user_type == 'parent':
+            verify_parent_child_relationship(user, log.student)
+            return True
+        elif user.user_type == 'student':
+            return user == log.student and verify_school_access(user, log)
+        else:
+            return False
+    except PermissionDenied:
+        return False
+
+
+def can_view_student_data(user, student):
+    """
+    Check if user can view a specific student's data.
+    
+    Args:
+        user: Django User object
+        student: Student user object
+    
+    Returns:
+        bool: True if user can view the student's data
+    """
+    try:
+        if user.user_type == 'administrator':
+            verify_school_access(user, student)
+            return True
+        elif user.user_type == 'teacher':
+            verify_teacher_student_access(user, student)
+            return True
+        elif user.user_type == 'parent':
+            verify_parent_child_relationship(user, student)
+            return True
+        elif user.user_type == 'student':
+            return user == student
+        else:
+            return False
+    except PermissionDenied:
+        return False

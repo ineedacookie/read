@@ -13,6 +13,7 @@ import json
 
 from .models import Log, DailyGoal
 from users.models import School
+from read.utils.analytics_helpers import ReadingStatsCalculator
 
 User = get_user_model()
 
@@ -320,9 +321,10 @@ class GamificationEngine:
                 return True
         
         if 'total_pages' in criteria:
-            total_pages = Log.objects.filter(student=student).aggregate(
-                total=Sum('pages')
-            )['total'] or 0
+            # Using centralized stats calculator
+            total_pages = ReadingStatsCalculator.get_total_pages(
+                Log.objects.filter(student=student)
+            )
             if total_pages >= criteria['total_pages']:
                 return True
         

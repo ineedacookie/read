@@ -12,6 +12,7 @@ import json
 
 from .models import Log, DailyGoal, TotalGoal
 from users.models import CustomUser, School, Classroom, ReadingGroup
+from read.utils.analytics_helpers import ReadingStatsCalculator
 
 
 class ReadingAnalytics:
@@ -39,14 +40,8 @@ class ReadingAnalytics:
             date__range=(start_date, end_date)
         )
         
-        # Basic metrics
-        total_stats = logs.aggregate(
-            total_logs=Count('id'),
-            total_pages=Sum('pages'),
-            total_minutes=Sum('minutes'),
-            avg_rating=Avg('rating'),
-            unique_students=Count('student', distinct=True)
-        )
+        # Basic metrics - using centralized stats calculator
+        total_stats = ReadingStatsCalculator.get_detailed_stats(logs)
         
         # Reading trends by week
         weekly_trends = logs.annotate(
@@ -124,12 +119,8 @@ class ReadingAnalytics:
         student_performance = []
         for student in students:
             student_logs = logs.filter(student=student)
-            stats = student_logs.aggregate(
-                total_pages=Sum('pages'),
-                total_minutes=Sum('minutes'),
-                total_logs=Count('id'),
-                avg_rating=Avg('rating')
-            )
+            # Using centralized stats calculator to eliminate duplication
+            stats = ReadingStatsCalculator.get_basic_stats(student_logs)
             
             # Calculate reading consistency (days with logs)
             reading_days = student_logs.values('date').distinct().count()
@@ -288,12 +279,8 @@ class ReadingAnalytics:
                 date__range=(start_date, end_date)
             )
             
-            stats = logs.aggregate(
-                total_pages=Sum('pages'),
-                total_minutes=Sum('minutes'),
-                total_logs=Count('id'),
-                avg_rating=Avg('rating')
-            )
+            # Using centralized stats calculator
+            stats = ReadingStatsCalculator.get_basic_stats(logs)
             
             # Calculate percentiles
             all_students_logs = Log.objects.filter(

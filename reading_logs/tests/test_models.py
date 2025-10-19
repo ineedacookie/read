@@ -4,30 +4,17 @@ Test reading log models
 from datetime import date, timedelta
 from decimal import Decimal
 
-from django.test import TestCase
 from django.contrib.auth import get_user_model
 
 from ..models import Log, DailyGoal, TotalGoal
 from users.models import School, CustomUser, StudentParentRelation
+from read.utils.test_helpers import BaseTestCase
 
 User = get_user_model()
 
 
-class ReadingLogModelTests(TestCase):
+class ReadingLogModelTests(BaseTestCase):
     """Test reading log model functionality"""
-    
-    def setUp(self):
-        self.school = School.objects.create(name="Test School")
-        self.student = CustomUser.objects.create(
-            username="teststudent",
-            email="student@test.com",
-            user_type="student",
-            school=self.school,
-            first_name="Test",
-            last_initial="S"
-        )
-        self.student.set_password("testpass123")
-        self.student.save()
     
     def test_log_creation(self):
         """Test basic log creation"""

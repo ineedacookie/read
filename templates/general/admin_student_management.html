@@ -1,0 +1,680 @@
+{% extends "general/nav_template.html" %}
+{% load static %}
+{% block title %}read | Student Management{% endblock %}
+{% block content %}
+<div class="container mt-5">
+    <div class="row mb-4">
+        <div class="col-12">
+            <div class="d-flex justify-content-between align-items-center mb-3">
+                <div>
+                    <h2 class="mb-1"><i class="fas fa-users-cog me-2 text-primary"></i>Student Management</h2>
+                    <p class="text-muted mb-0">Manage student assignments across classrooms and reading groups</p>
+                </div>
+                <div class="d-flex gap-2">
+                    <button class="btn btn-outline-info" id="bulk-transfer-btn" data-bs-toggle="modal" data-bs-target="#bulkTransferModal" disabled>
+                        <i class="fas fa-exchange-alt me-1"></i>Bulk Transfer (<span id="selected-count">0</span>)
+                    </button>
+                    <button class="btn btn-outline-secondary" id="refresh-data" title="Refresh Data">
+                        <i class="fas fa-sync-alt"></i>
+                    </button>
+                </div>
+            </div>
+        </div>
+    </div>
+
+    <!-- Quick Stats -->
+    <div class="row mb-4">
+        <div class="col-lg-3 col-md-6 mb-3">
+            <div class="card bg-primary text-white">
+                <div class="card-body">
+                    <div class="d-flex justify-content-between">
+                        <div>
+                            <h6 class="mb-0">Total Students</h6>
+                            <h3 class="mb-0" id="total-students-count">-</h3>
+                        </div>
+                        <div>
+                            <i class="fas fa-user-graduate fa-2x opacity-75"></i>
+                        </div>
+                    </div>
+                </div>
+            </div>
+        </div>
+        <div class="col-lg-3 col-md-6 mb-3">
+            <div class="card bg-success text-white">
+                <div class="card-body">
+                    <div class="d-flex justify-content-between">
+                        <div>
+                            <h6 class="mb-0">Active Classrooms</h6>
+                            <h3 class="mb-0" id="active-classrooms-count">-</h3>
+                        </div>
+                        <div>
+                            <i class="fas fa-chalkboard fa-2x opacity-75"></i>
+                        </div>
+                    </div>
+                </div>
+            </div>
+        </div>
+        <div class="col-lg-3 col-md-6 mb-3">
+            <div class="card bg-info text-white">
+                <div class="card-body">
+                    <div class="d-flex justify-content-between">
+                        <div>
+                            <h6 class="mb-0">Reading Groups</h6>
+                            <h3 class="mb-0" id="reading-groups-count">-</h3>
+                        </div>
+                        <div>
+                            <i class="fas fa-book-reader fa-2x opacity-75"></i>
+                        </div>
+                    </div>
+                </div>
+            </div>
+        </div>
+        <div class="col-lg-3 col-md-6 mb-3">
+            <div class="card bg-warning text-white">
+                <div class="card-body">
+                    <div class="d-flex justify-content-between">
+                        <div>
+                            <h6 class="mb-0">Unassigned Students</h6>
+                            <h3 class="mb-0" id="unassigned-students-count">-</h3>
+                        </div>
+                        <div>
+                            <i class="fas fa-user-slash fa-2x opacity-75"></i>
+                        </div>
+                    </div>
+                </div>
+            </div>
+        </div>
+    </div>
+
+    <!-- Filters and Search -->
+    <div class="row mb-4">
+        <div class="col-12">
+            <div class="card">
+                <div class="card-body">
+                    <div class="row g-3 align-items-center">
+                        <div class="col-md-3">
+                            <label class="form-label fw-bold">Search Students</label>
+                            <input type="text" class="form-control" id="student-search" placeholder="Search by name or email...">
+                        </div>
+                        <div class="col-md-3">
+                            <label class="form-label fw-bold">Filter by Classroom</label>
+                            <select class="form-select" id="classroom-filter">
+                                <option value="">All Classrooms</option>
+                                <option value="unassigned">Unassigned Students</option>
+                                <!-- Options will be populated dynamically -->
+                            </select>
+                        </div>
+                        <div class="col-md-3">
+                            <label class="form-label fw-bold">Filter by Reading Group</label>
+                            <select class="form-select" id="group-filter">
+                                <option value="">All Reading Groups</option>
+                                <!-- Options will be populated dynamically -->
+                            </select>
+                        </div>
+                        <div class="col-md-3">
+                            <label class="form-label fw-bold">Actions</label>
+                            <div class="d-flex gap-2">
+                                <button class="btn btn-outline-primary btn-sm" onclick="clearFilters()">
+                                    <i class="fas fa-filter-circle-xmark me-1"></i>Clear Filters
+                                </button>
+                                <button class="btn btn-outline-success btn-sm" onclick="selectAll()">
+                                    <i class="fas fa-check-square me-1"></i>Select All
+                                </button>
+                            </div>
+                        </div>
+                    </div>
+                </div>
+            </div>
+        </div>
+    </div>
+
+    <!-- Student Management Table -->
+    <div class="card">
+        <div class="card-header border-bottom border-200 px-0">
+            <div class="row flex-between-center gy-2 px-x1">
+                <div class="col-auto">
+                    <h5 class="mb-0">Student Assignments</h5>
+                </div>
+                <div class="col-auto d-flex align-items-center">
+                    <div class="form-check form-switch me-3">
+                        <input class="form-check-input" type="checkbox" id="show-inactive">
+                        <label class="form-check-label" for="show-inactive">Show Inactive Students</label>
+                    </div>
+                    <button class="btn btn-sm btn-success" onclick="createNewStudent()">
+                        <i class="fas fa-plus me-1"></i>Add New Student
+                    </button>
+                </div>
+            </div>
+        </div>
+        <div class="card-body p-0">
+            <div class="table-responsive scrollbar">
+                <table class="table table-sm mb-0 fs-10" id="students-table">
+                    <thead class="bg-body-tertiary">
+                        <tr>
+                            <th class="text-800 align-middle ps-3" style="width: 40px;">
+                                <div class="form-check">
+                                    <input class="form-check-input" type="checkbox" id="select-all">
+                                </div>
+                            </th>
+                            <th class="text-800 sort align-middle">Student</th>
+                            <th class="text-800 sort align-middle">Current Classroom</th>
+                            <th class="text-800 sort align-middle">Reading Groups</th>
+                            <th class="text-800 sort align-middle">Parents</th>
+                            <th class="text-800 sort align-middle">Last Activity</th>
+                            <th class="text-800 sort align-middle">Actions</th>
+                        </tr>
+                    </thead>
+                    <tbody class="list" id="students-table-body">
+                        <!-- Rows will be populated via AJAX -->
+                    </tbody>
+                </table>
+            </div>
+        </div>
+    </div>
+
+    <!-- Bulk Transfer Modal -->
+    <div class="modal fade" id="bulkTransferModal" tabindex="-1" aria-labelledby="bulkTransferModalLabel" aria-hidden="true">
+        <div class="modal-dialog modal-lg">
+            <div class="modal-content">
+                <div class="modal-header bg-primary text-white">
+                    <h5 class="modal-title" id="bulkTransferModalLabel">
+                        <i class="fas fa-exchange-alt me-2"></i>Bulk Student Transfer
+                    </h5>
+                    <button type="button" class="btn-close btn-close-white" data-bs-dismiss="modal" aria-label="Close"></button>
+                </div>
+                <div class="modal-body">
+                    <div class="alert alert-info">
+                        <i class="fas fa-info-circle me-2"></i>
+                        <strong>Selected Students:</strong> <span id="transfer-student-count">0</span> students will be transferred.
+                    </div>
+                    
+                    <form id="bulk-transfer-form">
+                        {% csrf_token %}
+                        <div class="row">
+                            <div class="col-md-6">
+                                <div class="form-group mb-3">
+                                    <label for="transfer-action" class="form-label">Transfer Action</label>
+                                    <select class="form-select" id="transfer-action" name="action" required>
+                                        <option value="">Select action...</option>
+                                        <option value="move_classroom">Move to Different Classroom</option>
+                                        <option value="add_classroom">Add to Additional Classroom</option>
+                                        <option value="remove_classroom">Remove from Current Classroom</option>
+                                        <option value="add_reading_group">Add to Reading Group</option>
+                                        <option value="remove_reading_group">Remove from Reading Group</option>
+                                    </select>
+                                </div>
+                            </div>
+                            <div class="col-md-6">
+                                <div class="form-group mb-3" id="target-classroom-group" style="display: none;">
+                                    <label for="target-destination" class="form-label">Target Destination</label>
+                                    <select class="form-select" id="target-destination" name="destination">
+                                        <option value="">Select destination...</option>
+                                        <!-- Options will be populated dynamically -->
+                                    </select>
+                                </div>
+                            </div>
+                        </div>
+                        
+                        <div class="form-group mb-3">
+                            <label for="transfer-reason" class="form-label">Reason for Transfer (Optional)</label>
+                            <textarea class="form-control" id="transfer-reason" name="reason" rows="2" 
+                                      placeholder="Brief reason for this transfer (for audit logs)..."></textarea>
+                        </div>
+                        
+                        <div class="form-check mb-3">
+                            <input class="form-check-input" type="checkbox" id="notify-teachers" name="notify_teachers" checked>
+                            <label class="form-check-label" for="notify-teachers">
+                                Notify affected teachers about the transfer
+                            </label>
+                        </div>
+                        
+                        <div class="form-check mb-3">
+                            <input class="form-check-input" type="checkbox" id="notify-parents" name="notify_parents">
+                            <label class="form-check-label" for="notify-parents">
+                                Notify parents about classroom changes
+                            </label>
+                        </div>
+                    </form>
+                    
+                    <div class="mt-3">
+                        <h6>Students to be transferred:</h6>
+                        <div id="transfer-student-list" class="border rounded p-2 bg-light" style="max-height: 150px; overflow-y: auto;">
+                            <!-- Will be populated dynamically -->
+                        </div>
+                    </div>
+                </div>
+                <div class="modal-footer">
+                    <button type="button" class="btn btn-secondary" data-bs-dismiss="modal">Cancel</button>
+                    <button type="button" class="btn btn-primary" id="btn-execute-transfer">
+                        <i class="fas fa-exchange-alt me-1"></i>Execute Transfer
+                    </button>
+                </div>
+            </div>
+        </div>
+    </div>
+
+    <!-- Quick Actions Modal -->
+    <div class="modal fade" id="quickActionsModal" tabindex="-1" aria-labelledby="quickActionsModalLabel" aria-hidden="true">
+        <div class="modal-dialog">
+            <div class="modal-content">
+                <div class="modal-header bg-success text-white">
+                    <h5 class="modal-title" id="quickActionsModalLabel">
+                        <i class="fas fa-bolt me-2"></i>Quick Actions for <span id="student-action-name"></span>
+                    </h5>
+                    <button type="button" class="btn-close btn-close-white" data-bs-dismiss="modal" aria-label="Close"></button>
+                </div>
+                <div class="modal-body">
+                    <input type="hidden" id="action-student-id">
+                    <div class="d-grid gap-2">
+                        <button class="btn btn-outline-primary" onclick="assignToClassroom()">
+                            <i class="fas fa-chalkboard me-2"></i>Assign to Classroom
+                        </button>
+                        <button class="btn btn-outline-info" onclick="assignToReadingGroup()">
+                            <i class="fas fa-book-reader me-2"></i>Add to Reading Group
+                        </button>
+                        <button class="btn btn-outline-warning" onclick="manageParents()">
+                            <i class="fas fa-users me-2"></i>Manage Parent Relationships
+                        </button>
+                        <button class="btn btn-outline-secondary" onclick="viewStudentHistory()">
+                            <i class="fas fa-history me-2"></i>View Transfer History
+                        </button>
+                        <hr>
+                        <button class="btn btn-outline-danger" onclick="deactivateStudent()">
+                            <i class="fas fa-user-slash me-2"></i>Deactivate Student
+                        </button>
+                    </div>
+                </div>
+            </div>
+        </div>
+    </div>
+</div>
+
+<script>
+$(document).ready(function() {
+    let allStudents = [];
+    let allClassrooms = [];
+    let allReadingGroups = [];
+    let selectedStudents = new Set();
+    
+    // Initialize page
+    loadStudentData();
+    loadClassroomsAndGroups();
+    
+    // Search functionality
+    $('#student-search').on('input', debounce(function() {
+        filterStudents();
+    }, 300));
+    
+    // Filter functionality
+    $('#classroom-filter, #group-filter, #show-inactive').on('change', function() {
+        filterStudents();
+    });
+    
+    // Transfer action change
+    $('#transfer-action').on('change', function() {
+        const action = $(this).val();
+        updateDestinationOptions(action);
+    });
+    
+    // Select all checkbox
+    $('#select-all').on('change', function() {
+        const isChecked = $(this).is(':checked');
+        $('.student-checkbox').prop('checked', isChecked);
+        updateSelectedStudents();
+    });
+    
+    function loadStudentData() {
+        $.ajax({
+            url: '{% url "api_admin_students" %}',
+            method: 'GET',
+            success: function(response) {
+                if (response.success) {
+                    allStudents = response.data.students;
+                    updateStats(response.data.stats);
+                    renderStudentsTable(allStudents);
+                } else {
+                    showNotification('error', 'Failed to load student data');
+                }
+            },
+            error: function() {
+                showNotification('error', 'Network error loading student data');
+            }
+        });
+    }
+    
+    function loadClassroomsAndGroups() {
+        $.ajax({
+            url: '{% url "api_classrooms_groups" %}',
+            method: 'GET',
+            success: function(response) {
+                allClassrooms = response.filter(item => item.type === 'classroom');
+                allReadingGroups = response.filter(item => item.type === 'reading_group');
+                
+                // Populate filter dropdowns
+                populateFilterDropdowns();
+            },
+            error: function() {
+                console.error('Failed to load classrooms and groups');
+            }
+        });
+    }
+    
+    function updateStats(stats) {
+        $('#total-students-count').text(stats.total_students);
+        $('#active-classrooms-count').text(stats.active_classrooms);
+        $('#reading-groups-count').text(stats.reading_groups);
+        $('#unassigned-students-count').text(stats.unassigned_students);
+    }
+    
+    function populateFilterDropdowns() {
+        const classroomFilter = $('#classroom-filter');
+        const groupFilter = $('#group-filter');
+        
+        // Clear existing options (except default)
+        classroomFilter.find('option:not(:first-child):not([value="unassigned"])').remove();
+        groupFilter.find('option:not(:first-child)').remove();
+        
+        // Add classrooms
+        allClassrooms.forEach(classroom => {
+            classroomFilter.append(`<option value="${classroom.id}">${classroom.name}</option>`);
+        });
+        
+        // Add reading groups
+        allReadingGroups.forEach(group => {
+            groupFilter.append(`<option value="${group.id}">${group.name}</option>`);
+        });
+    }
+    
+    function renderStudentsTable(students) {
+        const tbody = $('#students-table-body');
+        tbody.empty();
+        
+        if (students.length === 0) {
+            tbody.html(`
+                <tr>
+                    <td colspan="7" class="text-center py-4">
+                        <i class="fas fa-users fa-3x text-muted mb-3"></i>
+                        <p class="text-muted">No students found matching the current filters.</p>
+                    </td>
+                </tr>
+            `);
+            return;
+        }
+        
+        students.forEach(student => {
+            const classroomBadges = student.classrooms.map(c => 
+                `<span class="badge bg-primary me-1">${c.name}</span>`
+            ).join('') || '<span class="text-muted">Unassigned</span>';
+            
+            const groupBadges = student.reading_groups.map(g => 
+                `<span class="badge bg-info me-1">${g.name}</span>`
+            ).join('') || '<span class="text-muted">None</span>';
+            
+            const parentBadges = student.parents.map(p => 
+                `<span class="badge bg-secondary me-1">${p.name}</span>`
+            ).join('') || '<span class="text-muted">No parents</span>';
+            
+            const lastActivity = student.last_activity ? 
+                new Date(student.last_activity).toLocaleDateString() : 
+                '<span class="text-muted">No activity</span>';
+            
+            const row = `
+                <tr>
+                    <td class="align-middle ps-3">
+                        <div class="form-check">
+                            <input class="form-check-input student-checkbox" type="checkbox" 
+                                   value="${student.id}" onchange="updateSelectedStudents()">
+                        </div>
+                    </td>
+                    <td class="align-middle">
+                        <div class="d-flex align-items-center">
+                            <div>
+                                <h6 class="mb-0">${student.name}</h6>
+                                <small class="text-muted">${student.email}</small>
+                            </div>
+                        </div>
+                    </td>
+                    <td class="align-middle">${classroomBadges}</td>
+                    <td class="align-middle">${groupBadges}</td>
+                    <td class="align-middle">${parentBadges}</td>
+                    <td class="align-middle">${lastActivity}</td>
+                    <td class="align-middle">
+                        <div class="btn-group btn-group-sm">
+                            <button class="btn btn-outline-primary" onclick="quickActions(${student.id}, '${student.name}')" title="Quick Actions">
+                                <i class="fas fa-bolt"></i>
+                            </button>
+                            <button class="btn btn-outline-info" onclick="viewStudent(${student.id})" title="View Details">
+                                <i class="fas fa-eye"></i>
+                            </button>
+                            <button class="btn btn-outline-success" onclick="editStudent(${student.id})" title="Edit Student">
+                                <i class="fas fa-edit"></i>
+                            </button>
+                        </div>
+                    </td>
+                </tr>
+            `;
+            
+            tbody.append(row);
+        });
+    }
+    
+    function filterStudents() {
+        const searchTerm = $('#student-search').val().toLowerCase();
+        const classroomFilter = $('#classroom-filter').val();
+        const groupFilter = $('#group-filter').val();
+        const showInactive = $('#show-inactive').is(':checked');
+        
+        let filteredStudents = allStudents.filter(student => {
+            // Search filter
+            const matchesSearch = !searchTerm || 
+                student.name.toLowerCase().includes(searchTerm) ||
+                student.email.toLowerCase().includes(searchTerm);
+            
+            // Classroom filter
+            let matchesClassroom = true;
+            if (classroomFilter) {
+                if (classroomFilter === 'unassigned') {
+                    matchesClassroom = student.classrooms.length === 0;
+                } else {
+                    matchesClassroom = student.classrooms.some(c => c.id.toString() === classroomFilter);
+                }
+            }
+            
+            // Reading group filter
+            const matchesGroup = !groupFilter || 
+                student.reading_groups.some(g => g.id.toString() === groupFilter);
+            
+            // Active filter
+            const matchesActive = showInactive || student.is_active;
+            
+            return matchesSearch && matchesClassroom && matchesGroup && matchesActive;
+        });
+        
+        renderStudentsTable(filteredStudents);
+    }
+    
+    function updateSelectedStudents() {
+        selectedStudents.clear();
+        $('.student-checkbox:checked').each(function() {
+            selectedStudents.add(parseInt($(this).val()));
+        });
+        
+        const count = selectedStudents.size;
+        $('#selected-count').text(count);
+        $('#bulk-transfer-btn').prop('disabled', count === 0);
+        
+        // Update transfer modal content
+        if (count > 0) {
+            $('#transfer-student-count').text(count);
+            updateTransferStudentList();
+        }
+    }
+    
+    function updateTransferStudentList() {
+        const listContainer = $('#transfer-student-list');
+        listContainer.empty();
+        
+        const selectedStudentData = allStudents.filter(s => selectedStudents.has(s.id));
+        selectedStudentData.forEach(student => {
+            listContainer.append(`
+                <div class="d-flex justify-content-between align-items-center py-1 border-bottom">
+                    <span>${student.name}</span>
+                    <small class="text-muted">${student.email}</small>
+                </div>
+            `);
+        });
+    }
+    
+    function updateDestinationOptions(action) {
+        const destinationSelect = $('#target-destination');
+        const destinationGroup = $('#target-classroom-group');
+        
+        destinationSelect.empty().append('<option value="">Select destination...</option>');
+        
+        if (action.includes('classroom')) {
+            allClassrooms.forEach(classroom => {
+                destinationSelect.append(`<option value="${classroom.id}">${classroom.name}</option>`);
+            });
+            destinationGroup.show();
+        } else if (action.includes('reading_group')) {
+            allReadingGroups.forEach(group => {
+                destinationSelect.append(`<option value="${group.id}">${group.name}</option>`);
+            });
+            destinationGroup.show();
+        } else if (action === 'remove_classroom' || action === 'remove_reading_group') {
+            destinationGroup.hide();
+        } else {
+            destinationGroup.hide();
+        }
+    }
+    
+    // Global functions for buttons
+    window.quickActions = function(studentId, studentName) {
+        $('#action-student-id').val(studentId);
+        $('#student-action-name').text(studentName);
+        $('#quickActionsModal').modal('show');
+    };
+    
+    window.viewStudent = function(studentId) {
+        window.location.href = `/student/${studentId}/`;
+    };
+    
+    window.editStudent = function(studentId) {
+        window.location.href = `/student/${studentId}/`;
+    };
+    
+    window.clearFilters = function() {
+        $('#student-search').val('');
+        $('#classroom-filter').val('');
+        $('#group-filter').val('');
+        $('#show-inactive').prop('checked', false);
+        filterStudents();
+    };
+    
+    window.selectAll = function() {
+        $('.student-checkbox').prop('checked', true);
+        updateSelectedStudents();
+    };
+    
+    // Execute bulk transfer
+    $('#btn-execute-transfer').on('click', function() {
+        const formData = new FormData($('#bulk-transfer-form')[0]);
+        formData.append('student_ids', JSON.stringify(Array.from(selectedStudents)));
+        
+        $.ajax({
+            url: '{% url "api_bulk_student_transfer" %}',
+            method: 'POST',
+            data: formData,
+            processData: false,
+            contentType: false,
+            headers: {
+                'X-CSRFToken': $('[name=csrfmiddlewaretoken]').val()
+            },
+            success: function(response) {
+                if (response.success) {
+                    $('#bulkTransferModal').modal('hide');
+                    $('#bulk-transfer-form')[0].reset();
+                    selectedStudents.clear();
+                    showNotification('success', `Successfully transferred ${response.count} students`);
+                    loadStudentData(); // Refresh data
+                } else {
+                    showNotification('error', response.message || 'Failed to transfer students');
+                }
+            },
+            error: function() {
+                showNotification('error', 'Network error. Please try again.');
+            }
+        });
+    });
+    
+    // Utility functions
+    function debounce(func, wait) {
+        let timeout;
+        return function executedFunction(...args) {
+            const later = () => {
+                clearTimeout(timeout);
+                func(...args);
+            };
+            clearTimeout(timeout);
+            timeout = setTimeout(later, wait);
+        };
+    }
+    
+    function showNotification(type, message) {
+        const alertClass = type === 'success' ? 'alert-success' : 'alert-danger';
+        const iconClass = type === 'success' ? 'fa-check-circle' : 'fa-exclamation-circle';
+        
+        const notification = $(`
+            <div class="alert ${alertClass} alert-dismissible fade show position-fixed" style="top: 20px; right: 20px; z-index: 9999;">
+                <i class="fas ${iconClass} me-2"></i>${message}
+                <button type="button" class="btn-close" data-bs-dismiss="alert"></button>
+            </div>
+        `);
+        
+        $('body').append(notification);
+        
+        setTimeout(() => {
+            notification.alert('close');
+        }, 5000);
+    }
+    
+    // Quick action implementations
+    window.assignToClassroom = function() {
+        // TODO: Implement classroom assignment
+        showNotification('info', 'Classroom assignment feature coming soon!');
+    };
+    
+    window.assignToReadingGroup = function() {
+        // TODO: Implement reading group assignment
+        showNotification('info', 'Reading group assignment feature coming soon!');
+    };
+    
+    window.manageParents = function() {
+        // TODO: Implement parent management
+        showNotification('info', 'Parent management feature coming soon!');
+    };
+    
+    window.viewStudentHistory = function() {
+        // TODO: Implement student history view
+        showNotification('info', 'Student history feature coming soon!');
+    };
+    
+    window.deactivateStudent = function() {
+        // TODO: Implement student deactivation
+        showNotification('info', 'Student deactivation feature coming soon!');
+    };
+    
+    window.createNewStudent = function() {
+        // TODO: Implement new student creation
+        showNotification('info', 'New student creation feature coming soon!');
+    };
+    
+    // Refresh button
+    $('#refresh-data').on('click', function() {
+        loadStudentData();
+        loadClassroomsAndGroups();
+    });
+});
+</script>
+{% endblock %}
+

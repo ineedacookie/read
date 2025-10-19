@@ -1,0 +1,503 @@
+---
+description: Standards for Django management commands including structure, arguments, and error handling
+globs: ["**/management/commands/*.py"]
+alwaysApply: false
+---
+
+# Management Commands Standards
+
+## Command Structure Pattern
+
+### Base Command Template
+```python
+"""
+Management command to [description of what the command does]
+"""
+
+from django.core.management.base import BaseCommand, CommandError
+from django.db import transaction
+from django.utils import timezone
+from datetime import datetime, date
+import logging
+
+# Set up logging
+logger = logging.getLogger(__name__)
+
+class Command(BaseCommand):
+    help = 'Brief description of what this command does'
+    
+    def __init__(self, *args, **kwargs):
+        super().__init__(*args, **kwargs)
+        self.processed_count = 0
+        self.error_count = 0
+    
+    def add_arguments(self, parser):
+        """Define command-line arguments"""
+        # Required arguments
+        parser.add_argument(
+            'action',
+            choices=['create', 'update', 'delete'],
+            help='Action to perform'
+        )
+        
+        # Optional arguments
+        parser.add_argument(
+            '--school-id',
+            type=int,
+            help='Process specific school only'
+        )
+        
+        parser.add_argument(
+            '--dry-run',
+            action='store_true',
+            help='Show what would be done without making changes'
+        )
+        
+        parser.add_argument(
+            '--force',
+            action='store_true',
+            help='Force operation even if risks are detected'
+        )
+        
+        parser.add_argument(
+            '--batch-size',
+            type=int,
+            default=100,
+            help='Number of records to process in each batch (default: 100)'
+        )
+    
+    def handle(self, *args, **options):
+        """Main command logic"""
+        self.verbosity = options['verbosity']
+        
+        try:
+            # Validate arguments
+            self.validate_arguments(options)
+            
+            # Perform the operation
+            self.perform_operation(options)
+            
+            # Output summary
+            self.output_summary()
+            
+        except Exception as e:
+            logger.error(f'Command failed: {e}')
+            raise CommandError(f'Command failed: {e}')
+    
+    def validate_arguments(self, options):
+        """Validate command arguments"""
+        pass  # Override in subclasses
+    
+    def perform_operation(self, options):
+        """Perform the main operation"""
+        pass  # Override in subclasses
+    
+    def output_summary(self):
+        """Output operation summary"""
+        self.stdout.write(
+            self.style.SUCCESS(
+                f'Operation completed successfully. '
+                f'Processed: {self.processed_count}, Errors: {self.error_count}'
+            )
+        )
+```
+
+## Argument Handling Patterns
+
+### Common Argument Types
+```python
+def add_arguments(self, parser):
+    # Date arguments
+    parser.add_argument(
+        '--start-date',
+        type=lambda s: datetime.strptime(s, '%Y-%m-%d').date(),
+        default=date.today(),
+        help='Start date in YYYY-MM-DD format (default: today)'
+    )
+    
+    # File arguments
+    parser.add_argument(
+        '--input-file',
+        type=argparse.FileType('r'),
+        help='Input CSV file'
+    )
+    
+    # Multiple choice arguments
+    parser.add_argument(
+        '--user-types',
+        nargs='+',
+        choices=['student', 'teacher', 'parent', 'administrator'],
+        default=['student'],
+        help='User types to process'
+    )
+    
+    # Boolean flags
+    parser.add_argument(
+        '--include-inactive',
+        action='store_true',
+        help='Include inactive users in processing'
+    )
+    
+    # Integer with validation
+    parser.add_argument(
+        '--limit',
+        type=int,
+        metavar='N',
+        help='Maximum number of records to process'
+    )
+```
+
+### Argument Validation
+```python
+def validate_arguments(self, options):
+    """Validate command arguments with helpful error messages"""
+    # Date range validation
+    if options.get('start_date') and options.get('end_date'):
+        if options['start_date'] > options['end_date']:
+            raise CommandError('start_date cannot be after end_date')
+    
+    # File existence validation
+    if options.get('input_file'):
+        if not os.path.exists(options['input_file']):
+            raise CommandError(f'Input file does not exist: {options["input_file"]}')
+    
+    # School existence validation
+    if options.get('school_id'):
+        try:
+            School.objects.get(id=options['school_id'])
+        except School.DoesNotExist:
+            raise CommandError(f'School with ID {options["school_id"]} does not exist')
+    
+    # Batch size validation
+    if options.get('batch_size') and options['batch_size'] < 1:
+        raise CommandError('batch_size must be at least 1')
+```
+
+## Progress Reporting Patterns
+
+### Progress Indicators
+```python
+class Command(BaseCommand):
+    def show_progress(self, current, total, prefix='Processing'):
+        """Show progress bar for long operations"""
+        if self.verbosity >= 1:
+            percent = int((current / total) * 100)
+            bar_length = 50
+            filled_length = int(bar_length * current // total)
+            bar = '█' * filled_length + '-' * (bar_length - filled_length)
+            
+            self.stdout.write(
+                f'\r{prefix}: |{bar}| {percent}% ({current}/{total})',
+                ending=''
+            )
+            self.stdout.flush()
+            
+            if current == total:
+                self.stdout.write('')  # New line at end
+    
+    def process_batch(self, items, batch_size=100):
+        """Process items in batches with progress reporting"""
+        total = len(items)
+        
+        for i in range(0, total, batch_size):
+            batch = items[i:i + batch_size]
+            
+            try:
+                with transaction.atomic():
+                    for item in batch:
+                        self.process_single_item(item)
+                        self.processed_count += 1
+                        
+                self.show_progress(min(i + batch_size, total), total)
+                
+            except Exception as e:
+                self.error_count += 1
+                logger.error(f'Batch processing failed at index {i}: {e}')
+                
+                if not self.force_mode:
+                    raise CommandError(f'Batch failed: {e}')
+```
+
+### Verbosity Levels
+```python
+def log_message(self, message, level='info'):
+    """Log messages based on verbosity level"""
+    if level == 'error':
+        self.stderr.write(self.style.ERROR(message))
+    elif level == 'warning':
+        if self.verbosity >= 1:
+            self.stdout.write(self.style.WARNING(message))
+    elif level == 'info':
+        if self.verbosity >= 1:
+            self.stdout.write(message)
+    elif level == 'debug':
+        if self.verbosity >= 2:
+            self.stdout.write(self.style.HTTP_INFO(f'DEBUG: {message}'))
+```
+
+## Transaction Management
+
+### Safe Batch Processing
+```python
+def perform_operation(self, options):
+    """Perform operation with safe transaction handling"""
+    items = self.get_items_to_process(options)
+    batch_size = options['batch_size']
+    
+    for i in range(0, len(items), batch_size):
+        batch = items[i:i + batch_size]
+        
+        # Use savepoints for nested transactions
+        with transaction.atomic():
+            try:
+                # Create savepoint for this batch
+                savepoint = transaction.savepoint()
+                
+                for item in batch:
+                    self.process_single_item(item, options)
+                    self.processed_count += 1
+                
+                # Commit this batch
+                transaction.savepoint_commit(savepoint)
+                
+                self.log_message(f'Processed batch {i//batch_size + 1}', 'debug')
+                
+            except Exception as e:
+                # Rollback this batch only
+                transaction.savepoint_rollback(savepoint)
+                self.error_count += len(batch)
+                
+                error_msg = f'Batch {i//batch_size + 1} failed: {e}'
+                self.log_message(error_msg, 'error')
+                
+                if not options.get('force'):
+                    raise CommandError(error_msg)
+```
+
+## Dry Run Implementation
+
+### Dry Run Pattern
+```python
+def perform_operation(self, options):
+    """Perform operation with dry-run support"""
+    dry_run = options.get('dry_run', False)
+    
+    if dry_run:
+        self.stdout.write(
+            self.style.WARNING('DRY RUN MODE - No changes will be made')
+        )
+    
+    items = self.get_items_to_process(options)
+    
+    for item in items:
+        if dry_run:
+            # Show what would be done
+            self.stdout.write(f'Would process: {item}')
+        else:
+            # Actually do it
+            self.process_single_item(item, options)
+            self.processed_count += 1
+    
+    if dry_run:
+        self.stdout.write(
+            self.style.SUCCESS(f'DRY RUN: Would process {len(items)} items')
+        )
+```
+
+## Error Handling and Recovery
+
+### Comprehensive Error Handling
+```python
+def process_single_item(self, item, options):
+    """Process a single item with error handling"""
+    try:
+        # Validate item
+        self.validate_item(item)
+        
+        # Process item
+        result = self.perform_item_operation(item, options)
+        
+        # Log success
+        self.log_message(f'Successfully processed: {item}', 'debug')
+        
+        return result
+        
+    except ValidationError as e:
+        self.error_count += 1
+        error_msg = f'Validation failed for {item}: {e}'
+        self.log_message(error_msg, 'warning')
+        
+        if options.get('strict_mode'):
+            raise CommandError(error_msg)
+            
+    except Exception as e:
+        self.error_count += 1
+        error_msg = f'Processing failed for {item}: {e}'
+        self.log_message(error_msg, 'error')
+        
+        # Log full traceback in debug mode
+        if self.verbosity >= 2:
+            import traceback
+            self.log_message(traceback.format_exc(), 'debug')
+        
+        if not options.get('force'):
+            raise CommandError(error_msg)
+```
+
+## Data Import/Export Commands
+
+### CSV Import Pattern
+```python
+import csv
+from django.core.management.base import BaseCommand
+
+class Command(BaseCommand):
+    help = 'Import data from CSV file'
+    
+    def add_arguments(self, parser):
+        parser.add_argument('csv_file', type=str, help='Path to CSV file')
+        parser.add_argument(
+            '--delimiter',
+            default=',',
+            help='CSV delimiter (default: comma)'
+        )
+        parser.add_argument(
+            '--skip-header',
+            action='store_true',
+            help='Skip first row (header)'
+        )
+    
+    def handle(self, *args, **options):
+        csv_file = options['csv_file']
+        
+        try:
+            with open(csv_file, 'r', encoding='utf-8') as file:
+                reader = csv.DictReader(file, delimiter=options['delimiter'])
+                
+                if options['skip_header']:
+                    next(reader)  # Skip header row
+                
+                for row_num, row in enumerate(reader, start=1):
+                    try:
+                        self.process_csv_row(row, row_num)
+                        self.processed_count += 1
+                        
+                    except Exception as e:
+                        self.error_count += 1
+                        self.log_message(
+                            f'Row {row_num} failed: {e}',
+                            'error'
+                        )
+                        
+        except FileNotFoundError:
+            raise CommandError(f'File not found: {csv_file}')
+        except Exception as e:
+            raise CommandError(f'Error reading CSV: {e}')
+    
+    def process_csv_row(self, row, row_num):
+        """Process a single CSV row"""
+        # Validate required fields
+        required_fields = ['student_id', 'date', 'pages']
+        missing_fields = [field for field in required_fields if not row.get(field)]
+        
+        if missing_fields:
+            raise ValueError(f'Missing required fields: {missing_fields}')
+        
+        # Create object from row data
+        # Implementation specific to command purpose
+```
+
+## Cleanup and Maintenance Commands
+
+### Data Cleanup Pattern
+```python
+class Command(BaseCommand):
+    help = 'Clean up old data and optimize database'
+    
+    def add_arguments(self, parser):
+        parser.add_argument(
+            '--days-old',
+            type=int,
+            default=90,
+            help='Delete data older than N days (default: 90)'
+        )
+        
+        parser.add_argument(
+            '--cleanup-type',
+            choices=['logs', 'sessions', 'all'],
+            default='all',
+            help='Type of cleanup to perform'
+        )
+    
+    def handle(self, *args, **options):
+        days_old = options['days_old']
+        cleanup_type = options['cleanup_type']
+        
+        cutoff_date = timezone.now() - timedelta(days=days_old)
+        
+        if cleanup_type in ['logs', 'all']:
+            self.cleanup_old_logs(cutoff_date, options)
+        
+        if cleanup_type in ['sessions', 'all']:
+            self.cleanup_old_sessions(cutoff_date, options)
+    
+    def cleanup_old_logs(self, cutoff_date, options):
+        """Clean up old log entries"""
+        dry_run = options.get('dry_run', False)
+        
+        old_logs = Log.objects.filter(created_at__lt=cutoff_date)
+        count = old_logs.count()
+        
+        if dry_run:
+            self.stdout.write(f'Would delete {count} old log entries')
+        else:
+            deleted_count = old_logs.delete()[0]
+            self.stdout.write(
+                self.style.SUCCESS(f'Deleted {deleted_count} old log entries')
+            )
+```
+
+## Command Testing Patterns
+
+### Management Command Testing
+```python
+from io import StringIO
+from django.core.management import call_command
+from django.core.management.base import CommandError
+from django.test import TestCase
+
+class CommandTests(TestCase):
+    def test_command_success(self):
+        """Test successful command execution"""
+        out = StringIO()
+        call_command('my_command', 'create', stdout=out)
+        
+        self.assertIn('Operation completed successfully', out.getvalue())
+    
+    def test_command_with_arguments(self):
+        """Test command with specific arguments"""
+        out = StringIO()
+        call_command(
+            'my_command',
+            'create',
+            '--school-id=1',
+            '--batch-size=50',
+            stdout=out
+        )
+        
+        self.assertIn('Processed:', out.getvalue())
+    
+    def test_command_error_handling(self):
+        """Test command error handling"""
+        with self.assertRaises(CommandError):
+            call_command('my_command', 'invalid_action')
+    
+    def test_dry_run_mode(self):
+        """Test dry run functionality"""
+        out = StringIO()
+        call_command('my_command', 'create', '--dry-run', stdout=out)
+        
+        output = out.getvalue()
+        self.assertIn('DRY RUN MODE', output)
+        self.assertIn('Would process', output)
+```

@@ -1,0 +1,518 @@
+---
+description: Date and time handling standards for parsing, validation, and timezone management
+globs: ["**/views.py", "**/models.py", "**/forms.py", "**/analytics*.py"]
+alwaysApply: false
+---
+
+# Date and Time Handling Standards
+
+## Date Parsing and Validation
+
+### Standard Date Parsing
+```python
+from datetime import datetime, date, timedelta
+from django.utils import timezone
+from django.core.exceptions import ValidationError
+import re
+
+def parse_date_input(date_string, field_name="date"):
+    """
+    Standard date parsing with validation
+    """
+    if not date_string:
+        raise ValidationError(f"{field_name} is required")
+    
+    # Handle different date formats
+    date_formats = [
+        '%Y-%m-%d',        # 2024-01-15
+        '%m/%d/%Y',        # 01/15/2024
+        '%d/%m/%Y',        # 15/01/2024 (European)
+        '%Y%m%d',          # 20240115
+    ]
+    
+    for date_format in date_formats:
+        try:
+            parsed_date = datetime.strptime(date_string.strip(), date_format).date()
+            
+            # Validate date range
+            validate_date_range(parsed_date, field_name)
+            
+            return parsed_date
+        except ValueError:
+            continue
+    
+    # If no format worked
+    raise ValidationError(f"Invalid {field_name} format. Use YYYY-MM-DD")
+
+def validate_date_range(input_date, field_name="date"):
+    """
+    Validate that date is within reasonable range
+    """
+    today = date.today()
+    
+    # Check for future dates (reading logs shouldn't be in future)
+    if input_date > today:
+        raise ValidationError(f"{field_name} cannot be in the future")
+    
+    # Check for very old dates (probably data entry error)
+    min_date = today - timedelta(days=365 * 5)  # 5 years ago
+    if input_date < min_date:
+        raise ValidationError(f"{field_name} cannot be more than 5 years ago")
+    
+    return input_date
+```
+
+### API Date Parameter Handling
+```python
+def parse_api_date_params(request):
+    """
+    Parse date parameters from API requests
+    """
+    try:
+        # Parse start date
+        start_date_str = request.GET.get('start')
+        if start_date_str:
+            start_date = datetime.fromisoformat(start_date_str).date()
+        else:
+            # Default to 30 days ago
+            start_date = date.today() - timedelta(days=30)
+        
+        # Parse end date
+        end_date_str = request.GET.get('end')
+        if end_date_str:
+            end_date = datetime.fromisoformat(end_date_str).date()
+        else:
+            # Default to today
+            end_date = date.today()
+        
+        # Validate date range
+        if start_date > end_date:
+            raise ValidationError("start_date cannot be after end_date")
+        
+        # Limit range to prevent performance issues
+        max_range = timedelta(days=365)  # 1 year
+        if (end_date - start_date) > max_range:
+            raise ValidationError("Date range cannot exceed 365 days")
+        
+        return start_date, end_date
+        
+    except (ValueError, TypeError) as e:
+        raise ValidationError(f"Invalid date format: {str(e)}")
+```
+
+## Timezone Handling
+
+### Timezone-Aware Date Processing
+```python
+from django.utils import timezone
+from django.conf import settings
+import pytz
+
+def get_user_timezone(user):
+    """
+    Get user's timezone preference
+    """
+    # Try user preference first
+    if hasattr(user, 'profile') and user.profile.timezone:
+        return pytz.timezone(user.profile.timezone)
+    
+    # Fall back to school timezone
+    if hasattr(user, 'school') and user.school.timezone:
+        return pytz.timezone(user.school.timezone)
+    
+    # Default to system timezone
+    return timezone.get_current_timezone()
+
+def convert_to_user_timezone(dt, user):
+    """
+    Convert datetime to user's timezone
+    """
+    user_tz = get_user_timezone(user)
+    
+    # Ensure datetime is timezone-aware
+    if timezone.is_naive(dt):
+        dt = timezone.make_aware(dt)
+    
+    return dt.astimezone(user_tz)
+
+def get_user_date_today(user):
+    """
+    Get today's date in user's timezone
+    """
+    user_tz = get_user_timezone(user)
+    now_user_tz = timezone.now().astimezone(user_tz)
+    return now_user_tz.date()
+```
+
+### School Day Calculations
+```python
+def get_school_day_range(date_input, school):
+    """
+    Get start and end of school day in UTC
+    """
+    school_tz = pytz.timezone(school.timezone)
+    
+    # School day starts at 6 AM and ends at 11:59 PM
+    start_time = school_tz.localize(
+        datetime.combine(date_input, datetime.min.time().replace(hour=6))
+    )
+    end_time = school_tz.localize(
+        datetime.combine(date_input, datetime.min.time().replace(hour=23, minute=59))
+    )
+    
+    # Convert to UTC for database queries
+    start_utc = start_time.astimezone(pytz.UTC)
+    end_utc = end_time.astimezone(pytz.UTC)
+    
+    return start_utc, end_utc
+```
+
+## Date Range Utilities
+
+### Smart Date Range Generation
+```python
+def get_date_range_options():
+    """
+    Get common date range options
+    """
+    today = date.today()
+    
+    return {
+        'today': (today, today),
+        'yesterday': (today - timedelta(days=1), today - timedelta(days=1)),
+        'this_week': get_week_range(today),
+        'last_week': get_week_range(today - timedelta(weeks=1)),
+        'this_month': get_month_range(today),
+        'last_month': get_month_range(today.replace(day=1) - timedelta(days=1)),
+        'this_quarter': get_quarter_range(today),
+        'this_year': get_year_range(today),
+        'last_30_days': (today - timedelta(days=30), today),
+        'last_90_days': (today - timedelta(days=90), today),
+    }
+
+def get_week_range(reference_date):
+    """
+    Get start and end of week containing reference_date
+    """
+    start = reference_date - timedelta(days=reference_date.weekday())
+    end = start + timedelta(days=6)
+    return start, end
+
+def get_month_range(reference_date):
+    """
+    Get start and end of month containing reference_date
+    """
+    start = reference_date.replace(day=1)
+    
+    # Get last day of month
+    if start.month == 12:
+        next_month = start.replace(year=start.year + 1, month=1)
+    else:
+        next_month = start.replace(month=start.month + 1)
+    
+    end = next_month - timedelta(days=1)
+    return start, end
+
+def get_quarter_range(reference_date):
+    """
+    Get start and end of quarter containing reference_date
+    """
+    quarter = (reference_date.month - 1) // 3 + 1
+    start_month = (quarter - 1) * 3 + 1
+    
+    start = reference_date.replace(month=start_month, day=1)
+    
+    # Get end of quarter
+    end_month = quarter * 3
+    if end_month == 12:
+        end = reference_date.replace(month=12, day=31)
+    else:
+        next_quarter = reference_date.replace(month=end_month + 1, day=1)
+        end = next_quarter - timedelta(days=1)
+    
+    return start, end
+
+def get_year_range(reference_date):
+    """
+    Get start and end of year containing reference_date
+    """
+    start = reference_date.replace(month=1, day=1)
+    end = reference_date.replace(month=12, day=31)
+    return start, end
+```
+
+## Academic Calendar Support
+
+### School Year Calculations
+```python
+def get_current_school_year(reference_date=None, school_year_start_month=8):
+    """
+    Get current school year based on reference date
+    School year typically starts in August/September
+    """
+    if reference_date is None:
+        reference_date = date.today()
+    
+    if reference_date.month >= school_year_start_month:
+        # Current calendar year is start of school year
+        start_year = reference_date.year
+        end_year = reference_date.year + 1
+    else:
+        # Previous calendar year is start of school year
+        start_year = reference_date.year - 1
+        end_year = reference_date.year
+    
+    school_year_start = date(start_year, school_year_start_month, 1)
+    school_year_end = date(end_year, school_year_start_month - 1, 30)
+    
+    return {
+        'start_date': school_year_start,
+        'end_date': school_year_end,
+        'label': f"{start_year}-{str(end_year)[-2:]}"
+    }
+
+def get_school_years_list(years_back=5):
+    """
+    Get list of school years for dropdown options
+    """
+    current_year = get_current_school_year()
+    school_years = [current_year]
+    
+    # Add previous years
+    for i in range(1, years_back + 1):
+        reference_date = date.today().replace(year=date.today().year - i)
+        school_year = get_current_school_year(reference_date)
+        school_years.append(school_year)
+    
+    return school_years
+```
+
+## Date Formatting and Display
+
+### Consistent Date Formatting
+```python
+def format_date_for_display(date_obj, format_type='standard'):
+    """
+    Format dates consistently for display
+    """
+    if not date_obj:
+        return ''
+    
+    if format_type == 'standard':
+        return date_obj.strftime('%B %d, %Y')  # January 15, 2024
+    elif format_type == 'short':
+        return date_obj.strftime('%m/%d/%Y')   # 01/15/2024
+    elif format_type == 'iso':
+        return date_obj.strftime('%Y-%m-%d')   # 2024-01-15
+    elif format_type == 'friendly':
+        today = date.today()
+        if date_obj == today:
+            return 'Today'
+        elif date_obj == today - timedelta(days=1):
+            return 'Yesterday'
+        elif date_obj == today + timedelta(days=1):
+            return 'Tomorrow'
+        elif (today - date_obj).days < 7:
+            return f"{(today - date_obj).days} days ago"
+        else:
+            return date_obj.strftime('%B %d, %Y')
+    
+    return str(date_obj)
+
+def format_datetime_for_display(dt, user=None, format_type='standard'):
+    """
+    Format datetime for display with timezone consideration
+    """
+    if not dt:
+        return ''
+    
+    # Convert to user timezone if provided
+    if user:
+        dt = convert_to_user_timezone(dt, user)
+    
+    if format_type == 'standard':
+        return dt.strftime('%B %d, %Y at %I:%M %p')
+    elif format_type == 'short':
+        return dt.strftime('%m/%d/%Y %I:%M %p')
+    elif format_type == 'time_only':
+        return dt.strftime('%I:%M %p')
+    
+    return str(dt)
+```
+
+## Date Queries and Analytics
+
+### Efficient Date-Based Queries
+```python
+from django.db.models import Q, Count, Sum
+from django.db.models.functions import TruncDate, TruncWeek, TruncMonth
+
+def get_daily_reading_stats(student, start_date, end_date):
+    """
+    Get daily reading statistics for date range
+    """
+    return Log.objects.filter(
+        student=student,
+        date__range=(start_date, end_date)
+    ).extra(
+        select={'day': 'date(date)'}
+    ).values('day').annotate(
+        log_count=Count('id'),
+        total_pages=Sum('pages'),
+        total_minutes=Sum('minutes')
+    ).order_by('day')
+
+def get_weekly_reading_trends(queryset):
+    """
+    Aggregate reading data by week
+    """
+    return queryset.annotate(
+        week=TruncWeek('date')
+    ).values('week').annotate(
+        log_count=Count('id'),
+        total_pages=Sum('pages'),
+        avg_pages=Avg('pages')
+    ).order_by('week')
+
+def get_reading_streaks(student, max_gap_days=1):
+    """
+    Calculate reading streaks for a student
+    """
+    logs = Log.objects.filter(student=student).values_list('date', flat=True).distinct().order_by('date')
+    
+    if not logs:
+        return []
+    
+    streaks = []
+    current_streak_start = logs[0]
+    current_streak_end = logs[0]
+    
+    for i in range(1, len(logs)):
+        gap = (logs[i] - current_streak_end).days
+        
+        if gap <= max_gap_days + 1:  # +1 because consecutive days have gap of 1
+            current_streak_end = logs[i]
+        else:
+            # End current streak, start new one
+            streak_length = (current_streak_end - current_streak_start).days + 1
+            streaks.append({
+                'start_date': current_streak_start,
+                'end_date': current_streak_end,
+                'length_days': streak_length
+            })
+            
+            current_streak_start = logs[i]
+            current_streak_end = logs[i]
+    
+    # Add final streak
+    streak_length = (current_streak_end - current_streak_start).days + 1
+    streaks.append({
+        'start_date': current_streak_start,
+        'end_date': current_streak_end,
+        'length_days': streak_length
+    })
+    
+    return streaks
+```
+
+## Form Date Handling
+
+### Date Input Widgets and Validation
+```python
+from django import forms
+from django.core.exceptions import ValidationError
+
+class DateRangeForm(forms.Form):
+    start_date = forms.DateField(
+        widget=forms.DateInput(
+            attrs={
+                'type': 'date',
+                'class': 'form-control',
+                'max': date.today().isoformat()  # Prevent future dates
+            }
+        ),
+        help_text="Start date for the report"
+    )
+    
+    end_date = forms.DateField(
+        widget=forms.DateInput(
+            attrs={
+                'type': 'date',
+                'class': 'form-control',
+                'max': date.today().isoformat()
+            }
+        ),
+        help_text="End date for the report"
+    )
+    
+    def clean(self):
+        """
+        Cross-field validation for date range
+        """
+        cleaned_data = super().clean()
+        start_date = cleaned_data.get('start_date')
+        end_date = cleaned_data.get('end_date')
+        
+        if start_date and end_date:
+            if start_date > end_date:
+                raise ValidationError("Start date cannot be after end date")
+            
+            # Check maximum range
+            if (end_date - start_date).days > 365:
+                raise ValidationError("Date range cannot exceed 365 days")
+        
+        return cleaned_data
+
+class ReadingLogForm(forms.ModelForm):
+    date = forms.DateField(
+        widget=forms.DateInput(
+            attrs={
+                'type': 'date',
+                'class': 'form-control',
+                'max': date.today().isoformat()
+            }
+        )
+    )
+    
+    class Meta:
+        model = Log
+        fields = ['date', 'title', 'author', 'pages', 'minutes', 'rating']
+    
+    def clean_date(self):
+        """
+        Validate reading log date
+        """
+        date_value = self.cleaned_data['date']
+        return validate_date_range(date_value, "Reading date")
+```
+
+## Performance Considerations
+
+### Date Query Optimization
+```python
+def optimize_date_queries():
+    """
+    Examples of optimized date-based queries
+    """
+    
+    # ✅ GOOD: Use date ranges with indexes
+    recent_logs = Log.objects.filter(
+        date__gte=date.today() - timedelta(days=30)
+    ).select_related('student', 'school')
+    
+    # ✅ GOOD: Use database date functions
+    monthly_stats = Log.objects.annotate(
+        month=TruncMonth('date')
+    ).values('month').annotate(
+        count=Count('id')
+    )
+    
+    # ❌ AVOID: Complex date calculations in Python
+    # logs = Log.objects.all()
+    # recent = [log for log in logs if (date.today() - log.date).days <= 30]
+    
+    # ✅ GOOD: Use __date lookup for datetime fields
+    today_logs = Log.objects.filter(created_at__date=date.today())
+    
+    return recent_logs, monthly_stats, today_logs
+```

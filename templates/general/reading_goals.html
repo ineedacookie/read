@@ -1,0 +1,607 @@
+{% extends "general/nav_template.html" %}
+{% load static %}
+{% block title %}read | Reading Goals{% endblock %}
+{% block content %}
+<div class="container mt-5">
+    <div class="row mb-4">
+        <div class="col-12">
+            <div class="d-flex justify-content-between align-items-center mb-3">
+                <div>
+                    <h2 class="mb-1"><i class="fas fa-bullseye me-2 text-primary"></i>Reading Goals Management</h2>
+                    <p class="text-muted mb-0">Set and track reading goals for your students to motivate consistent reading habits</p>
+                </div>
+                <div class="d-flex gap-2">
+                    <button class="btn btn-outline-secondary" id="refresh-goals" title="Refresh Data">
+                        <i class="fas fa-sync-alt"></i>
+                    </button>
+                    <button class="btn btn-primary" id="btn-bulk-set-goals" data-bs-toggle="modal" data-bs-target="#bulkGoalModal">
+                        <i class="fas fa-users me-1"></i>Set Goals for Class
+                    </button>
+                </div>
+            </div>
+        </div>
+    </div>
+
+    <!-- Goal Type Selection and Filters -->
+    <div class="row mb-4">
+        <div class="col-12">
+            <div class="card">
+                <div class="card-body">
+                    <div class="row g-3 align-items-center">
+                        <div class="col-md-4">
+                            <label class="form-label fw-bold">Goal Type</label>
+                            <div class="btn-group w-100" role="group" id="goal-type-toggle">
+                                <input type="radio" class="btn-check" name="goalType" id="daily-goals" value="daily" checked>
+                                <label class="btn btn-outline-primary" for="daily-goals">
+                                    <i class="fas fa-calendar-day me-1"></i>Daily Goals
+                                </label>
+                                <input type="radio" class="btn-check" name="goalType" id="total-goals" value="total">
+                                <label class="btn btn-outline-success" for="total-goals">
+                                    <i class="fas fa-chart-line me-1"></i>Total Goals
+                                </label>
+                            </div>
+                        </div>
+                        <div class="col-md-4">
+                            <label class="form-label fw-bold">Classroom/Group</label>
+                            <select class="form-select" id="class-group-filter">
+                                <option value="">All Students</option>
+                                {% for classroom in data.classrooms %}
+                                <option value="class_{{ classroom.id }}">🏫 {{ classroom.name }}</option>
+                                {% endfor %}
+                                {% for reading_group in data.reading_groups %}
+                                <option value="group_{{ reading_group.id }}">📖 {{ reading_group.name }}</option>
+                                {% endfor %}
+                            </select>
+                        </div>
+                        <div class="col-md-4">
+                            <label class="form-label fw-bold">Goal Status</label>
+                            <select class="form-select" id="goal-status-filter">
+                                <option value="">All Students</option>
+                                <option value="with_goals">With Goals</option>
+                                <option value="without_goals">Without Goals</option>
+                                <option value="achieving">Achieving Goals</option>
+                                <option value="struggling">Struggling</option>
+                            </select>
+                        </div>
+                    </div>
+                </div>
+            </div>
+        </div>
+    </div>
+
+    <!-- Goals Overview Cards -->
+    <div class="row mb-4" id="goal-overview">
+        <div class="col-lg-3 col-md-6 mb-3">
+            <div class="card bg-primary text-white">
+                <div class="card-body">
+                    <div class="d-flex justify-content-between">
+                        <div>
+                            <h6 class="mb-0">Students with Goals</h6>
+                            <h3 class="mb-0" id="students-with-goals-count">-</h3>
+                        </div>
+                        <div>
+                            <i class="fas fa-users fa-2x opacity-75"></i>
+                        </div>
+                    </div>
+                </div>
+            </div>
+        </div>
+        <div class="col-lg-3 col-md-6 mb-3">
+            <div class="card bg-success text-white">
+                <div class="card-body">
+                    <div class="d-flex justify-content-between">
+                        <div>
+                            <h6 class="mb-0">Achieving Goals</h6>
+                            <h3 class="mb-0" id="achieving-goals-count">-</h3>
+                        </div>
+                        <div>
+                            <i class="fas fa-trophy fa-2x opacity-75"></i>
+                        </div>
+                    </div>
+                </div>
+            </div>
+        </div>
+        <div class="col-lg-3 col-md-6 mb-3">
+            <div class="card bg-warning text-white">
+                <div class="card-body">
+                    <div class="d-flex justify-content-between">
+                        <div>
+                            <h6 class="mb-0">Need Encouragement</h6>
+                            <h3 class="mb-0" id="struggling-goals-count">-</h3>
+                        </div>
+                        <div>
+                            <i class="fas fa-heart fa-2x opacity-75"></i>
+                        </div>
+                    </div>
+                </div>
+            </div>
+        </div>
+        <div class="col-lg-3 col-md-6 mb-3">
+            <div class="card bg-info text-white">
+                <div class="card-body">
+                    <div class="d-flex justify-content-between">
+                        <div>
+                            <h6 class="mb-0">No Goals Set</h6>
+                            <h3 class="mb-0" id="no-goals-count">-</h3>
+                        </div>
+                        <div>
+                            <i class="fas fa-plus-circle fa-2x opacity-75"></i>
+                        </div>
+                    </div>
+                </div>
+            </div>
+        </div>
+    </div>
+
+    <!-- Student Goals Table -->
+    <div class="card">
+        <div class="card-header border-bottom border-200 px-0">
+            <div class="row flex-between-center gy-2 px-x1">
+                <div class="col-auto">
+                    <h5 class="mb-0" id="goals-table-title">Daily Reading Goals</h5>
+                </div>
+                <div class="col-auto d-flex">
+                    <div class="form-check form-switch me-3">
+                        <input class="form-check-input" type="checkbox" id="show-progress" checked>
+                        <label class="form-check-label" for="show-progress">Show Progress</label>
+                    </div>
+                    <button class="btn btn-sm btn-success" id="btn-add-individual-goal" data-bs-toggle="modal" data-bs-target="#individualGoalModal">
+                        <i class="fas fa-plus me-1"></i>Set Individual Goal
+                    </button>
+                </div>
+            </div>
+        </div>
+        <div class="card-body p-0">
+            <div class="table-responsive scrollbar">
+                <table class="table table-sm mb-0 fs-10" id="goals-table">
+                    <thead class="bg-body-tertiary">
+                        <tr>
+                            <th class="text-800 sort align-middle ps-3">Student</th>
+                            <th class="text-800 sort align-middle">Current Goal</th>
+                            <th class="text-800 sort align-middle">Progress</th>
+                            <th class="text-800 sort align-middle">Status</th>
+                            <th class="text-800 sort align-middle">Actions</th>
+                        </tr>
+                    </thead>
+                    <tbody class="list" id="goals-table-body">
+                        <!-- Rows will be populated via AJAX -->
+                    </tbody>
+                </table>
+            </div>
+        </div>
+    </div>
+
+    <!-- Bulk Goal Setting Modal -->
+    <div class="modal fade" id="bulkGoalModal" tabindex="-1" aria-labelledby="bulkGoalModalLabel" aria-hidden="true">
+        <div class="modal-dialog modal-lg">
+            <div class="modal-content">
+                <div class="modal-header bg-primary text-white">
+                    <h5 class="modal-title" id="bulkGoalModalLabel">
+                        <i class="fas fa-users me-2"></i>Set Goals for Multiple Students
+                    </h5>
+                    <button type="button" class="btn-close btn-close-white" data-bs-dismiss="modal" aria-label="Close"></button>
+                </div>
+                <div class="modal-body">
+                    <form id="bulk-goal-form">
+                        {% csrf_token %}
+                        <div class="row">
+                            <div class="col-md-6">
+                                <div class="form-group mb-3">
+                                    <label for="bulk-class-group" class="form-label">Target Group</label>
+                                    <select class="form-select" id="bulk-class-group" name="target_group" required>
+                                        <option value="">Select classroom or reading group...</option>
+                                        {% for classroom in data.classrooms %}
+                                        <option value="class_{{ classroom.id }}">🏫 {{ classroom.name }}</option>
+                                        {% endfor %}
+                                        {% for reading_group in data.reading_groups %}
+                                        <option value="group_{{ reading_group.id }}">📖 {{ reading_group.name }}</option>
+                                        {% endfor %}
+                                    </select>
+                                </div>
+                            </div>
+                            <div class="col-md-6">
+                                <div class="form-group mb-3">
+                                    <label for="bulk-goal-type" class="form-label">Goal Type</label>
+                                    <select class="form-select" id="bulk-goal-type" name="goal_type" required>
+                                        <option value="daily">Daily Goal</option>
+                                        <option value="total">Total Goal</option>
+                                    </select>
+                                </div>
+                            </div>
+                        </div>
+                        
+                        <div class="row" id="daily-goal-inputs">
+                            <div class="col-md-6">
+                                <div class="form-group mb-3">
+                                    <label for="bulk-daily-pages" class="form-label">Daily Pages Goal</label>
+                                    <input type="number" class="form-control" id="bulk-daily-pages" name="daily_pages" min="1" max="500">
+                                    <small class="form-text text-muted">Leave blank to not set pages goal</small>
+                                </div>
+                            </div>
+                            <div class="col-md-6">
+                                <div class="form-group mb-3">
+                                    <label for="bulk-daily-minutes" class="form-label">Daily Minutes Goal</label>
+                                    <input type="number" class="form-control" id="bulk-daily-minutes" name="daily_minutes" min="1" max="300">
+                                    <small class="form-text text-muted">Leave blank to not set minutes goal</small>
+                                </div>
+                            </div>
+                        </div>
+                        
+                        <div class="row" id="total-goal-inputs" style="display: none;">
+                            <div class="col-md-6">
+                                <div class="form-group mb-3">
+                                    <label for="bulk-total-pages" class="form-label">Total Pages Goal</label>
+                                    <input type="number" class="form-control" id="bulk-total-pages" name="total_pages" min="1" max="10000">
+                                </div>
+                            </div>
+                            <div class="col-md-6">
+                                <div class="form-group mb-3">
+                                    <label for="bulk-goal-deadline" class="form-label">Goal Deadline</label>
+                                    <input type="date" class="form-control" id="bulk-goal-deadline" name="deadline">
+                                </div>
+                            </div>
+                        </div>
+                        
+                        <div class="alert alert-info">
+                            <i class="fas fa-info-circle me-2"></i>
+                            <strong>Note:</strong> This will set goals for all students in the selected group who don't already have the specified goal type. Existing goals will not be overwritten.
+                        </div>
+                    </form>
+                </div>
+                <div class="modal-footer">
+                    <button type="button" class="btn btn-secondary" data-bs-dismiss="modal">Cancel</button>
+                    <button type="button" class="btn btn-primary" id="btn-save-bulk-goals">
+                        <i class="fas fa-save me-1"></i>Set Goals
+                    </button>
+                </div>
+            </div>
+        </div>
+    </div>
+
+    <!-- Individual Goal Setting Modal -->
+    <div class="modal fade" id="individualGoalModal" tabindex="-1" aria-labelledby="individualGoalModalLabel" aria-hidden="true">
+        <div class="modal-dialog">
+            <div class="modal-content">
+                <div class="modal-header bg-success text-white">
+                    <h5 class="modal-title" id="individualGoalModalLabel">
+                        <i class="fas fa-user me-2"></i>Set Individual Goal
+                    </h5>
+                    <button type="button" class="btn-close btn-close-white" data-bs-dismiss="modal" aria-label="Close"></button>
+                </div>
+                <div class="modal-body">
+                    <form id="individual-goal-form">
+                        {% csrf_token %}
+                        <input type="hidden" id="individual-student-id" name="student_id">
+                        <div class="form-group mb-3">
+                            <label for="individual-student" class="form-label">Student</label>
+                            <select class="form-select" id="individual-student" name="student_select" required>
+                                <option value="">Select a student...</option>
+                                <!-- Will be populated dynamically -->
+                            </select>
+                        </div>
+                        <div class="form-group mb-3">
+                            <label for="individual-goal-type" class="form-label">Goal Type</label>
+                            <select class="form-select" id="individual-goal-type" name="goal_type" required>
+                                <option value="daily">Daily Goal</option>
+                                <option value="total">Total Goal</option>
+                            </select>
+                        </div>
+                        
+                        <div id="individual-daily-inputs">
+                            <div class="form-group mb-3">
+                                <label for="individual-daily-pages" class="form-label">Daily Pages Goal</label>
+                                <input type="number" class="form-control" id="individual-daily-pages" name="daily_pages" min="1" max="500">
+                            </div>
+                            <div class="form-group mb-3">
+                                <label for="individual-daily-minutes" class="form-label">Daily Minutes Goal</label>
+                                <input type="number" class="form-control" id="individual-daily-minutes" name="daily_minutes" min="1" max="300">
+                            </div>
+                        </div>
+                        
+                        <div id="individual-total-inputs" style="display: none;">
+                            <div class="form-group mb-3">
+                                <label for="individual-total-pages" class="form-label">Total Pages Goal</label>
+                                <input type="number" class="form-control" id="individual-total-pages" name="total_pages" min="1" max="10000">
+                            </div>
+                            <div class="form-group mb-3">
+                                <label for="individual-deadline" class="form-label">Goal Deadline</label>
+                                <input type="date" class="form-control" id="individual-deadline" name="deadline">
+                            </div>
+                        </div>
+                    </form>
+                </div>
+                <div class="modal-footer">
+                    <button type="button" class="btn btn-secondary" data-bs-dismiss="modal">Cancel</button>
+                    <button type="button" class="btn btn-success" id="btn-save-individual-goal">
+                        <i class="fas fa-save me-1"></i>Set Goal
+                    </button>
+                </div>
+            </div>
+        </div>
+    </div>
+</div>
+
+<script>
+$(document).ready(function() {
+    let allStudents = [];
+    let currentGoalType = 'daily';
+    
+    // Initialize page
+    loadStudents();
+    loadGoalData();
+    
+    // Goal type toggle
+    $('input[name="goalType"]').on('change', function() {
+        currentGoalType = $(this).val();
+        updateGoalTypeDisplay();
+        loadGoalData();
+    });
+    
+    // Filters
+    $('#class-group-filter, #goal-status-filter').on('change', function() {
+        loadGoalData();
+    });
+    
+    // Modal toggles for goal types
+    $('#bulk-goal-type, #individual-goal-type').on('change', function() {
+        const goalType = $(this).val();
+        const isIndividual = $(this).attr('id') === 'individual-goal-type';
+        const prefix = isIndividual ? 'individual' : 'bulk';
+        
+        if (goalType === 'daily') {
+            $(`#${prefix}-daily-inputs`).show();
+            $(`#${prefix}-total-inputs`).hide();
+        } else {
+            $(`#${prefix}-daily-inputs`).hide();
+            $(`#${prefix}-total-inputs`).show();
+        }
+    });
+    
+    function updateGoalTypeDisplay() {
+        const title = currentGoalType === 'daily' ? 'Daily Reading Goals' : 'Total Reading Goals';
+        $('#goals-table-title').text(title);
+    }
+    
+    function loadStudents() {
+        $.ajax({
+            url: '{% url "api_students" %}',
+            method: 'GET',
+            success: function(data) {
+                allStudents = data;
+                
+                // Populate individual goal student dropdown
+                $('#individual-student').empty().append('<option value="">Select a student...</option>');
+                data.forEach(student => {
+                    $('#individual-student').append(`<option value="${student.id}">${student.name}</option>`);
+                });
+            },
+            error: function() {
+                console.error('Failed to load students');
+            }
+        });
+    }
+    
+    function loadGoalData() {
+        const classGroup = $('#class-group-filter').val();
+        const status = $('#goal-status-filter').val();
+        
+        $.ajax({
+            url: '{% url "api_reading_goals" %}',
+            method: 'GET',
+            data: {
+                goal_type: currentGoalType,
+                class_group: classGroup,
+                status: status
+            },
+            success: function(data) {
+                updateOverviewCards(data.overview);
+                updateGoalsTable(data.students);
+            },
+            error: function() {
+                console.error('Failed to load goal data');
+                showNotification('error', 'Failed to load goal data');
+            }
+        });
+    }
+    
+    function updateOverviewCards(overview) {
+        $('#students-with-goals-count').text(overview.with_goals || 0);
+        $('#achieving-goals-count').text(overview.achieving || 0);
+        $('#struggling-goals-count').text(overview.struggling || 0);
+        $('#no-goals-count').text(overview.no_goals || 0);
+    }
+    
+    function updateGoalsTable(students) {
+        $('#goals-table-body').empty();
+        
+        students.forEach(student => {
+            const hasGoal = currentGoalType === 'daily' ? student.daily_goal : student.total_goal;
+            const goalText = hasGoal ? getGoalDisplayText(hasGoal, currentGoalType) : '<span class="text-muted">No goal set</span>';
+            const progressHtml = hasGoal ? getProgressHtml(student.progress) : '-';
+            const statusBadge = getStatusBadge(student.status);
+            
+            const row = `
+                <tr>
+                    <td class="align-middle ps-3">
+                        <div class="d-flex align-items-center">
+                            <div>
+                                <h6 class="mb-0">${student.name}</h6>
+                                <small class="text-muted">${student.classroom || 'No classroom'}</small>
+                            </div>
+                        </div>
+                    </td>
+                    <td class="align-middle">${goalText}</td>
+                    <td class="align-middle">${progressHtml}</td>
+                    <td class="align-middle">${statusBadge}</td>
+                    <td class="align-middle">
+                        <div class="btn-group btn-group-sm">
+                            <button class="btn btn-outline-primary" onclick="editStudentGoal(${student.id}, '${student.name}')" title="Edit Goal">
+                                <i class="fas fa-edit"></i>
+                            </button>
+                            ${hasGoal ? `<button class="btn btn-outline-danger" onclick="removeStudentGoal(${student.id}, '${currentGoalType}')" title="Remove Goal">
+                                <i class="fas fa-trash"></i>
+                            </button>` : ''}
+                        </div>
+                    </td>
+                </tr>
+            `;
+            
+            $('#goals-table-body').append(row);
+        });
+    }
+    
+    function getGoalDisplayText(goal, type) {
+        if (type === 'daily') {
+            const parts = [];
+            if (goal.pages) parts.push(`${goal.pages} pages`);
+            if (goal.minutes) parts.push(`${goal.minutes} minutes`);
+            return parts.join(' / ') || 'No specific target';
+        } else {
+            return `${goal.pages || 0} pages by ${goal.deadline || 'No deadline'}`;
+        }
+    }
+    
+    function getProgressHtml(progress) {
+        if (!progress) return '-';
+        
+        const percentage = Math.min(progress.percentage, 100);
+        const progressClass = percentage >= 100 ? 'bg-success' : percentage >= 70 ? 'bg-primary' : percentage >= 40 ? 'bg-warning' : 'bg-danger';
+        
+        return `
+            <div class="progress" style="height: 8px;">
+                <div class="progress-bar ${progressClass}" style="width: ${percentage}%"></div>
+            </div>
+            <small class="text-muted">${percentage.toFixed(0)}%</small>
+        `;
+    }
+    
+    function getStatusBadge(status) {
+        const badges = {
+            'achieving': '<span class="badge bg-success">Achieving</span>',
+            'on_track': '<span class="badge bg-primary">On Track</span>',
+            'needs_encouragement': '<span class="badge bg-warning">Needs Help</span>',
+            'no_goal': '<span class="badge bg-secondary">No Goal</span>'
+        };
+        return badges[status] || '<span class="badge bg-light text-dark">Unknown</span>';
+    }
+    
+    // Global functions for buttons
+    window.editStudentGoal = function(studentId, studentName) {
+        $('#individual-student').val(studentId);
+        $('#individual-goal-type').val(currentGoalType);
+        $('#individualGoalModalLabel').html(`<i class="fas fa-user me-2"></i>Edit Goal for ${studentName}`);
+        
+        // Load existing goal data if any
+        // TODO: Implement goal loading for editing
+        
+        $('#individualGoalModal').modal('show');
+    };
+    
+    window.removeStudentGoal = function(studentId, goalType) {
+        if (confirm('Are you sure you want to remove this goal?')) {
+            $.ajax({
+                url: '{% url "api_reading_goals" %}',
+                method: 'DELETE',
+                data: JSON.stringify({
+                    student_id: studentId,
+                    goal_type: goalType
+                }),
+                contentType: 'application/json',
+                headers: {
+                    'X-CSRFToken': $('[name=csrfmiddlewaretoken]').val()
+                },
+                success: function() {
+                    showNotification('success', 'Goal removed successfully');
+                    loadGoalData();
+                },
+                error: function() {
+                    showNotification('error', 'Failed to remove goal');
+                }
+            });
+        }
+    };
+    
+    // Form submissions
+    $('#btn-save-bulk-goals').on('click', function() {
+        const formData = new FormData($('#bulk-goal-form')[0]);
+        
+        $.ajax({
+            url: '{% url "api_bulk_reading_goals" %}',
+            method: 'POST',
+            data: formData,
+            processData: false,
+            contentType: false,
+            headers: {
+                'X-CSRFToken': $('[name=csrfmiddlewaretoken]').val()
+            },
+            success: function(response) {
+                if (response.success) {
+                    $('#bulkGoalModal').modal('hide');
+                    $('#bulk-goal-form')[0].reset();
+                    showNotification('success', `Goals set for ${response.count} students`);
+                    loadGoalData();
+                } else {
+                    showNotification('error', response.message || 'Failed to set goals');
+                }
+            },
+            error: function() {
+                showNotification('error', 'Network error. Please try again.');
+            }
+        });
+    });
+    
+    $('#btn-save-individual-goal').on('click', function() {
+        const formData = new FormData($('#individual-goal-form')[0]);
+        
+        $.ajax({
+            url: '{% url "api_individual_reading_goal" %}',
+            method: 'POST',
+            data: formData,
+            processData: false,
+            contentType: false,
+            headers: {
+                'X-CSRFToken': $('[name=csrfmiddlewaretoken]').val()
+            },
+            success: function(response) {
+                if (response.success) {
+                    $('#individualGoalModal').modal('hide');
+                    $('#individual-goal-form')[0].reset();
+                    showNotification('success', 'Goal set successfully');
+                    loadGoalData();
+                } else {
+                    showNotification('error', response.message || 'Failed to set goal');
+                }
+            },
+            error: function() {
+                showNotification('error', 'Network error. Please try again.');
+            }
+        });
+    });
+    
+    // Helper function for notifications
+    function showNotification(type, message) {
+        const alertClass = type === 'success' ? 'alert-success' : 'alert-danger';
+        const iconClass = type === 'success' ? 'fa-check-circle' : 'fa-exclamation-circle';
+        
+        const notification = $(`
+            <div class="alert ${alertClass} alert-dismissible fade show position-fixed" style="top: 20px; right: 20px; z-index: 9999;">
+                <i class="fas ${iconClass} me-2"></i>${message}
+                <button type="button" class="btn-close" data-bs-dismiss="alert"></button>
+            </div>
+        `);
+        
+        $('body').append(notification);
+        
+        setTimeout(() => {
+            notification.alert('close');
+        }, 5000);
+    }
+    
+    // Refresh button
+    $('#refresh-goals').on('click', function() {
+        loadGoalData();
+    });
+});
+</script>
+{% endblock %}
+

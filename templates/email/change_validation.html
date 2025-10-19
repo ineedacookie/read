@@ -1,5 +1,22 @@
-{% autoescape off %}
-Hi {{ user }},
-Please click on the link to validate your new email,
-http://{{ domain }}{% url 'activate' uidb64=uid token=token %}
-{% endautoescape %}
+{% extends "email/base_email.html" %}
+
+{% block email_content %}
+<p>We received a request to change the email address associated with your account.</p>
+
+<p>To confirm this change and validate your new email address, please click the button below:</p>
+
+<div style="text-align: center;">
+    <a href="http://{{ domain }}{% url 'activate' uidb64=uid token=token %}" class="email-button">
+        Validate New Email
+    </a>
+</div>
+
+<p>If the button doesn't work, you can copy and paste this link into your browser:</p>
+<div class="link-box">
+    http://{{ domain }}{% url 'activate' uidb64=uid token=token %}
+</div>
+
+<p><strong>Important:</strong> If you didn't request this email change, please ignore this message or contact our support team.</p>
+
+<p>For your security, this validation link will expire in 24 hours.</p>
+{% endblock %}

@@ -207,13 +207,19 @@
                 {% if form_name == "Student" %}
                 <ul class="nav nav-tabs">
                     <li class="nav-item">
-                        <a class="nav-link {% if default_tab == 'status' %}active{% endif %}" id="tab-status" href="#">Status</a>
+                        <a class="nav-link {% if default_tab == 'status' %}active{% endif %}" id="tab-status" href="#">
+                            <i class="fas fa-chart-line me-2"></i>Status & Progress
+                        </a>
                     </li>
                     <li class="nav-item">
-                        <a class="nav-link {% if default_tab == 'calendar' %}active{% endif %}" id="tab-calendar" href="#">Calendar</a>
+                        <a class="nav-link {% if default_tab == 'calendar' %}active{% endif %}" id="tab-calendar" href="#">
+                            <i class="fas fa-book-open me-2"></i>Reading Logs
+                        </a>
                     </li>
                     <li class="nav-item">
-                        <a class="nav-link {% if default_tab == 'settings' %}active{% endif %}" id="tab-settings" href="#">Settings</a>
+                        <a class="nav-link {% if default_tab == 'settings' %}active{% endif %}" id="tab-settings" href="#">
+                            <i class="fas fa-cog me-2"></i>Settings
+                        </a>
                     </li>
                 </ul>
                 {% elif form_name in "ClassroomsGroups" %}
@@ -323,58 +329,111 @@
             {% csrf_token %}
             <div class="card-body">
                 {% if form_name == "Student" %}
-                    <!-- Student-specific form sections -->
-                    <div class="row">
+                    <!-- Student-specific form sections with improved layout -->
+                    <div class="row g-4">
                         <div class="col-md-6">
-                            <h6 class="text-primary border-bottom pb-2 mb-3">
-                                <i class="fas fa-user me-2"></i>Personal Information
-                            </h6>
-                            {% for field in form %}
-                                {% if field.name in "first_name,last_name,email,date_of_birth" %}
-                                <div class="mb-3">
-                                    {{ field.label_tag }}
-                                    {{ field }}
-                                    {% if field.errors %}
-                                        <div class="text-danger small mt-1">{{ field.errors }}</div>
-                                    {% endif %}
+                            <div class="card border-primary border-opacity-25">
+                                <div class="card-header bg-primary bg-opacity-10">
+                                    <h6 class="text-primary mb-0">
+                                        <i class="fas fa-user me-2"></i>Personal Information
+                                    </h6>
                                 </div>
-                                {% endif %}
-                            {% endfor %}
+                                <div class="card-body">
+                                    {% for field in form %}
+                                        {% if field.name in "first_name,last_initial,email,username" %}
+                                        <div class="mb-3">
+                                            <label class="form-label fw-semibold">{{ field.label }}</label>
+                                            {{ field }}
+                                            {% if field.help_text %}
+                                                <div class="form-text">{{ field.help_text }}</div>
+                                            {% endif %}
+                                            {% if field.errors %}
+                                                <div class="text-danger small mt-1">{{ field.errors }}</div>
+                                            {% endif %}
+                                        </div>
+                                        {% endif %}
+                                    {% endfor %}
+                                </div>
+                            </div>
                         </div>
+                        
                         <div class="col-md-6">
-                            <h6 class="text-success border-bottom pb-2 mb-3">
-                                <i class="fas fa-graduation-cap me-2"></i>Academic Settings
-                            </h6>
-                            {% for field in form %}
-                                {% if field.name in "student_id,grade_level,reading_level,classrooms,reading_groups" %}
-                                <div class="mb-3">
-                                    {{ field.label_tag }}
-                                    {{ field }}
-                                    {% if field.errors %}
-                                        <div class="text-danger small mt-1">{{ field.errors }}</div>
-                                    {% endif %}
+                            <div class="card border-success border-opacity-25">
+                                <div class="card-header bg-success bg-opacity-10">
+                                    <h6 class="text-success mb-0">
+                                        <i class="fas fa-graduation-cap me-2"></i>Academic Settings
+                                    </h6>
                                 </div>
-                                {% endif %}
-                            {% endfor %}
+                                <div class="card-body">
+                                    {% for field in form %}
+                                        {% if field.name in "classrooms,reading_groups" %}
+                                        <div class="mb-3">
+                                            <label class="form-label fw-semibold">{{ field.label }}</label>
+                                            {{ field }}
+                                            {% if field.help_text %}
+                                                <div class="form-text">{{ field.help_text }}</div>
+                                            {% endif %}
+                                            {% if field.errors %}
+                                                <div class="text-danger small mt-1">{{ field.errors }}</div>
+                                            {% endif %}
+                                        </div>
+                                        {% endif %}
+                                    {% endfor %}
+                                </div>
+                            </div>
                         </div>
                     </div>
-                    <div class="row mt-4">
-                        <div class="col-12">
-                            <h6 class="text-info border-bottom pb-2 mb-3">
-                                <i class="fas fa-bullseye me-2"></i>Reading Goals & Preferences
-                            </h6>
-                            <div class="row">
-                                {% for field in form %}
-                                    {% if field.name in "daily_goal_pages,daily_goal_minutes,reading_preferences,notes" %}
-                                    <div class="col-md-6 mb-3">
-                                        {{ field.label_tag }}
-                                        {{ field }}
-                                        {% if field.errors %}
-                                            <div class="text-danger small mt-1">{{ field.errors }}</div>
+                    
+                    <div class="row g-4 mt-2">
+                        <div class="col-md-6">
+                            <div class="card border-info border-opacity-25">
+                                <div class="card-header bg-info bg-opacity-10">
+                                    <h6 class="text-info mb-0">
+                                        <i class="fas fa-users me-2"></i>Parent Relationships
+                                    </h6>
+                                </div>
+                                <div class="card-body" id="parentsSection">
+                                    {% for field in form %}
+                                        {% if field.name == "parents" %}
+                                        <div class="mb-3">
+                                            <label class="form-label fw-semibold">{{ field.label }}</label>
+                                            {{ field }}
+                                            {% if field.help_text %}
+                                                <div class="form-text">{{ field.help_text }}</div>
+                                            {% endif %}
+                                            {% if field.errors %}
+                                                <div class="text-danger small mt-1">{{ field.errors }}</div>
+                                            {% endif %}
+                                        </div>
                                         {% endif %}
-                                    </div>
-                                    {% endif %}
-                                {% endfor %}
+                                    {% endfor %}
+                                </div>
+                            </div>
+                        </div>
+                        
+                        <div class="col-md-6">
+                            <div class="card border-warning border-opacity-25">
+                                <div class="card-header bg-warning bg-opacity-10">
+                                    <h6 class="text-warning mb-0">
+                                        <i class="fas fa-sticky-note me-2"></i>Additional Notes
+                                    </h6>
+                                </div>
+                                <div class="card-body">
+                                    {% for field in form %}
+                                        {% if field.name in "notes" %}
+                                        <div class="mb-3">
+                                            <label class="form-label fw-semibold">{{ field.label }}</label>
+                                            {{ field }}
+                                            {% if field.help_text %}
+                                                <div class="form-text">{{ field.help_text }}</div>
+                                            {% endif %}
+                                            {% if field.errors %}
+                                                <div class="text-danger small mt-1">{{ field.errors }}</div>
+                                            {% endif %}
+                                        </div>
+                                        {% endif %}
+                                    {% endfor %}
+                                </div>
                             </div>
                         </div>
                     </div>
@@ -558,7 +617,7 @@
                 <!-- Show any remaining fields that weren't categorized -->
                 {% if form_name == "Student" %}
                     {% for field in form %}
-                        {% if field.name not in "first_name,last_name,email,date_of_birth,student_id,grade_level,reading_level,classrooms,reading_groups,daily_goal_pages,daily_goal_minutes,reading_preferences,notes" %}
+                        {% if field.name not in "first_name,last_initial,email,username,classrooms,reading_groups,parents,notes,password" %}
                         <div class="mb-3">
                             {{ field.label_tag }}
                             {{ field }}

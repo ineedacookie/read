@@ -1,0 +1,401 @@
+---
+description: Database optimization guidelines for indexes, constraints, queries, and performance
+globs: ["**/models.py", "**/migrations/*", "**/views.py", "**/managers.py"]
+alwaysApply: false
+---
+
+# Database Optimization Guidelines
+
+## Index Strategy
+
+### Primary Index Patterns
+```python
+class Log(models.Model):
+    student = models.ForeignKey(CustomUser, on_delete=models.CASCADE, db_index=True)
+    school = models.ForeignKey(School, on_delete=models.CASCADE, db_index=True)
+    date = models.DateField(db_index=True)  # Frequently queried for date ranges
+    title = models.CharField(max_length=255, blank=True, null=True, db_index=True)
+    
+    class Meta:
+        # Composite indexes for common query patterns
+        indexes = [
+            models.Index(fields=['school', 'student', 'date']),  # Student progress queries
+            models.Index(fields=['school', 'date']),            # School-wide queries  
+            models.Index(fields=['student', 'date']),           # Individual student queries
+            models.Index(fields=['date', 'school']),            # Date-first analytics
+        ]
+```
+
+### When to Add Indexes
+```python
+# ✅ ADD indexes for:
+# - Foreign keys (automatically indexed by Django)
+# - Fields frequently used in WHERE clauses
+# - Fields used in ORDER BY
+# - Fields used in JOINs
+# - Composite indexes for multi-field queries
+
+# ❌ AVOID indexes on:
+# - Fields that are updated frequently
+# - Small tables (< 1000 rows)
+# - Fields with very low selectivity (boolean fields)
+# - Very wide columns (text fields)
+```
+
+## Query Optimization Patterns
+
+### Use Select Related for Foreign Keys
+```python
+# ✅ GOOD: Single query with JOIN
+logs = Log.objects.select_related('student', 'school')\
+                 .filter(date__gte=start_date)
+
+# ❌ BAD: N+1 queries
+logs = Log.objects.filter(date__gte=start_date)
+for log in logs:
+    print(log.student.name)  # Additional query for each log
+```
+
+### Use Prefetch Related for Reverse FKs and M2M
+```python
+# ✅ GOOD: Prefetch related objects
+students = CustomUser.objects.prefetch_related(
+    'log_set',           # Reverse FK
+    'classrooms',        # M2M
+    'reading_groups'     # M2M
+).filter(user_type='student')
+
+# Access without additional queries
+for student in students:
+    for log in student.log_set.all():  # No additional query
+        print(log.title)
+```
+
+### Use Only() and Defer() for Large Objects
+```python
+# ✅ GOOD: Only select needed fields
+logs = Log.objects.only('id', 'title', 'pages', 'date')\
+                 .filter(student=student)
+
+# ✅ GOOD: Defer expensive fields
+logs = Log.objects.defer('comments')\
+                 .filter(student=student)
+```
+
+## Aggregation Optimization
+
+### Database-Level Aggregations
+```python
+# ✅ GOOD: Database aggregation
+stats = Log.objects.filter(student=student).aggregate(
+    total_pages=Sum('pages'),
+    avg_rating=Avg('rating'),
+    log_count=Count('id')
+)
+
+# ❌ BAD: Python-level aggregation
+logs = Log.objects.filter(student=student)
+total_pages = sum(log.pages or 0 for log in logs)
+```
+
+### Use Annotations for Calculated Fields
+```python
+# ✅ GOOD: Database calculation
+students = CustomUser.objects.annotate(
+    total_pages=Sum('log__pages'),
+    avg_rating=Avg('log__rating'),
+    log_count=Count('log')
+).filter(user_type='student')
+
+# Access calculated fields
+for student in students:
+    print(f"{student.name}: {student.total_pages} pages")
+```
+
+## Constraint Patterns
+
+### Data Integrity Constraints
+```python
+class Log(models.Model):
+    pages = models.IntegerField(blank=True, null=True)
+    minutes = models.IntegerField(blank=True, null=True)
+    rating = models.DecimalField(
+        max_digits=3, decimal_places=2, 
+        blank=True, null=True,
+        validators=[
+            MinValueValidator(0.00),
+            MaxValueValidator(5.00)
+        ]
+    )
+    
+    class Meta:
+        constraints = [
+            # Ensure non-negative values
+            models.CheckConstraint(
+                check=models.Q(pages__gte=0) | models.Q(pages__isnull=True),
+                name='pages_non_negative'
+            ),
+            models.CheckConstraint(
+                check=models.Q(minutes__gte=0) | models.Q(minutes__isnull=True),
+                name='minutes_non_negative'
+            ),
+            # Ensure at least one metric is provided
+            models.CheckConstraint(
+                check=models.Q(pages__isnull=False) | models.Q(minutes__isnull=False),
+                name='at_least_one_metric'
+            ),
+            # Unique constraint for specific combinations
+            models.UniqueConstraint(
+                fields=['student', 'date', 'title'],
+                name='unique_daily_book_log'
+            )
+        ]
+```
+
+## Transaction Management
+
+### Use Atomic Transactions for Related Operations
+```python
+from django.db import transaction
+
+@transaction.atomic
+def create_reading_log_with_achievements(student, log_data):
+    """
+    Create log and process achievements in single transaction
+    """
+    # Create the log
+    log = Log.objects.create(student=student, **log_data)
+    
+    # Update student stats
+    profile = student.profile
+    profile.total_pages += log.pages or 0
+    profile.save()
+    
+    # Check for new achievements
+    gamification_engine = GamificationEngine(student)
+    badges = gamification_engine.check_achievements_for_log(log)
+    
+    return log, badges
+```
+
+### Savepoint for Nested Transactions
+```python
+from django.db import transaction
+
+def bulk_process_students(student_ids):
+    with transaction.atomic():
+        for student_id in student_ids:
+            try:
+                with transaction.atomic():
+                    # Process individual student
+                    process_student_analytics(student_id)
+            except Exception as e:
+                # This student fails, but others continue
+                logger.error(f'Failed to process student {student_id}: {e}')
+```
+
+## Custom Manager Optimization
+
+### Efficient Custom Managers
+```python
+class LogManager(models.Manager):
+    def for_student(self, student):
+        """Get logs for a specific student with common optimizations"""
+        return self.select_related('school')\
+                  .filter(student=student)\
+                  .order_by('-date')
+    
+    def for_date_range(self, start_date, end_date):
+        """Get logs in date range with validation"""
+        if start_date > end_date:
+            raise ValueError("start_date cannot be after end_date")
+            
+        return self.select_related('student', 'school')\
+                  .filter(date__range=(start_date, end_date))
+    
+    def with_analytics(self):
+        """Include common analytics annotations"""
+        return self.annotate(
+            student_name=F('student__first_name'),
+            school_name=F('school__name')
+        )
+
+class Log(models.Model):
+    # ... fields ...
+    
+    objects = LogManager()
+```
+
+## Bulk Operations
+
+### Bulk Create for Multiple Records
+```python
+# ✅ GOOD: Bulk create
+logs_to_create = []
+for log_data in log_data_list:
+    logs_to_create.append(Log(**log_data))
+
+Log.objects.bulk_create(logs_to_create, batch_size=100)
+
+# ❌ BAD: Individual creates
+for log_data in log_data_list:
+    Log.objects.create(**log_data)  # One query per log
+```
+
+### Bulk Update for Multiple Records
+```python
+# ✅ GOOD: Bulk update
+Log.objects.filter(student=student, date__gte=start_date)\
+          .update(school=new_school)
+
+# ❌ BAD: Individual updates
+logs = Log.objects.filter(student=student, date__gte=start_date)
+for log in logs:
+    log.school = new_school
+    log.save()  # One query per log
+```
+
+## Query Performance Monitoring
+
+### Use Django Debug Toolbar in Development
+```python
+# settings.py (development only)
+if DEBUG:
+    INSTALLED_APPS.append('debug_toolbar')
+    MIDDLEWARE.append('debug_toolbar.middleware.DebugToolbarMiddleware')
+    
+    # Show queries that take longer than 0.1 seconds
+    DEBUG_TOOLBAR_CONFIG = {
+        'SHOW_TEMPLATE_CONTEXT': True,
+        'SQL_WARNING_THRESHOLD': 100,  # milliseconds
+    }
+```
+
+### Log Slow Queries in Production
+```python
+# settings.py
+LOGGING = {
+    'version': 1,
+    'disable_existing_loggers': False,
+    'handlers': {
+        'slow_queries': {
+            'level': 'DEBUG',
+            'class': 'logging.FileHandler',
+            'filename': 'slow_queries.log',
+        },
+    },
+    'loggers': {
+        'django.db.backends': {
+            'handlers': ['slow_queries'],
+            'level': 'DEBUG',
+            'propagate': False,
+        },
+    },
+}
+
+# Database settings for query logging
+DATABASES = {
+    'default': {
+        # ... other settings ...
+        'OPTIONS': {
+            'init_command': "SET sql_mode='STRICT_TRANS_TABLES'",
+            'charset': 'utf8mb4',
+        },
+        'CONN_MAX_AGE': 600,
+    }
+}
+```
+
+## Migration Best Practices
+
+### Safe Schema Changes
+```python
+# ✅ GOOD: Add index concurrently (PostgreSQL)
+from django.contrib.postgres.operations import AddIndexConcurrently
+
+class Migration(migrations.Migration):
+    atomic = False  # Required for concurrent operations
+    
+    operations = [
+        AddIndexConcurrently(
+            model_name='log',
+            index=models.Index(fields=['date', 'student'], name='idx_log_date_student'),
+        ),
+    ]
+
+# ✅ GOOD: Add nullable field first, then make required
+# Migration 1: Add nullable field
+operations = [
+    migrations.AddField(
+        model_name='log',
+        name='new_field',
+        field=models.CharField(max_length=100, null=True, blank=True),
+    ),
+]
+
+# Migration 2: Populate field with data
+# Migration 3: Make field required
+operations = [
+    migrations.AlterField(
+        model_name='log',
+        name='new_field',
+        field=models.CharField(max_length=100),
+    ),
+]
+```
+
+## Database Connection Optimization
+
+### Connection Pooling Settings
+```python
+# settings.py
+DATABASES = {
+    'default': {
+        'ENGINE': 'django.db.backends.postgresql',
+        'NAME': 'reading_logs',
+        'CONN_MAX_AGE': 600,  # Persistent connections
+        'OPTIONS': {
+            'MAX_CONNS': 20,      # Connection pool size
+            'MIN_CONNS': 1,       # Minimum connections
+        }
+    }
+}
+
+# Use read replicas for analytics
+DATABASE_ROUTERS = ['myapp.routers.DatabaseRouter']
+
+class DatabaseRouter:
+    def db_for_read(self, model, **hints):
+        if model._meta.app_label == 'analytics':
+            return 'analytics_readonly'
+        return None
+```
+
+## Memory Usage Optimization
+
+### Use Iterator for Large Querysets
+```python
+# ✅ GOOD: Iterator for large datasets
+for log in Log.objects.filter(school=school).iterator(chunk_size=1000):
+    process_log(log)
+
+# ❌ BAD: Load all objects into memory
+logs = Log.objects.filter(school=school)  # Could be millions of records
+for log in logs:
+    process_log(log)
+```
+
+### Use Values/Values List for Simple Data
+```python
+# ✅ GOOD: Only get needed data
+student_names = CustomUser.objects.filter(user_type='student')\
+                                 .values_list('first_name', flat=True)
+
+# ✅ GOOD: Get multiple fields as tuples
+student_data = CustomUser.objects.filter(user_type='student')\
+                                 .values_list('id', 'first_name', 'email')
+
+# ❌ BAD: Full objects when only names needed
+students = CustomUser.objects.filter(user_type='student')
+names = [student.first_name for student in students]
+```

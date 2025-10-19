@@ -20,6 +20,9 @@ urlpatterns += [
     path('api/classrooms/', views.classrooms_view, name='api_classrooms'),
     path('groups/', views.render_group_list_view, name='reading_groups'),
     path('api/groups/', views.groups_view, name='api_reading_groups'),
+    path('api/groups-detailed/', views.groups_detailed_view, name='api_reading_groups_detailed'),
+    path('api/reading-groups/<int:group_id>/', views.reading_group_detail_view, name='api_reading_group_detail'),
+    path('api/reading-group-invite/', views.reading_group_invite_view, name='api_reading_group_invite'),
     path('api/classrooms_and_groups', views.list_classrooms_and_groups, name="api_classrooms_groups"),
     path('api/students/', views.fetch_user_type, name='api_students'),
     path('api/teachers/', views.fetch_user_type, name='api_teachers'),
@@ -39,5 +42,11 @@ urlpatterns += [
     path('api/remove-student-from-classes/', views.remove_student_from_classes, name='remove_student_from_classes'),
     path('api/classrooms/<int:classroom_id>/students/', views.get_classroom_students, name='get_classroom_students'),
     path('api/remove-student-from-classroom/', views.remove_student_from_classroom, name='remove_student_from_classroom'),
+    
+    # Admin student management
+    path('admin/student-management/', views.admin_student_management_view, name='admin_student_management'),
+    path('api/admin/students/', views.api_admin_students, name='api_admin_students'),
+    path('api/admin/bulk-transfer/', views.api_bulk_student_transfer, name='api_bulk_student_transfer'),
+    
     path('<str:user_type>/', views.user_list_page, name='user_list_page'),
 ]
