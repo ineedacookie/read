@@ -1,0 +1,40 @@
+{# 
+    Reusable Stat Card Component
+    
+    Usage:
+        {% include "components/cards/stat_card.html" with 
+            icon="users" 
+            color="primary" 
+            label="Active Readers" 
+            value="-" 
+            id="active-readers-count"
+            badge_text="0 total"
+        %}
+    
+    Parameters:
+        - icon: FontAwesome icon name (without fa- prefix)
+        - color: Bootstrap color (primary, success, warning, danger, info)
+        - label: Card label text
+        - value: Initial display value
+        - id: HTML id for JavaScript updates
+        - badge_text: Optional badge text (default: empty)
+#}
+<div class="col-xxl-3 col-md-6">
+    <div class="card overflow-hidden">
+        <div class="card-body">
+            <div class="d-flex align-items-center">
+                <div class="flex-1">
+                    <p class="text-body-tertiary fw-semibold mb-0">{{ label }}</p>
+                    <h4 class="mb-0" id="{{ id }}">{{ value }}</h4>
+                    {% if badge_text %}
+                    <span class="badge badge-phoenix badge-phoenix-{{ color }} fs-10">{{ badge_text }}</span>
+                    {% endif %}
+                </div>
+                <div class="flex-shrink-0">
+                    <span class="fa-solid fa-{{ icon }} text-{{ color }} fs-4"></span>
+                </div>
+            </div>
+        </div>
+    </div>
+</div>
+
