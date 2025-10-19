@@ -775,7 +775,13 @@ def my_students_page(request):
         id__in=student_ids,
         school=school,
         user_type='student'
-         ).select_related('school').prefetch_related('parent_relations__parent').order_by('first_name', 'last_initial')
+    ).select_related(
+        'school'
+    ).prefetch_related(
+        'parent_relations__parent',
+        'students_classrooms',
+        'reading_groups'
+    ).order_by('first_name', 'last_initial')
     
     # Get all available parents for assignment
     available_parents = CustomUser.objects.filter(
@@ -812,10 +818,23 @@ def my_classrooms_page(request):
     school = request.user.school
     
     # Get teacher's classrooms
+    from django.db.models import Count
+    
     if request.user.user_type == 'teacher':
-        classrooms = Classroom.objects.filter(school=school, teachers=request.user).select_related('school').prefetch_related('students', 'teachers').order_by('name')
+        classrooms = Classroom.objects.filter(
+            school=school, 
+            teachers=request.user
+        ).select_related('school')\
+         .prefetch_related('students', 'teachers')\
+         .annotate(student_count=Count('students'))\
+         .order_by('name')
     else:  # administrator
-        classrooms = Classroom.objects.filter(school=school).select_related('school').prefetch_related('students', 'teachers').order_by('name')
+        classrooms = Classroom.objects.filter(
+            school=school
+        ).select_related('school')\
+         .prefetch_related('students', 'teachers')\
+         .annotate(student_count=Count('students'))\
+         .order_by('name')
     
     # Get all students in school for adding to classrooms
     all_students = CustomUser.objects.filter(
@@ -826,7 +845,7 @@ def my_classrooms_page(request):
     # Calculate statistics for each classroom
     classroom_stats = []
     for classroom in classrooms:
-        students_count = classroom.students.count()
+        students_count = classroom.student_count  # Use annotated field instead of .count()
         # Calculate reading statistics for the classroom
         # You can add more complex stats here later if needed
         classroom_stats.append({
