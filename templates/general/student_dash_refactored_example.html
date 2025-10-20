@@ -1,0 +1,91 @@
+{% extends "general/nav_template.html" %}
+{% load static %}
+{% block title %}Student Dashboard | My Reading Progress{% endblock %}
+
+{% block optional_scripts %}
+{# Load only scripts needed for student dashboard #}
+<script src="{% static 'vendors/echarts/echarts.min.js' %}"></script>
+<script src="{% static 'js/modules/dashboard-manager.js' %}"></script>
+<script src="{% static 'js/modules/chart-builder.js' %}"></script>
+{% endblock %}
+
+{% block content %}
+<div class="student-dash">
+    {# Dashboard header #}
+    <div class="row mb-4">
+        <div class="col-12">
+            <h2><i class="fas fa-book-reader me-2"></i>My Reading Progress</h2>
+        </div>
+    </div>
+
+    {# Stats cards using component #}
+    <div class="row mb-4">
+        {% include "components/cards/stat_card.html" with 
+            icon="book" 
+            color="primary" 
+            label="Books Read" 
+            value="-" 
+            id="books-count"
+        %}
+        
+        {% include "components/cards/stat_card.html" with 
+            icon="file-alt" 
+            color="success" 
+            label="Pages Read" 
+            value="-" 
+            id="pages-count"
+        %}
+        
+        {% include "components/cards/stat_card.html" with 
+            icon="clock" 
+            color="warning" 
+            label="Time Spent" 
+            value="-" 
+            id="time-count"
+        %}
+        
+        {% include "components/cards/stat_card.html" with 
+            icon="star" 
+            color="info" 
+            label="Average Rating" 
+            value="-" 
+            id="rating-avg"
+        %}
+    </div>
+
+    {# Charts using component #}
+    <div class="row mb-4">
+        <div class="col-md-12">
+            {% include "components/cards/chart_card.html" with
+                title="My Reading Activity"
+                chart_id="student-activity-chart"
+                height="350px"
+            %}
+        </div>
+    </div>
+</div>
+{% endblock %}
+
+{% block afterScripts %}
+<script>
+// REFACTORED - Using DashboardManager module (reduces from ~350 lines to ~30)
+document.addEventListener('DOMContentLoaded', function() {
+    const dashboard = new DashboardManager({
+        userType: 'student',
+        apiEndpoint: '{% url "student_progress" %}',
+        statCards: {
+            booksCount: { id: 'books-count', path: 'stats.total_books', format: 'number' },
+            pagesCount: { id: 'pages-count', path: 'stats.total_pages', format: 'number' },
+            timeCount: { id: 'time-count', path: 'stats.total_minutes', format: 'time' },
+            ratingAvg: { id: 'rating-avg', path: 'stats.avg_rating', format: 'number' }
+        },
+        charts: {
+            activityChart: { id: 'student-activity-chart', type: 'line', dataPath: 'logs' }
+        }
+    });
+    
+    dashboard.load();
+});
+</script>
+{% endblock %}
+

@@ -1,0 +1,113 @@
+{% extends "general/nav_template.html" %}
+{% load static %}
+{% block title %}Teacher Dashboard | Class Analytics{% endblock %}
+
+{% block optional_scripts %}
+{# Load only scripts needed for teacher dashboard #}
+<script src="{% static 'vendors/echarts/echarts.min.js' %}"></script>
+<script src="{% static 'vendors/dayjs/dayjs.min.js' %}"></script>
+<script src="{% static 'vendors/flatpickr/flatpickr.min.js' %}"></script>
+<script src="{% static 'js/modules/dashboard-manager.js' %}"></script>
+<script src="{% static 'js/modules/chart-builder.js' %}"></script>
+{% endblock %}
+
+{% block content %}
+<div class="teacher-dash">
+    {# Dashboard controls #}
+    <div class="row mb-4">
+        <div class="col-md-8">
+            <h2><i class="fas fa-chart-line me-2"></i>Teacher Dashboard</h2>
+        </div>
+        <div class="col-md-4">
+            <select class="form-select" id="Classroom_Group">
+                <option value="all">All Students</option>
+                {# Dynamically populated #}
+            </select>
+        </div>
+    </div>
+
+    {# Stats using components #}
+    <div class="row mb-4">
+        {% include "components/cards/stat_card.html" with 
+            icon="users" 
+            color="primary" 
+            label="Active Readers" 
+            value="-" 
+            id="active-readers-count"
+            badge_text="0 total"
+        %}
+        
+        {% include "components/cards/stat_card.html" with 
+            icon="book" 
+            color="success" 
+            label="Total Pages" 
+            value="-" 
+            id="total-pages-metric"
+        %}
+        
+        {% include "components/cards/stat_card.html" with 
+            icon="clock" 
+            color="warning" 
+            label="Reading Time" 
+            value="-" 
+            id="total-minutes-metric"
+        %}
+        
+        {% include "components/cards/stat_card.html" with 
+            icon="target" 
+            color="info" 
+            label="Goal Progress" 
+            value="-" 
+            id="goal-achievement-metric"
+        %}
+    </div>
+
+    {# Charts using components #}
+    <div class="row">
+        <div class="col-md-8">
+            {% include "components/cards/chart_card.html" with
+                title="Reading Activity Trends"
+                chart_id="activity-chart"
+                height="400px"
+            %}
+        </div>
+        <div class="col-md-4">
+            {% include "components/cards/chart_card.html" with
+                title="Student Status"
+                chart_id="status-chart"
+                height="400px"
+            %}
+        </div>
+    </div>
+</div>
+{% endblock %}
+
+{% block afterScripts %}
+<script>
+// REFACTORED - Using DashboardManager module (reduces from ~790 lines to ~40)
+document.addEventListener('DOMContentLoaded', function() {
+    const dashboard = new DashboardManager({
+        userType: 'teacher',
+        apiEndpoint: '{% url "teacher_dashboard_logs" %}',
+        statCards: {
+            activeReaders: { id: 'active-readers-count', path: 'group_totals.students_count', format: 'number' },
+            totalPages: { id: 'total-pages-metric', path: 'group_totals.pages', format: 'number' },
+            totalMinutes: { id: 'total-minutes-metric', path: 'group_totals.minutes', format: 'time' },
+            goalAchievement: { id: 'goal-achievement-metric', path: 'group_totals.goal_achievement_rate', format: 'percentage' }
+        },
+        charts: {
+            activityChart: { id: 'activity-chart', type: 'line', dataPath: 'students' },
+            statusChart: { id: 'status-chart', type: 'pie', dataPath: 'students' }
+        }
+    });
+    
+    dashboard.setupControls({
+        group: '#Classroom_Group',
+        refreshButton: '#refresh-dashboard'
+    });
+    
+    dashboard.load({ group: 'all' });
+});
+</script>
+{% endblock %}
+
