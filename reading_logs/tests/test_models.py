@@ -4,6 +4,7 @@ Test reading log models
 from datetime import date, timedelta
 from decimal import Decimal
 
+from django.test import TestCase
 from django.contrib.auth import get_user_model
 
 from ..models import Log, DailyGoal, TotalGoal
