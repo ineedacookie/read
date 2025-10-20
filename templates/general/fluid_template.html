@@ -689,14 +689,6 @@
     {# Theme script - Always loaded #}
     <script src="{% static 'assets/js/theme.min.js' %}"></script>
     
-    {# Utility scripts - Always loaded #}
-    {% if 'js/utils/api-utils.js'|static_exists %}
-    <script src="{% static 'js/utils/api-utils.js' %}"></script>
-    {% endif %}
-    {% if 'js/utils/ui-utils.js'|static_exists %}
-    <script src="{% static 'js/utils/ui-utils.js' %}"></script>
-    {% endif %}
-    
   {% block afterScripts %}{% endblock %}
   <noscript class="text-center">
          	Your browser does not support JavaScript. Please activate JavaScript or switch to a different browser for the best experience. <br/>
