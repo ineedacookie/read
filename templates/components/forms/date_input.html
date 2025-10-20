@@ -1,0 +1,48 @@
+{#
+    Date Input Component
+    
+    Usage:
+        {% include "components/forms/date_input.html" with
+            name="reading_date"
+            label="Reading Date"
+            value=form.reading_date.value
+            required=True
+        %}
+    
+    Parameters:
+        - name: Input name attribute
+        - label: Field label
+        - value: Current value (YYYY-MM-DD format)
+        - required: Is field required (default: False)
+        - min: Minimum date (optional)
+        - max: Maximum date (optional)
+        - help_text: Help text (optional)
+        - errors: Error list (optional)
+#}
+
+<div class="mb-3">
+    <label for="id_{{ name }}" class="form-label">
+        {{ label }}
+        {% if required %}<span class="text-danger">*</span>{% endif %}
+    </label>
+    
+    <input type="date" 
+           class="form-control {% if errors %}is-invalid{% endif %}"
+           id="id_{{ name }}"
+           name="{{ name }}"
+           value="{{ value|default:'' }}"
+           {% if min %}min="{{ min }}"{% endif %}
+           {% if max %}max="{{ max }}"{% endif %}
+           {% if required %}required{% endif %}>
+    
+    {% if help_text %}
+    <small class="form-text text-muted">{{ help_text }}</small>
+    {% endif %}
+    
+    {% if errors %}
+    <div class="invalid-feedback d-block">
+        {{ errors.0 }}
+    </div>
+    {% endif %}
+</div>
+

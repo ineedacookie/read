@@ -1,0 +1,48 @@
+{#
+    Text Input Component
+    
+    Usage:
+        {% include "components/forms/text_input.html" with
+            name="book_title"
+            label="Book Title"
+            value=form.book_title.value
+            required=True
+            help_text="Enter the full book title"
+        %}
+    
+    Parameters:
+        - name: Input name attribute
+        - label: Field label
+        - value: Current value (optional)
+        - required: Is field required (default: False)
+        - help_text: Help text below field (optional)
+        - placeholder: Placeholder text (optional)
+        - errors: Error list (optional)
+        - input_class: Additional CSS classes (optional)
+#}
+
+<div class="mb-3">
+    <label for="id_{{ name }}" class="form-label">
+        {{ label }}
+        {% if required %}<span class="text-danger">*</span>{% endif %}
+    </label>
+    
+    <input type="text" 
+           class="form-control {{ input_class|default:'' }} {% if errors %}is-invalid{% endif %}"
+           id="id_{{ name }}"
+           name="{{ name }}"
+           value="{{ value|default:'' }}"
+           {% if required %}required{% endif %}
+           {% if placeholder %}placeholder="{{ placeholder }}"{% endif %}>
+    
+    {% if help_text %}
+    <small class="form-text text-muted">{{ help_text }}</small>
+    {% endif %}
+    
+    {% if errors %}
+    <div class="invalid-feedback d-block">
+        {{ errors.0 }}
+    </div>
+    {% endif %}
+</div>
+

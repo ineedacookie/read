@@ -1,0 +1,64 @@
+{#
+    Select Input Component
+    
+    Usage:
+        {% include "components/forms/select_input.html" with
+            name="book_genre"
+            label="Genre"
+            choices=genre_choices
+            selected=current_genre
+            required=True
+        %}
+    
+    Parameters:
+        - name: Select name attribute
+        - label: Field label
+        - choices: List of (value, label) tuples or objects with 'value' and 'label'
+        - selected: Currently selected value (optional)
+        - required: Is field required (default: False)
+        - help_text: Help text (optional)
+        - errors: Error list (optional)
+        - empty_label: Label for empty option (default: "Select...")
+#}
+
+<div class="mb-3">
+    <label for="id_{{ name }}" class="form-label">
+        {{ label }}
+        {% if required %}<span class="text-danger">*</span>{% endif %}
+    </label>
+    
+    <select class="form-select {% if errors %}is-invalid{% endif %}"
+            id="id_{{ name }}"
+            name="{{ name }}"
+            {% if required %}required{% endif %}>
+        
+        {% if not required %}
+        <option value="">{{ empty_label|default:"Select..." }}</option>
+        {% endif %}
+        
+        {% for choice in choices %}
+            {% if choice.0 is defined %}
+                {# Tuple format (value, label) #}
+                <option value="{{ choice.0 }}" {% if choice.0 == selected %}selected{% endif %}>
+                    {{ choice.1 }}
+                </option>
+            {% else %}
+                {# Object format with .value and .label #}
+                <option value="{{ choice.value }}" {% if choice.value == selected %}selected{% endif %}>
+                    {{ choice.label|default:choice.name|default:choice }}
+                </option>
+            {% endif %}
+        {% endfor %}
+    </select>
+    
+    {% if help_text %}
+    <small class="form-text text-muted">{{ help_text }}</small>
+    {% endif %}
+    
+    {% if errors %}
+    <div class="invalid-feedback d-block">
+        {{ errors.0 }}
+    </div>
+    {% endif %}
+</div>
+

@@ -1,0 +1,52 @@
+{#
+    Number Input Component
+    
+    Usage:
+        {% include "components/forms/number_input.html" with
+            name="pages_read"
+            label="Pages Read"
+            value=form.pages_read.value
+            min=0
+            max=1000
+            required=True
+        %}
+    
+    Parameters:
+        - name: Input name attribute
+        - label: Field label
+        - value: Current value (optional)
+        - min: Minimum value (optional)
+        - max: Maximum value (optional)
+        - step: Step increment (default: 1)
+        - required: Is field required (default: False)
+        - help_text: Help text (optional)
+        - errors: Error list (optional)
+#}
+
+<div class="mb-3">
+    <label for="id_{{ name }}" class="form-label">
+        {{ label }}
+        {% if required %}<span class="text-danger">*</span>{% endif %}
+    </label>
+    
+    <input type="number" 
+           class="form-control {% if errors %}is-invalid{% endif %}"
+           id="id_{{ name }}"
+           name="{{ name }}"
+           value="{{ value|default:'' }}"
+           {% if min is not None %}min="{{ min }}"{% endif %}
+           {% if max is not None %}max="{{ max }}"{% endif %}
+           step="{{ step|default:'1' }}"
+           {% if required %}required{% endif %}>
+    
+    {% if help_text %}
+    <small class="form-text text-muted">{{ help_text }}</small>
+    {% endif %}
+    
+    {% if errors %}
+    <div class="invalid-feedback d-block">
+        {{ errors.0 }}
+    </div>
+    {% endif %}
+</div>
+

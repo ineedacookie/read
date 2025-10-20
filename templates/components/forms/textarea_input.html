@@ -1,0 +1,49 @@
+{#
+    Textarea Input Component
+    
+    Usage:
+        {% include "components/forms/textarea_input.html" with
+            name="notes"
+            label="Reading Notes"
+            value=form.notes.value
+            rows=4
+            required=False
+        %}
+    
+    Parameters:
+        - name: Textarea name attribute
+        - label: Field label
+        - value: Current value (optional)
+        - rows: Number of rows (default: 3)
+        - required: Is field required (default: False)
+        - help_text: Help text (optional)
+        - placeholder: Placeholder text (optional)
+        - errors: Error list (optional)
+        - maxlength: Maximum length (optional)
+#}
+
+<div class="mb-3">
+    <label for="id_{{ name }}" class="form-label">
+        {{ label }}
+        {% if required %}<span class="text-danger">*</span>{% endif %}
+    </label>
+    
+    <textarea class="form-control {% if errors %}is-invalid{% endif %}"
+              id="id_{{ name }}"
+              name="{{ name }}"
+              rows="{{ rows|default:3 }}"
+              {% if required %}required{% endif %}
+              {% if placeholder %}placeholder="{{ placeholder }}"{% endif %}
+              {% if maxlength %}maxlength="{{ maxlength }}"{% endif %}>{{ value|default:'' }}</textarea>
+    
+    {% if help_text %}
+    <small class="form-text text-muted">{{ help_text }}</small>
+    {% endif %}
+    
+    {% if errors %}
+    <div class="invalid-feedback d-block">
+        {{ errors.0 }}
+    </div>
+    {% endif %}
+</div>
+
