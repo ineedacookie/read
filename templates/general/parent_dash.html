@@ -2,6 +2,11 @@
 {% load static %}
 {% block title %}read | Parent Dashboard{% endblock %}
 
+{% block optional_scripts %}
+{# Load charts library for parent dashboard #}
+<script src="{% static 'vendors/echarts/echarts.min.js' %}"></script>
+{% endblock %}
+
 {% block content %}
 <div class="parent-dash">
 

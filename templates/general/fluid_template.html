@@ -670,22 +670,33 @@
     <!-- ===============================================-->
     <!--    JavaScripts-->
     <!-- ===============================================-->
+    {# Core scripts - Always loaded #}
     <script src="{% static 'vendors/popper/popper.min.js' %}"></script>
     <script src="{% static 'vendors/bootstrap/bootstrap.min.js' %}"></script>
     <script src="{% static 'vendors/anchorjs/anchor.min.js' %}"></script>
     <script src="{% static 'vendors/is/is.min.js' %}"></script>
-    <script src="{% static 'vendors/echarts/echarts.min.js' %}"></script>
-    <script src="{% static 'vendors/prism/prism.js' %}"></script>
     <script src="{% static 'vendors/fontawesome/all.min.js' %}"></script>
     <script src="{% static 'vendors/lodash/lodash.min.js' %}"></script>
-    <script src="{% static 'vendors/dayjs/dayjs.min.js' %}"></script>
-    <script src="{% static 'vendors/list.js/list.min.js' %}"></script>
+    
+    {# Optional heavy scripts - Load per page as needed #}
+    {% block optional_scripts %}
+    {# Pages can override this block to load only what they need #}
+    {# Example: <script src="{% static 'vendors/echarts/echarts.min.js' %}"></script> #}
+    {% endblock %}
+    
     {% block beforeThemeScript %}{% endblock %}
-    <script src="{% static 'vendors/fullcalendar/main.min.js' %}"></script>
-    <script src="{% static 'assets/js/flatpickr.js' %}"></script>
-    <script src="{% static 'vendors/choices/choices.min.js' %}"></script>
-    <!-- Full Falcon Theme with Dark Mode Support -->
+    
+    {# Theme script - Always loaded #}
     <script src="{% static 'assets/js/theme.min.js' %}"></script>
+    
+    {# Utility scripts - Always loaded #}
+    {% if 'js/utils/api-utils.js'|static_exists %}
+    <script src="{% static 'js/utils/api-utils.js' %}"></script>
+    {% endif %}
+    {% if 'js/utils/ui-utils.js'|static_exists %}
+    <script src="{% static 'js/utils/ui-utils.js' %}"></script>
+    {% endif %}
+    
   {% block afterScripts %}{% endblock %}
   <noscript class="text-center">
          	Your browser does not support JavaScript. Please activate JavaScript or switch to a different browser for the best experience. <br/>
