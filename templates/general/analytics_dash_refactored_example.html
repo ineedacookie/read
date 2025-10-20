@@ -1,0 +1,50 @@
+{% extends "general/nav_template.html" %}
+{% load static %}
+{% block title %}Analytics Dashboard{% endblock %}
+
+{% block optional_scripts %}
+<script src="{% static 'vendors/echarts/echarts.min.js' %}"></script>
+<script src="{% static 'js/modules/chart-builder.js' %}"></script>
+{% endblock %}
+
+{% block content %}
+<div class="analytics-dash">
+    <h2><i class="fas fa-chart-bar me-2"></i>Reading Analytics</h2>
+    
+    {# Analytics charts using components #}
+    <div class="row mb-4">
+        <div class="col-md-6">
+            {% include "components/cards/chart_card.html" with
+                title="Reading Trends"
+                chart_id="trends-chart"
+                height="350px"
+            %}
+        </div>
+        <div class="col-md-6">
+            {% include "components/cards/chart_card.html" with
+                title="Genre Distribution"
+                chart_id="genre-chart"
+                height="350px"
+            %}
+        </div>
+    </div>
+</div>
+{% endblock %}
+
+{% block afterScripts %}
+<script>
+// REFACTORED - Reduces from ~300 lines to ~15
+document.addEventListener('DOMContentLoaded', function() {
+    // Trends chart
+    fetch('/api/analytics/trends/')
+        .then(r => r.json())
+        .then(data => ChartBuilder.createLineChart('trends-chart', data));
+    
+    // Genre chart
+    fetch('/api/analytics/genres/')
+        .then(r => r.json())
+        .then(data => ChartBuilder.createPieChart('genre-chart', data));
+});
+</script>
+{% endblock %}
+

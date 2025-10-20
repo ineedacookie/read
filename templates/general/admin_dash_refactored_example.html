@@ -1,0 +1,73 @@
+{% extends "general/nav_template.html" %}
+{% load static %}
+{% block title %}Admin Dashboard | System Overview{% endblock %}
+
+{% block optional_scripts %}
+<script src="{% static 'vendors/echarts/echarts.min.js' %}"></script>
+<script src="{% static 'js/modules/dashboard-manager.js' %}"></script>
+<script src="{% static 'js/modules/chart-builder.js' %}"></script>
+{% endblock %}
+
+{% block content %}
+<div class="admin-dash">
+    <div class="row mb-4">
+        <div class="col-12">
+            <h2><i class="fas fa-tachometer-alt me-2"></i>Administrator Dashboard</h2>
+        </div>
+    </div>
+
+    {# System stats using components #}
+    <div class="row mb-4">
+        {% include "components/cards/stat_card.html" with 
+            icon="users" color="primary" label="Total Students" 
+            value="-" id="total-students"
+        %}
+        {% include "components/cards/stat_card.html" with 
+            icon="chalkboard-teacher" color="success" label="Total Teachers" 
+            value="-" id="total-teachers"
+        %}
+        {% include "components/cards/stat_card.html" with 
+            icon="book-open" color="warning" label="Total Logs" 
+            value="-" id="total-logs"
+        %}
+        {% include "components/cards/stat_card.html" with 
+            icon="chart-line" color="info" label="Activity Rate" 
+            value="-" id="activity-rate"
+        %}
+    </div>
+
+    {# Charts #}
+    <div class="row">
+        <div class="col-md-12">
+            {% include "components/cards/chart_card.html" with
+                title="System-wide Reading Activity"
+                chart_id="system-activity-chart"
+                height="400px"
+            %}
+        </div>
+    </div>
+</div>
+{% endblock %}
+
+{% block afterScripts %}
+<script>
+// REFACTORED - Reduces from ~250 lines to ~25
+document.addEventListener('DOMContentLoaded', function() {
+    const dashboard = new DashboardManager({
+        userType: 'administrator',
+        apiEndpoint: '/api/admin-dashboard/',
+        statCards: {
+            totalStudents: { id: 'total-students', path: 'stats.total_students', format: 'number' },
+            totalTeachers: { id: 'total-teachers', path: 'stats.total_teachers', format: 'number' },
+            totalLogs: { id: 'total-logs', path: 'stats.total_logs', format: 'number' },
+            activityRate: { id: 'activity-rate', path: 'stats.activity_rate', format: 'percentage' }
+        },
+        charts: {
+            systemChart: { id: 'system-activity-chart', type: 'line', dataPath: 'activity' }
+        }
+    });
+    dashboard.load();
+});
+</script>
+{% endblock %}
+

@@ -1,0 +1,59 @@
+{% extends "general/nav_template.html" %}
+{% load static %}
+{% block title %}Gamification Dashboard{% endblock %}
+
+{% block optional_scripts %}
+<script src="{% static 'vendors/echarts/echarts.min.js' %}"></script>
+<script src="{% static 'js/modules/chart-builder.js' %}"></script>
+{% endblock %}
+
+{% block content %}
+<div class="gamification-dash">
+    <h2><i class="fas fa-trophy me-2"></i>Achievements & Rewards</h2>
+    
+    {# Achievement stats #}
+    <div class="row mb-4">
+        {% include "components/cards/stat_card.html" with 
+            icon="medal" color="warning" label="Total XP" 
+            value="-" id="total-xp"
+        %}
+        {% include "components/cards/stat_card.html" with 
+            icon="award" color="success" label="Badges Earned" 
+            value="-" id="badges-earned"
+        %}
+        {% include "components/cards/stat_card.html" with 
+            icon="fire" color="danger" label="Current Streak" 
+            value="-" id="current-streak"
+        %}
+    </div>
+
+    {# Leaderboard using list component #}
+    <div class="row">
+        <div class="col-md-12">
+            {% include "components/cards/list_card.html" with
+                title="Top Readers This Week"
+                items=leaderboard
+                empty_message="No data yet"
+                show_badges=True
+                max_items=10
+            %}
+        </div>
+    </div>
+</div>
+{% endblock %}
+
+{% block afterScripts %}
+<script>
+// REFACTORED - Reduces from ~280 lines to ~20
+document.addEventListener('DOMContentLoaded', function() {
+    fetch('/api/gamification/stats/')
+        .then(r => r.json())
+        .then(data => {
+            document.getElementById('total-xp').textContent = data.total_xp;
+            document.getElementById('badges-earned').textContent = data.badges;
+            document.getElementById('current-streak').textContent = data.streak + ' days';
+        });
+});
+</script>
+{% endblock %}
+
