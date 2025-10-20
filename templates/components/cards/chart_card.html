@@ -1,0 +1,46 @@
+{#
+    Chart Card Component
+    
+    Usage:
+        {% include "components/cards/chart_card.html" with
+            title="Reading Trends"
+            chart_id="reading-chart"
+            height="400px"
+            show_legend=True
+        %}
+    
+    Parameters:
+        - title: Card title
+        - chart_id: HTML id for the chart container
+        - height: Chart height (default: 300px)
+        - show_legend: Show chart legend (default: True)
+        - subtitle: Optional subtitle
+        - actions: Optional action buttons HTML
+#}
+
+<div class="card h-100">
+    <div class="card-header d-flex align-items-center justify-content-between">
+        <div>
+            <h6 class="mb-0">{{ title }}</h6>
+            {% if subtitle %}
+            <small class="text-muted">{{ subtitle }}</small>
+            {% endif %}
+        </div>
+        {% if actions %}
+        <div class="btn-group btn-group-sm">
+            {{ actions|safe }}
+        </div>
+        {% endif %}
+    </div>
+    <div class="card-body">
+        <div id="{{ chart_id }}" style="width: 100%; height: {{ height|default:'300px' }};"></div>
+        {% if show_legend|default:True %}
+        <div class="chart-legend mt-3 text-center">
+            <small class="text-muted">
+                Use controls above to filter data
+            </small>
+        </div>
+        {% endif %}
+    </div>
+</div>
+

@@ -1,0 +1,69 @@
+{#
+    List Card Component
+    
+    Usage:
+        {% include "components/cards/list_card.html" with
+            title="Recent Books"
+            items=book_list
+            empty_message="No books yet"
+            show_badges=True
+        %}
+    
+    Parameters:
+        - title: Card title
+        - items: List of items to display (each item should have 'name' and optionally 'badge', 'url')
+        - empty_message: Message when list is empty
+        - show_badges: Show item badges (default: False)
+        - max_items: Maximum items to show (default: all)
+        - show_more_url: URL for "View All" link (optional)
+#}
+
+<div class="card h-100">
+    <div class="card-header d-flex align-items-center justify-content-between">
+        <h6 class="mb-0">{{ title }}</h6>
+        {% if show_more_url %}
+        <a href="{{ show_more_url }}" class="btn btn-sm btn-link">
+            View All <i class="fas fa-arrow-right ms-1"></i>
+        </a>
+        {% endif %}
+    </div>
+    <div class="card-body">
+        {% if items %}
+        <ul class="list-group list-group-flush">
+            {% for item in items|slice:":"|default:items %}
+                {% if max_items and forloop.counter > max_items %}
+                    {% if forloop.last %}
+                    <li class="list-group-item text-center">
+                        <small class="text-muted">
+                            + {{ items|length|add:"-"|add:max_items }} more
+                        </small>
+                    </li>
+                    {% endif %}
+                {% else %}
+                <li class="list-group-item d-flex justify-content-between align-items-center">
+                    {% if item.url %}
+                    <a href="{{ item.url }}" class="text-decoration-none">
+                        {{ item.name|default:item }}
+                    </a>
+                    {% else %}
+                    <span>{{ item.name|default:item }}</span>
+                    {% endif %}
+                    
+                    {% if show_badges and item.badge %}
+                    <span class="badge bg-{{ item.badge_color|default:'primary' }} rounded-pill">
+                        {{ item.badge }}
+                    </span>
+                    {% endif %}
+                </li>
+                {% endif %}
+            {% endfor %}
+        </ul>
+        {% else %}
+        <div class="text-center py-4 text-muted">
+            <i class="fas fa-inbox fa-2x mb-2"></i>
+            <p class="mb-0">{{ empty_message|default:"No items to display" }}</p>
+        </div>
+        {% endif %}
+    </div>
+</div>
+
