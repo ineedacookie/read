@@ -52,6 +52,32 @@
     </div>
 </div>
 
+<!-- First-Time Setup Guide (shows when user has no classrooms) -->
+<div class="row mb-4" id="onboarding-section" style="display: none;">
+    <div class="col-12">
+        <div class="alert alert-info alert-dismissible fade show" role="alert">
+            <h5 class="alert-heading"><i class="fas fa-rocket me-2"></i>Get Started with Your Reading Program</h5>
+            <p>Welcome! Here's how to get started tracking reading:</p>
+            <ol class="mb-3">
+                <li><strong>Create your first classroom</strong> - Organize students into groups</li>
+                <li><strong>Add students</strong> - Create or invite student accounts</li>
+                <li><strong>Start tracking</strong> - Students log reading and you see progress here!</li>
+            </ol>
+            <div class="d-flex gap-2 flex-wrap">
+                <a href="{% url 'my_classrooms' %}" class="btn btn-primary btn-sm">
+                    <i class="fas fa-plus me-1"></i>Create First Classroom
+                </a>
+                <a href="{% url 'my_students' %}" class="btn btn-success btn-sm">
+                    <i class="fas fa-user-plus me-1"></i>Add Students
+                </a>
+                <button type="button" class="btn btn-outline-light btn-sm" data-bs-dismiss="alert">
+                    <i class="fas fa-times me-1"></i>Dismiss
+                </button>
+            </div>
+        </div>
+    </div>
+</div>
+
 <!-- Enhanced Key Metrics Overview -->
 <div class="row mb-4" id="metrics-overview">
     <div class="col-lg-3 col-md-6 mb-3">
@@ -352,19 +378,91 @@
         </div>
     </div>
 </div>
+
+<!-- Admin Tools Section (only visible to administrators) -->
+{% if is_admin %}
+<div class="row mb-4">
+    <div class="col-12">
+        <div class="card border-warning">
+            <div class="card-header bg-light">
+                <div class="d-flex justify-content-between align-items-center">
+                    <h5 class="mb-0"><i class="fas fa-tools me-2 text-warning"></i>Admin Tools</h5>
+                    <button class="btn btn-sm btn-outline-secondary" type="button" data-bs-toggle="collapse" data-bs-target="#adminToolsCollapse">
+                        <i class="fas fa-chevron-down"></i> Toggle
+                    </button>
+                </div>
+            </div>
+            <div class="collapse" id="adminToolsCollapse">
+                <div class="card-body">
+                    <div class="row">
+                        <div class="col-md-3 mb-3">
+                            <a href="{% url 'user_list_page' 'teacher' %}" class="card text-decoration-none h-100 border-0 bg-light hover-shadow">
+                                <div class="card-body text-center">
+                                    <i class="fas fa-chalkboard-teacher fa-2x text-success mb-2"></i>
+                                    <h6 class="mb-1">Manage Teachers</h6>
+                                    <small class="text-muted">Invite and manage teachers</small>
+                                </div>
+                            </a>
+                        </div>
+                        <div class="col-md-3 mb-3">
+                            <a href="{% url 'user_list_page' 'parent' %}" class="card text-decoration-none h-100 border-0 bg-light hover-shadow">
+                                <div class="card-body text-center">
+                                    <i class="fas fa-users fa-2x text-primary mb-2"></i>
+                                    <h6 class="mb-1">Manage Parents</h6>
+                                    <small class="text-muted">Invite and manage parents</small>
+                                </div>
+                            </a>
+                        </div>
+                        <div class="col-md-3 mb-3">
+                            <a href="{% url 'admin_student_management' %}" class="card text-decoration-none h-100 border-0 bg-light hover-shadow">
+                                <div class="card-body text-center">
+                                    <i class="fas fa-users-cog fa-2x text-info mb-2"></i>
+                                    <h6 class="mb-1">Bulk Student Actions</h6>
+                                    <small class="text-muted">Transfer students between classes</small>
+                                </div>
+                            </a>
+                        </div>
+                        <div class="col-md-3 mb-3">
+                            <a href="/io_admin/" class="card text-decoration-none h-100 border-0 bg-light hover-shadow">
+                                <div class="card-body text-center">
+                                    <i class="fas fa-cog fa-2x text-warning mb-2"></i>
+                                    <h6 class="mb-1">Advanced Settings</h6>
+                                    <small class="text-muted">Django admin panel</small>
+                                </div>
+                            </a>
+                        </div>
+                    </div>
+                </div>
+            </div>
+        </div>
+    </div>
+</div>
+{% endif %}
 {% endblock %}
 
 {% block optional_scripts %}
 {# Load charts library for dashboard #}
 <script src="{% static 'vendors/echarts/echarts.min.js' %}"></script>
 <script src="{% static 'vendors/dayjs/dayjs.min.js' %}"></script>
-<script src="{% static 'vendors/flatpickr/flatpickr.min.js' %}"></script>
+<!-- Flatpickr loaded via date-range-picker component -->
+<!-- <script src="{% static 'vendors/flatpickr/flatpickr.min.js' %}"></script> -->
 {% endblock %}
 
 {% block afterScripts %}
 <script>
 document.addEventListener('DOMContentLoaded', function () {
     console.log('🎯 Enhanced Teacher Dashboard initializing...');
+    
+    // Show onboarding if user has no classrooms
+    const classroomSelect = document.getElementById('Classroom_Group');
+    const onboardingSection = document.getElementById('onboarding-section');
+    
+    if (classroomSelect && onboardingSection) {
+        // If there are no options in the classroom selector, show onboarding
+        if (classroomSelect.options.length === 0) {
+            onboardingSection.style.display = 'block';
+        }
+    }
     
     // Wait for all libraries to load
     if (typeof window.echarts === 'undefined' || typeof window.bootstrap === 'undefined') {
@@ -497,26 +595,62 @@ function loadDashboardData() {
     showLoadingState(true);
     
     // Fetch data from API
-    fetch(`{% url "get_logs_by_range_and_group" %}?date_range=${encodeURIComponent(dateRange)}&group=${encodeURIComponent(groupValue)}`)
-        .then(response => response.json())
+    fetch(`{% url "get_logs_by_range_and_group" %}?date_range=${encodeURIComponent(dateRange)}&group=${encodeURIComponent(groupValue)}`, {
+        credentials: 'same-origin',
+        headers: {
+            'X-Requested-With': 'XMLHttpRequest'
+        }
+    })
+        .then(response => {
+            if (!response.ok) {
+                if (response.status === 302 || response.status === 401 || response.status === 403) {
+                    console.error('❌ Authentication error - redirecting to login');
+                    window.location.href = '/login/';
+                    return;
+                }
+                throw new Error(`HTTP ${response.status}: ${response.statusText}`);
+            }
+            return response.json();
+        })
         .then(data => {
+            if (!data) return; // Handle auth redirect case
+            
             if (data.status === 'success') {
                 console.log('✅ Dashboard data loaded successfully');
                 updateDashboard(data);
                 showLoadingState(false);
+            } else if (data.status === 'error' && data.message === 'Authentication required') {
+                console.error('❌ Session expired - redirecting to login');
+                window.location.href = '/login/';
             } else {
                 console.error('❌ API error:', data.message);
-                showError('Failed to load dashboard data');
+                showError(data.message || 'Failed to load dashboard data');
+                showLoadingState(false);
             }
         })
         .catch(error => {
             console.error('❌ Network error:', error);
             showError('Network error loading dashboard data');
+            showLoadingState(false);
         });
 }
 
+// Store dashboard data globally for charts
+let dashboardData = {
+    students: [],
+    groupTotals: {},
+    dailyData: []
+};
+
 function updateDashboard(data) {
-    const { students = [], group_totals = {} } = data;
+    const { students = [], group_totals = {}, daily_data = [] } = data;
+    
+    // Store data globally for charts
+    dashboardData = {
+        students,
+        groupTotals: group_totals,
+        dailyData: daily_data
+    };
     
     // Update overview metrics
     updateOverviewMetrics(students, group_totals);
@@ -525,15 +659,15 @@ function updateDashboard(data) {
     updateTeacherInsights(students);
     
     // Update engagement insights
-    updateEngagementInsights(students, group_totals);
+    updateEngagementInsights(students, group_totals, daily_data);
     
     // Update charts
-    updateCharts(students, group_totals);
+    updateCharts(students, group_totals, daily_data);
     
     // Update student table
     updateStudentTable(students);
     
-    console.log('📊 Dashboard updated with', students.length, 'students');
+    console.log('📊 Dashboard updated with', students.length, 'students and', daily_data.length, 'days of data');
 }
 
 function updateOverviewMetrics(students, groupTotals) {
@@ -577,13 +711,24 @@ function updateTeacherInsights(students) {
     document.getElementById('inactive-count').textContent = inactive;
 }
 
-function updateEngagementInsights(students, groupTotals) {
+function updateEngagementInsights(students, groupTotals, dailyData) {
     // Calculate engagement metrics
-    const totalSessions = students.length; // Simplified
-    const avgSessionLength = groupTotals.minutes / Math.max(totalSessions, 1) || 0;
-    const readingFrequency = totalSessions / 7; // Sessions per week
+    const totalLogs = dailyData.reduce((sum, day) => sum + day.logs_count, 0);
+    const avgSessionLength = totalLogs > 0 ? groupTotals.minutes / totalLogs : 0;
+    const activeDays = dailyData.filter(day => day.logs_count > 0).length;
+    const totalDays = dailyData.length;
+    const readingFrequency = totalDays > 0 ? (activeDays / totalDays) * 7 : 0; // Active days per week
     const completionRate = (groupTotals.goal_achievement_rate || 0);
-    const improvementTrend = Math.random() * 20 - 10; // Placeholder - would be calculated from historical data
+    
+    // Calculate improvement trend from daily data
+    let improvementTrend = 0;
+    if (dailyData.length >= 3) {
+        const firstHalf = dailyData.slice(0, Math.floor(dailyData.length / 2));
+        const secondHalf = dailyData.slice(Math.ceil(dailyData.length / 2));
+        const firstAvg = firstHalf.reduce((sum, d) => sum + d.pages, 0) / Math.max(firstHalf.length, 1);
+        const secondAvg = secondHalf.reduce((sum, d) => sum + d.pages, 0) / Math.max(secondHalf.length, 1);
+        improvementTrend = firstAvg > 0 ? ((secondAvg - firstAvg) / firstAvg) * 100 : 0;
+    }
     
     document.getElementById('avg-session-length').textContent = Math.round(avgSessionLength);
     document.getElementById('reading-frequency').textContent = Math.round(readingFrequency * 10) / 10;
@@ -601,14 +746,14 @@ function updateEngagementInsights(students, groupTotals) {
     }
 }
 
-function updateCharts(students, groupTotals) {
+function updateCharts(students, groupTotals, dailyData) {
     // Create enhanced visualizations
-    createActivityChart(students, groupTotals);
+    createActivityChart(students, groupTotals, dailyData);
     createStatusChart(students);
 }
 
-function createActivityChart(students, groupTotals) {
-    // Initialize with daily view
+function createActivityChart(students, groupTotals, dailyData) {
+    // Initialize with daily view, passing the current data
     updateChartView('daily');
 }
 
@@ -858,15 +1003,26 @@ function updateChartView(viewType) {
         return;
     }
     
+    // Check if we have data
+    if (!dashboardData.dailyData || dashboardData.dailyData.length === 0) {
+        console.warn('⚠️ No daily data available for charts');
+        return;
+    }
+    
     try {
         const chart = echarts.getInstanceByDom(chartElement) || echarts.init(chartElement);
     
     let option;
     
     if (viewType === 'summary') {
-        // Summary view - show aggregated data
+        // Summary view - show aggregated data from real data
+        const totalPages = dashboardData.groupTotals.pages || 0;
+        const totalMinutes = dashboardData.groupTotals.minutes || 0;
+        const activeStudents = dashboardData.students.filter(s => s.pages > 0 || s.minutes > 0).length;
+        const goalAchievement = dashboardData.groupTotals.goal_achievement_rate || 0;
+        
         const categories = ['Pages Read', 'Reading Time', 'Active Students', 'Goal Achievement'];
-        const values = [150, 320, 12, 75]; // Sample summary data
+        const values = [totalPages, totalMinutes, activeStudents, goalAchievement];
         
         option = {
             tooltip: {
@@ -894,10 +1050,13 @@ function updateChartView(viewType) {
             ]
         };
     } else {
-        // Daily view - show daily breakdown
-        const days = ['Mon', 'Tue', 'Wed', 'Thu', 'Fri', 'Sat', 'Sun'];
-        const pagesData = days.map(() => Math.floor(Math.random() * 50) + 10);
-        const minutesData = days.map(() => Math.floor(Math.random() * 60) + 20);
+        // Daily view - show daily breakdown from real data
+        const dates = dashboardData.dailyData.map(d => {
+            const date = new Date(d.date);
+            return date.toLocaleDateString('en-US', { month: 'short', day: 'numeric' });
+        });
+        const pagesData = dashboardData.dailyData.map(d => d.pages || 0);
+        const minutesData = dashboardData.dailyData.map(d => d.minutes || 0);
         
         option = {
             tooltip: {
@@ -909,7 +1068,10 @@ function updateChartView(viewType) {
             },
             xAxis: {
                 type: 'category',
-                data: days
+                data: dates,
+                axisLabel: {
+                    rotate: 45
+                }
             },
             yAxis: [
                 {
@@ -943,6 +1105,7 @@ function updateChartView(viewType) {
     }
     
         chart.setOption(option, true);
+        console.log('✅ Chart updated with real data');
     } catch (error) {
         console.error('❌ Chart view update error:', error);
     }
@@ -1153,6 +1316,9 @@ document.addEventListener('DOMContentLoaded', function() {
     loadCollaborationNotifications();
 });
 </script>
+
+<script src="{% static 'js/modules/dashboard-manager.js' %}" defer></script>
+<script src="{% static 'js/modules/chart-builder.js' %}" defer></script>
 
 
 {% endblock %}

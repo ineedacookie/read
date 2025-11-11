@@ -24,15 +24,11 @@ from .response_helpers import (
     error_response,
     validation_error_response,
     permission_denied_response,
-    not_found_response,
-    rate_limit_response,
     server_error_response,
     created_response,
     reading_log_created_response,
-    reading_log_updated_response,
-    student_progress_response,
-    teacher_dashboard_response,
-    parent_dashboard_response
+    paginated_response,
+    dashboard_response
 )
 
 from .permission_helpers import (
@@ -44,11 +40,9 @@ from .permission_helpers import (
     get_accessible_students,
     get_accessible_reading_logs,
     require_user_types,
-    require_rate_limit,
-    can_edit_reading_log,
-    can_view_student_data,
+    require_same_school,
     log_successful_action,
-    log_permission_denied
+    log_security_event
 )
 
 from .form_helpers import (
@@ -77,32 +71,9 @@ from .user_creation_helpers import (
     create_school_with_data
 )
 
-from .template_helpers import (
-    get_user_navigation_items,
-    get_user_dashboard_widgets,
-    get_breadcrumb_items,
-    get_date_range_options,
-    format_user_display_name,
-    get_user_permissions_context,
-    format_reading_stats,
-    get_common_template_context,
-    template_helpers_context
-)
-
+# Template helpers removed - not registered as context processor, never used in templates
+# URL helpers removed - not used in production, only in examples
 # Test helpers are imported directly in test files to avoid circular imports
-
-from .url_helpers import (
-    crud_urls,
-    api_crud_urls,
-    user_type_urls,
-    activation_urls,
-    api_resource_urls,
-    dashboard_urls,
-    management_urls,
-    static_page_urls,
-    bulk_url_patterns,
-    URLPatternGenerator
-)
 
 from .settings_helpers import (
     get_env_variable,
@@ -123,17 +94,17 @@ from .email_helpers import (
     send_invitation_email,
     send_email_change_validation,
     send_feedback_notification,
-    send_password_reset_email,
-    send_bulk_email,
-    send_welcome_email,
-    send_reading_goal_reminder,
-    validate_email_template,
-    get_email_context_defaults
+    send_password_reset_email
 )
 
 from .analytics_helpers import (
     ReadingStatsCalculator,
     GoalProgressCalculator
+)
+
+from .db_debug import (
+    query_debugger,
+    log_query_stats,
 )
 
 __all__ = [
@@ -156,15 +127,11 @@ __all__ = [
     'error_response',
     'validation_error_response',
     'permission_denied_response',
-    'not_found_response',
-    'rate_limit_response',
     'server_error_response',
     'created_response',
     'reading_log_created_response',
-    'reading_log_updated_response',
-    'student_progress_response',
-    'teacher_dashboard_response',
-    'parent_dashboard_response',
+    'paginated_response',
+    'dashboard_response',
     
     # Permission helpers
     'check_user_type',
@@ -175,11 +142,9 @@ __all__ = [
     'get_accessible_students',
     'get_accessible_reading_logs',
     'require_user_types',
-    'require_rate_limit',
-    'can_edit_reading_log',
-    'can_view_student_data',
+    'require_same_school',
     'log_successful_action',
-    'log_permission_denied',
+    'log_security_event',
     
     # Form helpers
     'apply_form_control_styling',
@@ -205,30 +170,9 @@ __all__ = [
     'create_superuser_if_needed',
     'create_school_with_data',
     
-    # Template helpers
-    'get_user_navigation_items',
-    'get_user_dashboard_widgets',
-    'get_breadcrumb_items',
-    'get_date_range_options',
-    'format_user_display_name',
-    'get_user_permissions_context',
-    'format_reading_stats',
-    'get_common_template_context',
-    'template_helpers_context',
-    
-    # Test helpers removed to avoid circular imports - import directly in test files
-    
-    # URL helpers
-    'crud_urls',
-    'api_crud_urls',
-    'user_type_urls',
-    'activation_urls',
-    'api_resource_urls',
-    'dashboard_urls',
-    'management_urls',
-    'static_page_urls',
-    'bulk_url_patterns',
-    'URLPatternGenerator',
+    # Template helpers removed - not used in production
+    # URL helpers removed - not used in production, only in examples
+    # Test helpers are imported directly in test files to avoid circular imports
     
     # Settings helpers
     'get_env_variable',
@@ -249,13 +193,12 @@ __all__ = [
     'send_email_change_validation',
     'send_feedback_notification',
     'send_password_reset_email',
-    'send_bulk_email',
-    'send_welcome_email',
-    'send_reading_goal_reminder',
-    'validate_email_template',
-    'get_email_context_defaults',
     
     # Analytics helpers
     'ReadingStatsCalculator',
     'GoalProgressCalculator',
+
+    # Query debugging utilities
+    'query_debugger',
+    'log_query_stats',
 ]

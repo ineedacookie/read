@@ -1,5 +1,5 @@
 from django.contrib.auth.forms import UserCreationForm, UserChangeForm, AdminPasswordChangeForm, PasswordChangeForm
-from django.forms import SelectMultiple, EmailField, ModelForm, BooleanField, CharField, PasswordInput, CheckboxSelectMultiple, ModelMultipleChoiceField, ValidationError
+from django.forms import SelectMultiple, EmailField, ModelForm, BooleanField, CharField, PasswordInput, CheckboxSelectMultiple, ModelMultipleChoiceField, ValidationError, ChoiceField
 
 from .models import CustomUser, School, Classroom, StudentParentRelation, ReadingGroup
 from .utils import send_email_with_link
@@ -23,9 +23,11 @@ class BaseUserForm(ModelForm):
         super().__init__(*args, **kwargs)
         apply_form_control_styling(self)
         
-        if self.instance and self.instance.pk and self.instance.school:
+        # Setup querysets if instance has school (works for both new and existing)
+        if self.instance and self.instance.school:
             setup_school_filtered_querysets(self, self.instance.school, self.logged_in_user)
-            setup_initial_values_for_instance(self, self.instance, self.instance.school)
+            if self.instance.pk:  # Only setup initial values for existing instances
+                setup_initial_values_for_instance(self, self.instance, self.instance.school)
 
 
 class SchoolForm(ModelForm):
@@ -96,18 +98,37 @@ class UserForm(ModelForm):
 
 class RegisterUserForm(ModelForm):
     agree_to_terms_and_conditions = BooleanField(required=True)
+    
     class Meta:
         model = CustomUser
         fields = (
             'first_name',
             'last_initial',
-            'username',
             'email'
         )
 
     def __init__(self, *args, **kwargs):
         super().__init__(*args, **kwargs)
         apply_form_control_styling(self)
+        
+        # Add helpful labels
+        self.fields['first_name'].help_text = 'Your first name'
+        self.fields['last_initial'].help_text = 'First letter of your last name (e.g., "S" for Smith)'
+        self.fields['email'].help_text = 'Your email address (used for login)'
+    
+    def save(self, commit=True):
+        # All new registrations default to administrator
+        instance = super().save(commit=False)
+        instance.user_type = 'administrator'
+        
+        # Auto-generate username from email (required by Django for admin)
+        if not instance.username:
+            instance.username = instance.email
+        
+        if commit:
+            instance.save()
+        
+        return instance
 
 
 class InviteUsersForm(ModelForm):

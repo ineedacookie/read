@@ -21,22 +21,23 @@ User = get_user_model()
 class GamificationEngineTests(TestCase):
     """Test the core gamification engine functionality"""
     
-    def setUp(self):
-        """Set up test data"""
-        self.school = School.objects.create(name="Test School")
+    @classmethod
+    def setUpTestData(cls):
+        """Set up data once for all tests in this class - OPTIMIZED"""
+        cls.school = School.objects.create(name="Test School")
         
-        self.student = User.objects.create_user(
+        cls.student = User.objects.create_user(
             username="teststudent",
             email="student@test.com",
             password="testpass123",
             user_type="student",
             first_name="Test",
             last_initial="S",
-            school=self.school
+            school=cls.school
         )
         
-        # Create a few badges for testing
-        self.badge_first_log = Badge.objects.create(
+        # Create badges for testing (shared across all tests)
+        cls.badge_first_log = Badge.objects.create(
             name="First Steps",
             description="Complete your first reading log",
             category="reading",
@@ -47,7 +48,7 @@ class GamificationEngineTests(TestCase):
             points_value=10
         )
         
-        self.badge_page_turner = Badge.objects.create(
+        cls.badge_page_turner = Badge.objects.create(
             name="Page Turner",
             description="Read 100 pages total",
             category="reading",
@@ -57,6 +58,13 @@ class GamificationEngineTests(TestCase):
             criteria={"total_pages": 100},
             points_value=25
         )
+    
+    def setUp(self):
+        """Per-test setup - clean up logs/points from previous tests"""
+        # Clean up any logs or points from previous tests
+        Log.objects.filter(student=self.student).delete()
+        StudentPoints.objects.filter(student=self.student).delete()
+        StudentBadge.objects.filter(student=self.student).delete()
         
         self.badge_streak = Badge.objects.create(
             name="Steady Reader",
@@ -197,33 +205,33 @@ class GamificationEngineTests(TestCase):
 class GamificationAPITests(TestCase):
     """Test the gamification API endpoints"""
     
-    def setUp(self):
-        """Set up test data"""
-        self.client = Client()
-        self.school = School.objects.create(name="Test School")
+    @classmethod
+    def setUpTestData(cls):
+        """Set up data once for all tests in this class - OPTIMIZED"""
+        cls.school = School.objects.create(name="Test School")
         
-        self.student = User.objects.create_user(
+        cls.student = User.objects.create_user(
             username="teststudent",
             email="student@test.com",
             password="testpass123",
             user_type="student",
             first_name="Test",
             last_initial="S",
-            school=self.school
+            school=cls.school
         )
         
-        self.teacher = User.objects.create_user(
+        cls.teacher = User.objects.create_user(
             username="testteacher",
             email="teacher@test.com",
             password="testpass123",
             user_type="teacher",
             first_name="Teacher",
             last_initial="T",
-            school=self.school
+            school=cls.school
         )
         
         # Create a badge
-        self.badge = Badge.objects.create(
+        cls.badge = Badge.objects.create(
             name="Test Badge",
             description="Test badge description",
             category="reading",
@@ -235,9 +243,9 @@ class GamificationAPITests(TestCase):
         )
         
         # Create points profile for student
-        self.points_profile = StudentPoints.objects.create(
-            student=self.student,
-            school=self.school,
+        cls.points_profile = StudentPoints.objects.create(
+            student=cls.student,
+            school=cls.school,
             total_points=50,
             current_level=2,
             points_to_next_level=125,
@@ -247,6 +255,10 @@ class GamificationAPITests(TestCase):
             total_pages_read=150,
             total_minutes_read=300
         )
+    
+    def setUp(self):
+        """Per-test setup - only create client"""
+        self.client = Client()
     
     def test_student_profile_api_success(self):
         """Test successful student profile retrieval"""

@@ -336,7 +336,7 @@ def get_context_processors():
         'django.template.context_processors.media',
         'django.template.context_processors.static',
         'django.template.context_processors.tz',
-        'read.utils.template_helpers.template_helpers_context',  # Our custom context processor
+        # 'read.utils.template_helpers.template_helpers_context',  # Removed - was never used
     ]
 
 

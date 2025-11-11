@@ -11,7 +11,7 @@ from django.contrib.auth import get_user_model
 from django.test.utils import override_settings
 
 from ..models import Log, DailyGoal
-from users.models import School, CustomUser, StudentParentRelation
+from users.models import Classroom, School, CustomUser, StudentParentRelation
 
 User = get_user_model()
 
@@ -19,29 +19,34 @@ User = get_user_model()
 class StudentAPITests(TestCase):
     """Test student-specific API endpoints"""
     
-    def setUp(self):
-        self.client = Client()
-        self.school = School.objects.create(name="Test School")
+    @classmethod
+    def setUpTestData(cls):
+        """Set up data once for all tests in this class - OPTIMIZED"""
+        cls.school = School.objects.create(name="Test School")
         
-        self.student = CustomUser.objects.create(
+        cls.student = CustomUser.objects.create(
             username="teststudent",
             email="student@test.com",
             user_type="student",
-            school=self.school,
+            school=cls.school,
             first_name="Test",
             last_initial="S"
         )
-        self.student.set_password("testpass123")
-        self.student.save()
+        cls.student.set_password("testpass123")
+        cls.student.save()
         
-        self.teacher = CustomUser.objects.create(
+        cls.teacher = CustomUser.objects.create(
             username="testteacher",
             email="teacher@test.com",
             user_type="teacher",
-            school=self.school
+            school=cls.school
         )
-        self.teacher.set_password("testpass123")
-        self.teacher.save()
+        cls.teacher.set_password("testpass123")
+        cls.teacher.save()
+    
+    def setUp(self):
+        """Per-test setup - only create client"""
+        self.client = Client()
     
     def test_student_quick_log_success(self):
         """Test successful log creation via API"""
@@ -63,7 +68,8 @@ class StudentAPITests(TestCase):
             content_type='application/json'
         )
         
-        self.assertEqual(response.status_code, 200)
+        # API returns 201 Created for successful log creation
+        self.assertEqual(response.status_code, 201)
         response_data = json.loads(response.content)
         self.assertEqual(response_data['status'], 'success')
         self.assertIn('log_id', response_data)
@@ -89,7 +95,8 @@ class StudentAPITests(TestCase):
         )
         response_data = json.loads(response.content)
         self.assertEqual(response_data['status'], 'error')
-        self.assertIn('positive', response_data['message'])
+        # Validation message changed to be more specific
+        self.assertIn('at least', response_data['message'].lower())
         
         # Test invalid rating
         data = {"rating": 6}
@@ -100,7 +107,8 @@ class StudentAPITests(TestCase):
         )
         response_data = json.loads(response.content)
         self.assertEqual(response_data['status'], 'error')
-        self.assertIn('between 1 and 5', response_data['message'])
+        # Error message updated to include 0
+        self.assertIn('between 0 and 5', response_data['message'].lower())
     
     def test_student_quick_log_permissions(self):
         """Test that only students can create logs"""
@@ -113,9 +121,8 @@ class StudentAPITests(TestCase):
             content_type='application/json'
         )
         
-        response_data = json.loads(response.content)
-        self.assertEqual(response_data['status'], 'error')
-        self.assertIn('Access denied', response_data['message'])
+        # @require_user_types decorator raises PermissionDenied (403)
+        self.assertEqual(response.status_code, 403)
     
     def test_student_progress_api(self):
         """Test student progress API"""
@@ -155,54 +162,59 @@ class StudentAPITests(TestCase):
         
         response_data = json.loads(response.content)
         self.assertEqual(response_data['status'], 'error')
-        self.assertIn('Access denied', response_data['message'])
+        self.assertIn('Student ID required', response_data['message'])
 
 
 class ParentAPITests(TestCase):
     """Test parent dashboard API functionality"""
     
-    def setUp(self):
-        self.client = Client()
-        self.school = School.objects.create(name="Test School")
+    @classmethod
+    def setUpTestData(cls):
+        """Set up data once for all tests in this class - OPTIMIZED"""
+        cls.school = School.objects.create(name="Test School")
         
-        self.parent = CustomUser.objects.create(
+        cls.parent = CustomUser.objects.create(
             username="testparent",
             email="parent@test.com",
             user_type="parent",
-            school=self.school
+            school=cls.school
         )
-        self.parent.set_password("testpass123")
-        self.parent.save()
+        cls.parent.set_password("testpass123")
+        cls.parent.save()
         
-        self.student1 = CustomUser.objects.create(
+        cls.student1 = CustomUser.objects.create(
             username="student1",
             email="student1@test.com",
             user_type="student",
-            school=self.school,
+            school=cls.school,
             first_name="Student",
             last_initial="A"
         )
         
-        self.student2 = CustomUser.objects.create(
+        cls.student2 = CustomUser.objects.create(
             username="student2",
             email="student2@test.com",
             user_type="student",
-            school=self.school,
+            school=cls.school,
             first_name="Student",
             last_initial="B"
         )
         
         # Create parent-child relationships
         StudentParentRelation.objects.create(
-            school=self.school,
-            parent=self.parent,
-            student=self.student1
+            school=cls.school,
+            parent=cls.parent,
+            student=cls.student1
         )
         StudentParentRelation.objects.create(
-            school=self.school,
-            parent=self.parent,
-            student=self.student2
+            school=cls.school,
+            parent=cls.parent,
+            student=cls.student2
         )
+    
+    def setUp(self):
+        """Per-test setup - only create client"""
+        self.client = Client()
     
     def test_parent_dashboard_success(self):
         """Test parent dashboard API with children data"""
@@ -288,3 +300,114 @@ class ParentAPITests(TestCase):
         # Should only include today's log
         self.assertEqual(child_stats['total_pages'], 20)
         self.assertEqual(child_stats['total_logs'], 1)
+
+
+class CalendarApiTests(TestCase):
+    """Test calendar-centric log endpoints"""
+
+    @classmethod
+    def setUpTestData(cls):
+        cls.school = School.objects.create(name="Calendar School")
+
+        cls.teacher = CustomUser.objects.create(
+            username="calendar_teacher",
+            email="calendar_teacher@test.com",
+            user_type="teacher",
+            school=cls.school
+        )
+        cls.teacher.set_password("testpass123")
+        cls.teacher.save()
+
+        cls.student = CustomUser.objects.create(
+            username="calendar_student",
+            email="calendar_student@test.com",
+            user_type="student",
+            school=cls.school,
+            first_name="Calendar",
+            last_initial="S"
+        )
+
+        cls.classroom = Classroom.objects.create(
+            name="Calendar Room",
+            school=cls.school,
+            created_by=cls.teacher
+        )
+        cls.classroom.teachers.add(cls.teacher)
+        cls.classroom.students.add(cls.student)
+
+        cls.existing_log = Log.objects.create(
+            student=cls.student,
+            school=cls.school,
+            date=date.today(),
+            title="Existing Entry",
+            pages=10,
+            minutes=15
+        )
+
+    def setUp(self):
+        self.client = Client()
+        self.client.login(username="calendar_teacher@test.com", password="testpass123")
+
+    def test_calendar_logs_fetch_student(self):
+        """Teachers can fetch student logs via calendar endpoint"""
+        response = self.client.get(
+            reverse('calendar_logs'),
+            {
+                'start': date.today().strftime('%Y-%m-%d'),
+                'end': date.today().strftime('%Y-%m-%d'),
+                'id': self.student.id,
+                'form_name': 'Student'
+            },
+            HTTP_X_REQUESTED_WITH='XMLHttpRequest'
+        )
+
+        self.assertEqual(response.status_code, 200)
+        data = json.loads(response.content)
+        self.assertEqual(data['status'], 'success')
+        self.assertEqual(len(data['logs']), 1)
+        self.assertEqual(data['logs'][0]['id'], self.existing_log.id)
+
+    def test_calendar_logs_create_student(self):
+        """Teachers can create logs for accessible students via calendar API"""
+        payload = {
+            'student_id': self.student.id,
+            'date': date.today().strftime('%Y-%m-%d'),
+            'title': 'Calendar Created',
+            'pages': 12,
+            'minutes': 20,
+            'comments': 'Created from calendar endpoint'
+        }
+
+        response = self.client.post(
+            reverse('calendar_logs'),
+            data=json.dumps(payload),
+            content_type='application/json',
+            HTTP_X_REQUESTED_WITH='XMLHttpRequest'
+        )
+
+        self.assertEqual(response.status_code, 200)
+        data = json.loads(response.content)
+        self.assertEqual(data['status'], 'success')
+        self.assertIn('log_id', data)
+        self.assertTrue(Log.objects.filter(id=data['log_id']).exists())
+
+    def test_calendar_log_delete_student(self):
+        """Teachers can delete logs via calendar detail endpoint"""
+        log = Log.objects.create(
+            student=self.student,
+            school=self.school,
+            date=date.today(),
+            title="Delete Me"
+        )
+
+        response = self.client.delete(
+            reverse('calendar_log_detail', args=[log.id]),
+            data=json.dumps({'student_id': self.student.id}),
+            content_type='application/json',
+            HTTP_X_REQUESTED_WITH='XMLHttpRequest'
+        )
+
+        self.assertEqual(response.status_code, 200)
+        data = json.loads(response.content)
+        self.assertEqual(data['status'], 'success')
+        self.assertFalse(Log.objects.filter(id=log.id).exists())

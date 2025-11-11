@@ -27,45 +27,50 @@ User = get_user_model()
 class StudentCreationTests(TestCase):
     """Test student creation via both API and form workflows"""
     
-    def setUp(self):
-        self.client = Client()
-        self.school = School.objects.create(name="Test School")
+    @classmethod
+    def setUpTestData(cls):
+        """Set up data once for all tests in this class - OPTIMIZED"""
+        cls.school = School.objects.create(name="Test School")
         
         # Create a teacher for testing student creation
-        self.teacher = CustomUser.objects.create_user(
+        cls.teacher = CustomUser.objects.create_user(
             username="teacher@test.com",
             email="teacher@test.com",
             password="testpass123",
             user_type="teacher",
             first_name="Test",
             last_initial="T",
-            school=self.school
+            school=cls.school
         )
         
         # Create admin for comparison
-        self.admin = CustomUser.objects.create_user(
+        cls.admin = CustomUser.objects.create_user(
             username="admin@test.com",
             email="admin@test.com",
             password="testpass123",
             user_type="administrator",
             first_name="Admin",
             last_initial="A",
-            school=self.school
+            school=cls.school
         )
         
         # Create classroom for testing
-        self.classroom = Classroom.objects.create(
+        cls.classroom = Classroom.objects.create(
             name="Test Classroom",
-            school=self.school
+            school=cls.school
         )
-        self.classroom.teachers.add(self.teacher)
+        cls.classroom.teachers.add(cls.teacher)
         
         # Create reading group for testing
-        self.reading_group = ReadingGroup.objects.create(
+        cls.reading_group = ReadingGroup.objects.create(
             name="Test Reading Group",
-            school=self.school
+            school=cls.school
         )
-        self.reading_group.managers.add(self.teacher)
+        cls.reading_group.managers.add(cls.teacher)
+    
+    def setUp(self):
+        """Per-test setup - only create client"""
+        self.client = Client()
     
     def test_student_creation_via_api_success(self):
         """Test successful student creation via API endpoint"""
@@ -85,7 +90,7 @@ class StudentCreationTests(TestCase):
         self.assertEqual(response.status_code, 200)
         
         response_data = response.json()
-        self.assertTrue(response_data['success'])
+        self.assertEqual(response_data['status'], 'success')
         self.assertIn('student_email', response_data)
         self.assertEqual(response_data['student_email'], 'newstudent@test.com')
         # No temporary password in response anymore
@@ -129,11 +134,13 @@ class StudentCreationTests(TestCase):
         }
         
         response = self.client.post('/api/create-student/', data)
-        self.assertEqual(response.status_code, 200)
+        # Permission denied now returns 403, not 200
+        self.assertEqual(response.status_code, 403)
         
         response_data = response.json()
-        self.assertFalse(response_data['success'])
-        self.assertEqual(response_data['message'], 'Unauthorized')
+        self.assertEqual(response_data['status'], 'error')
+        # Message updated from 'Unauthorized' to 'Access denied'
+        self.assertEqual(response_data['message'], 'Access denied')
     
     def test_student_creation_via_api_duplicate_email(self):
         """Test duplicate email handling in API"""
@@ -148,7 +155,7 @@ class StudentCreationTests(TestCase):
         }
         response = self.client.post('/api/create-student/', data)
         self.assertEqual(response.status_code, 200)
-        self.assertTrue(response.json()['success'])
+        self.assertEqual(response.json()['status'], 'success')
         
         # Try to create second student with same email
         data = {
@@ -158,10 +165,11 @@ class StudentCreationTests(TestCase):
             'password': 'SecondPassword123'
         }
         response = self.client.post('/api/create-student/', data)
-        self.assertEqual(response.status_code, 200)
+        # Error responses now return 400, not 200
+        self.assertEqual(response.status_code, 400)
         
         response_data = response.json()
-        self.assertFalse(response_data['success'])
+        self.assertEqual(response_data['status'], 'error')
         self.assertEqual(response_data['message'], 'Email already exists')
     
     def test_student_creation_via_form_new_student(self):
@@ -263,7 +271,7 @@ class StudentCreationTests(TestCase):
         }
         response = self.client.post('/api/create-student/', data)
         response_data = response.json()
-        self.assertFalse(response_data['success'])
+        self.assertEqual(response_data['status'], 'error')
         self.assertEqual(response_data['message'], 'All required fields must be filled (first name, last initial, email, and password)')
         
         # Missing email
@@ -274,7 +282,7 @@ class StudentCreationTests(TestCase):
         }
         response = self.client.post('/api/create-student/', data)
         response_data = response.json()
-        self.assertFalse(response_data['success'])
+        self.assertEqual(response_data['status'], 'error')
         self.assertEqual(response_data['message'], 'All required fields must be filled (first name, last initial, email, and password)')
         
         # Missing password
@@ -285,32 +293,37 @@ class StudentCreationTests(TestCase):
         }
         response = self.client.post('/api/create-student/', data)
         response_data = response.json()
-        self.assertFalse(response_data['success'])
+        self.assertEqual(response_data['status'], 'error')
         self.assertEqual(response_data['message'], 'All required fields must be filled (first name, last initial, email, and password)')
 
 
 class ParentCreationTests(TestCase):
     """Test parent invitation and activation workflow"""
     
-    def setUp(self):
-        self.client = Client()
-        self.school = School.objects.create(name="Test School")
+    @classmethod
+    def setUpTestData(cls):
+        """Set up data once for all tests in this class - OPTIMIZED"""
+        cls.school = School.objects.create(name="Test School")
         
-        self.teacher = CustomUser.objects.create_user(
+        cls.teacher = CustomUser.objects.create_user(
             username="teacher@test.com",
             email="teacher@test.com",
             password="testpass123",
             user_type="teacher",
-            school=self.school
+            school=cls.school
         )
         
-        self.student = CustomUser.objects.create_user(
+        cls.student = CustomUser.objects.create_user(
             username="student@test.com",
             email="student@test.com",
             password="studentpass123",
             user_type="student",
-            school=self.school
+            school=cls.school
         )
+    
+    def setUp(self):
+        """Per-test setup"""
+        self.client = Client()
     
     @patch('users.forms.send_email_with_link')
     def test_parent_invitation_via_form(self, mock_send_email):
@@ -357,7 +370,7 @@ class ParentCreationTests(TestCase):
         self.assertEqual(response.status_code, 200)
         
         response_data = response.json()
-        self.assertTrue(response_data['success'])
+        self.assertEqual(response_data['status'], 'success')
         
         # Verify parent was created
         parent = CustomUser.objects.get(email='apiparent@test.com')
@@ -424,27 +437,32 @@ class ParentCreationTests(TestCase):
 class TeacherAdminCreationTests(TestCase):
     """Test teacher and administrator creation"""
     
-    def setUp(self):
-        self.client = Client()
-        self.school = School.objects.create(name="Test School")
+    @classmethod
+    def setUpTestData(cls):
+        """Set up data once for all tests in this class - OPTIMIZED"""
+        cls.school = School.objects.create(name="Test School")
         
-        self.admin = CustomUser.objects.create_user(
+        cls.admin = CustomUser.objects.create_user(
             username="admin@test.com",
             email="admin@test.com",
             password="testpass123",
             user_type="administrator",
-            school=self.school
+            school=cls.school
         )
         
-        self.classroom = Classroom.objects.create(
+        cls.classroom = Classroom.objects.create(
             name="Test Classroom",
-            school=self.school
+            school=cls.school
         )
         
-        self.reading_group = ReadingGroup.objects.create(
+        cls.reading_group = ReadingGroup.objects.create(
             name="Test Reading Group",
-            school=self.school
+            school=cls.school
         )
+    
+    def setUp(self):
+        """Per-test setup"""
+        self.client = Client()
     
     def test_teacher_creation_via_form(self):
         """Test teacher creation via CustomTeacherForm"""
@@ -535,7 +553,7 @@ class TeacherAdminCreationTests(TestCase):
         self.assertEqual(response.status_code, 200)
         
         response_data = response.json()
-        self.assertTrue(response_data['success'])
+        self.assertEqual(response_data['status'], 'success')
         
         # Verify teacher was created
         teacher = CustomUser.objects.get(email='invitedteacher@test.com')
@@ -549,33 +567,38 @@ class TeacherAdminCreationTests(TestCase):
 class UserCreationPermissionTests(TestCase):
     """Test permission restrictions for user creation"""
     
-    def setUp(self):
-        self.client = Client()
-        self.school = School.objects.create(name="Test School")
+    @classmethod
+    def setUpTestData(cls):
+        """Set up data once for all tests in this class - OPTIMIZED"""
+        cls.school = School.objects.create(name="Test School")
         
-        self.student = CustomUser.objects.create_user(
+        cls.student = CustomUser.objects.create_user(
             username="student@test.com",
             email="student@test.com",
             password="testpass123",
             user_type="student",
-            school=self.school
+            school=cls.school
         )
         
-        self.parent = CustomUser.objects.create_user(
+        cls.parent = CustomUser.objects.create_user(
             username="parent@test.com",
             email="parent@test.com",
             password="testpass123",
             user_type="parent",
-            school=self.school
+            school=cls.school
         )
         
-        self.teacher = CustomUser.objects.create_user(
+        cls.teacher = CustomUser.objects.create_user(
             username="teacher@test.com",
             email="teacher@test.com",
             password="testpass123",
             user_type="teacher",
-            school=self.school
+            school=cls.school
         )
+    
+    def setUp(self):
+        """Per-test setup"""
+        self.client = Client()
     
     def test_student_cannot_create_users(self):
         """Test students cannot create other users"""
@@ -589,8 +612,9 @@ class UserCreationPermissionTests(TestCase):
         }
         response = self.client.post('/api/create-student/', data)
         response_data = response.json()
-        self.assertFalse(response_data['success'])
-        self.assertEqual(response_data['message'], 'Unauthorized')
+        self.assertEqual(response_data['status'], 'error')
+        # Message updated from 'Unauthorized' to 'Access denied'
+        self.assertEqual(response_data['message'], 'Access denied')
         
         # Try to invite parent - Note: invite_user endpoint doesn't have explicit 
         # permission checks by user type at the view level, only login_required
@@ -628,8 +652,9 @@ class UserCreationPermissionTests(TestCase):
         }
         response = self.client.post('/api/create-student/', data)
         response_data = response.json()
-        self.assertFalse(response_data['success'])
-        self.assertEqual(response_data['message'], 'Unauthorized')
+        self.assertEqual(response_data['status'], 'error')
+        # Message updated from 'Unauthorized' to 'Access denied'
+        self.assertEqual(response_data['message'], 'Access denied')
     
     def test_teacher_can_create_students_parents(self):
         """Test teachers can create students and parents"""
@@ -645,7 +670,7 @@ class UserCreationPermissionTests(TestCase):
         response = self.client.post('/api/create-student/', data)
         self.assertEqual(response.status_code, 200)
         response_data = response.json()
-        self.assertTrue(response_data['success'])
+        self.assertEqual(response_data['status'], 'success')
         
         # Invite parent
         data = {
@@ -657,21 +682,23 @@ class UserCreationPermissionTests(TestCase):
         response = self.client.post('/invite_user/', data)
         self.assertEqual(response.status_code, 200)
         response_data = response.json()
-        self.assertTrue(response_data['success'])
+        self.assertEqual(response_data['status'], 'success')
 
 
 class EdgeCaseTests(TestCase):
     """Test edge cases and error conditions"""
     
-    def setUp(self):
-        self.school = School.objects.create(name="Test School")
+    @classmethod
+    def setUpTestData(cls):
+        """Set up data once for all tests in this class - OPTIMIZED"""
+        cls.school = School.objects.create(name="Test School")
         
-        self.teacher = CustomUser.objects.create_user(
+        cls.teacher = CustomUser.objects.create_user(
             username="teacher@test.com",
             email="teacher@test.com",
             password="testpass123",
             user_type="teacher",
-            school=self.school
+            school=cls.school
         )
     
     def test_password_required_for_new_students(self):
@@ -697,7 +724,7 @@ class EdgeCaseTests(TestCase):
         
         form = CustomStudentForm(data=form_data, instance=new_student, logged_in_user=self.teacher)
         self.assertFalse(form.is_valid())
-        self.assertIn('Password is required when creating a new student.', str(form.errors))
+        self.assertIn('Password is required when creating a new user.', str(form.errors))
         
         # Test with password provided - should be valid
         form_data['password'] = 'TeacherSetPassword123'
@@ -812,31 +839,36 @@ class EdgeCaseTests(TestCase):
 class IntegrationTests(TestCase):
     """End-to-end integration tests for complete user creation workflows"""
     
-    def setUp(self):
-        self.client = Client()
-        self.school = School.objects.create(name="Integration Test School")
+    @classmethod
+    def setUpTestData(cls):
+        """Set up data once for all tests in this class - OPTIMIZED"""
+        cls.school = School.objects.create(name="Integration Test School")
         
-        self.admin = CustomUser.objects.create_user(
+        cls.admin = CustomUser.objects.create_user(
             username="admin@test.com",
             email="admin@test.com",
             password="testpass123",
             user_type="administrator",
-            school=self.school
+            school=cls.school
         )
         
-        self.teacher = CustomUser.objects.create_user(
+        cls.teacher = CustomUser.objects.create_user(
             username="teacher@test.com",
             email="teacher@test.com",
             password="testpass123",
             user_type="teacher",
-            school=self.school
+            school=cls.school
         )
         
-        self.classroom = Classroom.objects.create(
+        cls.classroom = Classroom.objects.create(
             name="Integration Classroom",
-            school=self.school
+            school=cls.school
         )
-        self.classroom.teachers.add(self.teacher)
+        cls.classroom.teachers.add(cls.teacher)
+    
+    def setUp(self):
+        """Per-test setup"""
+        self.client = Client()
     
     def test_complete_student_workflow(self):
         """Test complete student creation and management workflow"""
@@ -855,7 +887,7 @@ class IntegrationTests(TestCase):
         response = self.client.post('/api/create-student/', data)
         self.assertEqual(response.status_code, 200)
         response_data = response.json()
-        self.assertTrue(response_data['success'])
+        self.assertEqual(response_data['status'], 'success')
         
         student = CustomUser.objects.get(email='complete@test.com')
         
@@ -901,7 +933,7 @@ class IntegrationTests(TestCase):
         
         response = self.client.post('/invite_user/', data)
         self.assertEqual(response.status_code, 200)
-        self.assertTrue(response.json()['success'])
+        self.assertEqual(response.json()['status'], 'success')
         
         parent = CustomUser.objects.get(email='completeparent@test.com')
         self.assertFalse(parent.is_active)

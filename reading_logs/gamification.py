@@ -73,12 +73,13 @@ class StudentBadge(models.Model):
         User,
         on_delete=models.CASCADE,
         related_name='earned_badges',
-        limit_choices_to={'user_type': 'student'}
+        limit_choices_to={'user_type': 'student'},
+        db_index=True
     )
-    badge = models.ForeignKey(Badge, on_delete=models.CASCADE)
-    school = models.ForeignKey(School, on_delete=models.CASCADE)
+    badge = models.ForeignKey(Badge, on_delete=models.CASCADE, db_index=True)
+    school = models.ForeignKey(School, on_delete=models.CASCADE, db_index=True)
     
-    earned_at = models.DateTimeField(auto_now_add=True)
+    earned_at = models.DateTimeField(auto_now_add=True, db_index=True)
     progress_data = models.JSONField(
         default=dict,
         help_text="JSON data about how the badge was earned"
@@ -87,6 +88,11 @@ class StudentBadge(models.Model):
     class Meta:
         unique_together = ['student', 'badge']
         ordering = ['-earned_at']
+        indexes = [
+            models.Index(fields=['student', '-earned_at']),  # Student badge history
+            models.Index(fields=['school', 'badge']),  # School-wide badge stats
+            models.Index(fields=['school', '-earned_at']),  # Recent badges by school
+        ]
     
     def __str__(self):
         return f"{self.student.full_name} - {self.badge.name}"
@@ -100,12 +106,13 @@ class StudentPoints(models.Model):
         User,
         on_delete=models.CASCADE,
         related_name='points_profile',
-        limit_choices_to={'user_type': 'student'}
+        limit_choices_to={'user_type': 'student'},
+        db_index=True
     )
-    school = models.ForeignKey(School, on_delete=models.CASCADE)
+    school = models.ForeignKey(School, on_delete=models.CASCADE, db_index=True)
     
-    total_points = models.IntegerField(default=0)
-    current_level = models.IntegerField(default=1)
+    total_points = models.IntegerField(default=0, db_index=True)  # For leaderboards
+    current_level = models.IntegerField(default=1, db_index=True)  # For level-based queries
     points_to_next_level = models.IntegerField(default=100)
     
     # Achievement streaks
@@ -114,13 +121,21 @@ class StudentPoints(models.Model):
     
     # Reading milestones
     total_books_read = models.IntegerField(default=0)
-    total_pages_read = models.IntegerField(default=0)
+    total_pages_read = models.IntegerField(default=0, db_index=True)  # For achievement queries
     total_minutes_read = models.IntegerField(default=0)
     
     # Tracking
-    last_activity = models.DateField(null=True, blank=True)
+    last_activity = models.DateField(null=True, blank=True, db_index=True)
     created_at = models.DateTimeField(auto_now_add=True)
     updated_at = models.DateTimeField(auto_now=True)
+    
+    class Meta:
+        indexes = [
+            models.Index(fields=['school', '-total_points']),  # School leaderboards
+            models.Index(fields=['school', '-current_level']),  # Level-based rankings
+            models.Index(fields=['school', '-total_pages_read']),  # Reading achievements
+            models.Index(fields=['-last_activity']),  # Active users
+        ]
     
     def __str__(self):
         return f"{self.student.full_name} - Level {self.current_level}"
@@ -159,19 +174,25 @@ class PointsHistory(models.Model):
     student = models.ForeignKey(
         User,
         on_delete=models.CASCADE,
-        related_name='points_history'
+        related_name='points_history',
+        db_index=True
     )
-    school = models.ForeignKey(School, on_delete=models.CASCADE)
+    school = models.ForeignKey(School, on_delete=models.CASCADE, db_index=True)
     
     points_earned = models.IntegerField()
     reason = models.CharField(max_length=200)
     new_total = models.IntegerField()
     new_level = models.IntegerField()
     
-    earned_at = models.DateTimeField(auto_now_add=True)
+    earned_at = models.DateTimeField(auto_now_add=True, db_index=True)
     
     class Meta:
         ordering = ['-earned_at']
+        indexes = [
+            models.Index(fields=['student', '-earned_at']),  # Student history queries
+            models.Index(fields=['school', '-earned_at']),  # Recent activity by school
+            models.Index(fields=['student', 'earned_at']),  # Time-range queries for students
+        ]
     
     def __str__(self):
         return f"{self.student.full_name}: +{self.points_earned} - {self.reason}"
@@ -189,6 +210,8 @@ class GamificationEngine:
         """
         Process a new reading log for achievements
         Called after a student creates a reading log
+        
+        OPTIMIZED: Batch all queries and cache student stats
         """
         student = log.student
         school = log.school
@@ -199,17 +222,20 @@ class GamificationEngine:
             school=school
         )
         
+        # Cache student stats for all operations (single query)
+        student_stats = self._get_student_stats(student)
+        
         # Award base points for logging
         self._award_base_points(log, points_profile)
         
-        # Update reading streaks
-        self._update_streaks(student, points_profile)
+        # Update reading streaks (uses cached stats)
+        self._update_streaks(student, points_profile, student_stats)
         
         # Update milestone counters first
         self._update_milestones(log, points_profile)
         
-        # Check for badge achievements after milestones are updated
-        self._check_badge_achievements(student, points_profile)
+        # Check for badge achievements after milestones are updated (uses cached stats)
+        self._check_badge_achievements(student, points_profile, student_stats)
     
     def _award_base_points(self, log, points_profile):
         """Award base points for reading activities"""
@@ -241,14 +267,19 @@ class GamificationEngine:
         if points > 0:
             points_profile.add_points(points, "; ".join(reasons))
     
-    def _update_streaks(self, student, points_profile):
-        """Update reading streaks"""
+    def _update_streaks(self, student, points_profile, student_stats=None):
+        """Update reading streaks - OPTIMIZED with cached stats"""
         yesterday = date.today() - timedelta(days=1)
         today = date.today()
         
-        # Check if student read yesterday and today
-        yesterday_logs = Log.objects.filter(student=student, date=yesterday).exists()
-        today_logs = Log.objects.filter(student=student, date=today).exists()
+        # Use cached stats if available, otherwise query
+        if student_stats and 'reading_dates' in student_stats:
+            yesterday_logs = yesterday in student_stats['reading_dates']
+            today_logs = today in student_stats['reading_dates']
+        else:
+            # Fallback to direct query (less efficient)
+            yesterday_logs = Log.objects.filter(student=student, date=yesterday).exists()
+            today_logs = Log.objects.filter(student=student, date=today).exists()
         
         if today_logs:
             if yesterday_logs or points_profile.last_activity == yesterday:
@@ -270,26 +301,27 @@ class GamificationEngine:
                 bonus_points = points_profile.current_streak * 2
                 points_profile.add_points(bonus_points, f"{points_profile.current_streak} day streak bonus!")
     
-    def _check_badge_achievements(self, student, points_profile):
-        """Check if student has earned any new badges"""
+    def _check_badge_achievements(self, student, points_profile, student_stats=None):
+        """Check if student has earned any new badges - OPTIMIZED"""
         
-        # Get all active badges student hasn't earned yet
-        earned_badge_ids = StudentBadge.objects.filter(
+        # Get all active badges student hasn't earned yet (single query with values_list)
+        earned_badge_ids = set(StudentBadge.objects.filter(
             student=student
-        ).values_list('badge_id', flat=True)
+        ).values_list('badge_id', flat=True))
         
+        # Fetch available badges with select_related if needed
         available_badges = Badge.objects.filter(
             is_active=True
         ).exclude(id__in=earned_badge_ids)
         
         for badge in available_badges:
-            if self._check_badge_criteria(student, badge, points_profile):
+            if self._check_badge_criteria(student, badge, points_profile, student_stats):
                 # Award the badge
                 StudentBadge.objects.create(
                     student=student,
                     badge=badge,
                     school=student.school,
-                    progress_data=self._get_badge_progress_data(student, badge)
+                    progress_data=self._get_badge_progress_data(student, badge, student_stats)
                 )
                 
                 # Award points for earning badge
@@ -298,12 +330,12 @@ class GamificationEngine:
                     f"Earned badge: {badge.name}"
                 )
     
-    def _check_badge_criteria(self, student, badge, points_profile):
-        """Check if student meets criteria for a specific badge"""
+    def _check_badge_criteria(self, student, badge, points_profile, student_stats=None):
+        """Check if student meets criteria for a specific badge - OPTIMIZED"""
         criteria = badge.criteria
         
         if badge.category == 'reading':
-            return self._check_reading_criteria(student, criteria)
+            return self._check_reading_criteria(student, criteria, student_stats)
         elif badge.category == 'consistency':
             return self._check_consistency_criteria(student, criteria, points_profile)
         elif badge.category == 'milestone':
@@ -313,37 +345,39 @@ class GamificationEngine:
         
         return False
     
-    def _check_reading_criteria(self, student, criteria):
-        """Check reading-based achievement criteria"""
+    def _get_student_stats(self, student):
+        """
+        Get comprehensive student statistics - DELEGATED to centralized helper.
+        This ensures consistency across the codebase and reduces duplicate code.
+        """
+        from read.utils.analytics_helpers import StudentStatsCalculator
+        
+        # Use centralized calculator with date information for streaks
+        return StudentStatsCalculator.get_student_comprehensive_stats(
+            student, 
+            include_dates=True
+        )
+    
+    def _check_reading_criteria(self, student, criteria, student_stats=None):
+        """Check reading-based achievement criteria - OPTIMIZED with cached stats"""
+        # Use cached stats if available
+        if not student_stats:
+            student_stats = self._get_student_stats(student)
+        
         if 'total_logs' in criteria:
-            total_logs = Log.objects.filter(student=student).count()
-            if total_logs >= criteria['total_logs']:
+            if student_stats['total_logs'] >= criteria['total_logs']:
                 return True
         
         if 'total_pages' in criteria:
-            # Using centralized stats calculator
-            total_pages = ReadingStatsCalculator.get_total_pages(
-                Log.objects.filter(student=student)
-            )
-            if total_pages >= criteria['total_pages']:
+            if student_stats['total_pages'] >= criteria['total_pages']:
                 return True
         
         if 'total_books' in criteria:
-            unique_books = Log.objects.filter(
-                student=student
-            ).exclude(
-                title__isnull=True
-            ).exclude(
-                title__exact=''
-            ).values('title').distinct().count()
-            if unique_books >= criteria['total_books']:
+            if student_stats['unique_books'] >= criteria['total_books']:
                 return True
         
         if 'single_session_pages' in criteria:
-            max_pages = Log.objects.filter(student=student).aggregate(
-                max_pages=Max('pages')
-            )['max_pages'] or 0
-            if max_pages >= criteria['single_session_pages']:
+            if student_stats['max_pages'] >= criteria['single_session_pages']:
                 return True
         
         return False
@@ -407,29 +441,21 @@ class GamificationEngine:
         
         return False
     
-    def _get_badge_progress_data(self, student, badge):
-        """Get data about how the badge was earned"""
+    def _get_badge_progress_data(self, student, badge, student_stats=None):
+        """Get data about how the badge was earned - OPTIMIZED with cached stats"""
+        if not student_stats:
+            student_stats = self._get_student_stats(student)
+        
         return {
             'earned_date': date.today().isoformat(),
             'criteria_met': badge.criteria,
-            'student_stats': self._get_student_current_stats(student)
+            'student_stats': {
+                'total_logs': student_stats['total_logs'],
+                'total_pages': student_stats['total_pages'],
+                'total_minutes': student_stats['total_minutes']
+            }
         }
     
-    def _get_student_current_stats(self, student):
-        """Get current statistics for a student"""
-        stats = Log.objects.filter(student=student).aggregate(
-            total_logs=models.Count('id'),
-            total_pages=models.Sum('pages'),
-            total_minutes=models.Sum('minutes'),
-            avg_rating=models.Avg('rating')
-        )
-        
-        return {
-            'total_logs': stats['total_logs'] or 0,
-            'total_pages': stats['total_pages'] or 0,
-            'total_minutes': stats['total_minutes'] or 0,
-            'avg_rating': float(stats['avg_rating']) if stats['avg_rating'] else 0
-        }
     
     def _update_milestones(self, log, points_profile):
         """Update milestone counters"""
@@ -555,7 +581,9 @@ class GamificationEngine:
                 defaults=badge_data
             )
             if created:
-                print(f"Created badge: {badge.name}")
+                import logging
+                logger = logging.getLogger(__name__)
+                logger.info(f"Created badge: {badge.name}")
 
 
 # Utility functions

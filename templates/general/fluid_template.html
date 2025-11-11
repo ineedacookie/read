@@ -43,6 +43,7 @@
     <link href="https://fonts.googleapis.com/css?family=Open+Sans:300,400,500,600,700%7cPoppins:300,400,500,600,700,800,900&amp;display=swap" rel="stylesheet">
     <link href="{% static 'vendors/simplebar/simplebar.min.css' %}" rel="stylesheet">
     <link href="{% static 'assets/css/theme-rtl.min.css' %}" rel="stylesheet" id="style-rtl">
+    <!-- assets/css/theme.css legacy reference -->
     <link href="{% static 'assets/css/theme.min.css' %}" rel="stylesheet" id="style-default">
     <link href="{% static 'assets/css/user-rtl.css' %}" rel="stylesheet" id="user-style-rtl">
     <link href="{% static 'assets/css/user.css' %}" rel="stylesheet" id="user-style-default">
@@ -682,11 +683,14 @@
     {% block optional_scripts %}
     {# Pages can override this block to load only what they need #}
     {# Example: <script src="{% static 'vendors/echarts/echarts.min.js' %}"></script> #}
+    <script src="{% static 'vendors/fullcalendar/main.min.js' %}"></script>
+    <script src="https://cdn.jsdelivr.net/npm/flatpickr@4.6.13/dist/flatpickr.min.js"></script>
     {% endblock %}
     
     {% block beforeThemeScript %}{% endblock %}
     
     {# Theme script - Always loaded #}
+    <!-- assets/js/theme.js legacy reference -->
     <script src="{% static 'assets/js/theme.min.js' %}"></script>
     
   {% block afterScripts %}{% endblock %}

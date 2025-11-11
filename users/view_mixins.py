@@ -88,31 +88,29 @@ class TeacherAccessMixin:
     """
     
     def get_teacher_student_ids(self):
-        """Get all student IDs assigned to this teacher"""
+        """
+        Get all student IDs assigned to this teacher.
+        OPTIMIZED: Eliminates N+1 queries by using values_list directly.
+        """
         if self.request.user.user_type != 'teacher':
             return None
         
         from .models import Classroom, ReadingGroup
         
-        student_ids = set()
-        
-        # Get students from classrooms
-        classrooms = Classroom.objects.filter(
+        # OPTIMIZED: Single query gets all student IDs from classrooms
+        classroom_students = Classroom.objects.filter(
             school=self.request.user.school,
             teachers=self.request.user
-        )
-        for classroom in classrooms:
-            student_ids.update(classroom.students.values_list('id', flat=True))
+        ).values_list('students', flat=True)
         
-        # Get students from reading groups
-        reading_groups = ReadingGroup.objects.filter(
+        # OPTIMIZED: Single query gets all student IDs from reading groups
+        group_students = ReadingGroup.objects.filter(
             school=self.request.user.school,
             managers=self.request.user
-        )
-        for group in reading_groups:
-            student_ids.update(group.students.values_list('id', flat=True))
+        ).values_list('students', flat=True)
         
-        return student_ids
+        # Combine efficiently
+        return set(classroom_students) | set(group_students)
     
     def filter_by_teacher_students(self, queryset):
         """Filter a queryset to only include the teacher's students"""

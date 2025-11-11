@@ -185,3 +185,71 @@ class GoalProgressCalculator:
             'progress_percentage': min(progress_percentage, 100)
         }
 
+
+class StudentStatsCalculator:
+    """Comprehensive student statistics in optimized queries."""
+    
+    @staticmethod
+    def get_student_comprehensive_stats(student, include_dates=False):
+        """
+        Get ALL statistics for a student in a SINGLE query.
+        This replaces multiple separate queries across the codebase.
+        
+        Args:
+            student: Student user object
+            include_dates: If True, also fetch recent reading dates for streaks
+            
+        Returns:
+            dict: Complete statistics including total_pages, total_minutes, 
+                  unique_books, max_pages_in_session, total_logs
+        """
+        from reading_logs.models import Log
+        from django.db.models import Max
+        from datetime import date, timedelta
+        
+        stats = Log.objects.filter(student=student).aggregate(
+            total_logs=Count('id'),
+            total_pages=Sum('pages'),
+            total_minutes=Sum('minutes'),
+            max_pages=Max('pages'),
+            unique_books=Count('title', distinct=True),
+            avg_rating=Avg('rating')
+        )
+        
+        result = {
+            'total_logs': stats['total_logs'] or 0,
+            'total_pages': stats['total_pages'] or 0,
+            'total_minutes': stats['total_minutes'] or 0,
+            'max_pages': stats['max_pages'] or 0,
+            'unique_books': stats['unique_books'] or 0,
+            'avg_rating': round(float(stats['avg_rating']), 2) if stats['avg_rating'] else 0
+        }
+        
+        # Optionally include reading dates for streak calculation
+        if include_dates:
+            thirty_days_ago = date.today() - timedelta(days=30)
+            reading_dates = set(
+                Log.objects.filter(
+                    student=student,
+                    date__gte=thirty_days_ago
+                ).values_list('date', flat=True).distinct()
+            )
+            result['reading_dates'] = reading_dates
+        
+        return result
+    
+    @staticmethod
+    def get_date_range_stats(queryset, start_date, end_date):
+        """
+        Get statistics for logs within a date range.
+        
+        Args:
+            queryset: Base queryset of Log objects
+            start_date: Start date (inclusive)
+            end_date: End date (inclusive)
+            
+        Returns:
+            dict: Statistics for the date range
+        """
+        logs = queryset.filter(date__range=(start_date, end_date))
+        return ReadingStatsCalculator.get_detailed_stats(logs)

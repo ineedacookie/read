@@ -49,8 +49,7 @@ def validate_date_range(start_date_str, end_date_str, max_days_back=1095, max_ra
     if start_date < today - timedelta(days=max_days_back):
         raise ValidationError(f'Start date too far in the past (max {max_days_back} days)')
     
-    if end_date > today:
-        raise ValidationError('End date cannot be in the future')
+    # No future date restriction - backend will simply return no data for future dates
     
     if start_date > end_date:
         raise ValidationError('Start date must be before end date')
@@ -61,7 +60,14 @@ def validate_date_range(start_date_str, end_date_str, max_days_back=1095, max_ra
     return start_date, end_date
 
 
-def validate_single_date(date_str, allow_future=False, max_days_back=365):
+def validate_single_date(
+    date_str,
+    allow_future=False,
+    max_days_back=365,
+    *,
+    default_to_today=False,
+    field_name='date'
+):
     """
     Validate and parse a single date with security constraints.
     
@@ -69,6 +75,8 @@ def validate_single_date(date_str, allow_future=False, max_days_back=365):
         date_str: String representation of date (YYYY-MM-DD format)
         allow_future: Whether future dates are allowed (default: False)
         max_days_back: Maximum days in the past allowed (default: 1 year)
+        default_to_today: Return today's date when value is empty (default: False)
+        field_name: Name of the field for error messages (default: 'date')
     
     Returns:
         date: Parsed date object
@@ -78,18 +86,23 @@ def validate_single_date(date_str, allow_future=False, max_days_back=365):
     """
     from datetime import datetime
     
+    if not date_str:
+        if default_to_today:
+            return date.today()
+        raise ValidationError(f'{field_name} is required')
+    
     try:
-        parsed_date = datetime.strptime(date_str, '%Y-%m-%d').date()
+        parsed_date = datetime.strptime(str(date_str), '%Y-%m-%d').date()
     except (ValueError, TypeError):
-        raise ValidationError(f'Invalid date format: {date_str}. Use YYYY-MM-DD')
+        raise ValidationError(f'Invalid {field_name} format: {date_str}. Use YYYY-MM-DD')
     
     today = date.today()
     
     if not allow_future and parsed_date > today:
-        raise ValidationError('Cannot log future dates')
+        raise ValidationError(f'Cannot use future {field_name}')
     
     if parsed_date < today - timedelta(days=max_days_back):
-        raise ValidationError(f'Date too far in the past (max {max_days_back} days)')
+        raise ValidationError(f'{field_name} too far in the past (max {max_days_back} days)')
     
     return parsed_date
 
@@ -274,9 +287,48 @@ def validate_id_parameter(value, field_name):
 
 
 # Common validation combinations for reading logs
+def resolve_date_range_with_default(
+    start_date_str,
+    end_date_str,
+    *,
+    default_days=30,
+    max_days_back=1095,
+    max_range_days=365
+):
+    """
+    Return a validated date range using defaults when parameters are missing.
+    
+    Args:
+        start_date_str: Optional start date parameter
+        end_date_str: Optional end date parameter
+        default_days: Days to subtract from today when values missing (default: 30)
+        max_days_back: Maximum days allowed when validating explicit values
+        max_range_days: Maximum span allowed between dates
+    
+    Returns:
+        tuple: (start_date, end_date, used_defaults)
+    
+    Raises:
+        ValidationError: If provided dates are invalid
+    """
+    if not start_date_str or not end_date_str:
+        end_date = date.today()
+        start_date = end_date - timedelta(days=default_days)
+        return start_date, end_date, True
+    
+    start_date, end_date = validate_date_range(
+        start_date_str,
+        end_date_str,
+        max_days_back=max_days_back,
+        max_range_days=max_range_days
+    )
+    return start_date, end_date, False
+
+
 def validate_reading_log_data(data):
     """
     Validate all fields for a reading log entry.
+    CONSOLIDATES validation logic used in multiple views.
     
     Args:
         data: Dictionary containing reading log data
@@ -313,7 +365,7 @@ def validate_reading_log_data(data):
     
     # Validate date
     if 'date' in data and data['date']:
-        validated_data['date'] = validate_single_date(data['date'])
+        validated_data['date'] = validate_single_date(data['date'], allow_future=False, max_days_back=365)
     
     return validated_data
 

@@ -282,131 +282,14 @@ def send_password_reset_email(user, request=None, domain=None):
     )
 
 
-def send_bulk_email(users, template_name, context_generator, subject, from_email=None):
-    """
-    Send bulk emails to multiple users with personalized context.
-    
-    Args:
-        users: Queryset or list of user objects
-        template_name: Email template name
-        context_generator: Function that takes a user and returns context dict
-        subject: Email subject
-        from_email: Sender email
-        
-    Returns:
-        Dictionary with success/failure counts
-    """
-    results = {'success': 0, 'failed': 0, 'errors': []}
-    
-    for user in users:
-        try:
-            context = context_generator(user)
-            success = send_template_email(
-                to_email=user.email,
-                template_name=template_name,
-                context=context,
-                subject=subject,
-                from_email=from_email,
-                fail_silently=True
-            )
-            
-            if success:
-                results['success'] += 1
-            else:
-                results['failed'] += 1
-                
-        except Exception as e:
-            results['failed'] += 1
-            results['errors'].append(f"{user.email}: {str(e)}")
-    
-    logger.info(f"Bulk email completed: {results['success']} sent, {results['failed']} failed")
-    return results
-
-
-def send_welcome_email(user, request=None):
-    """
-    Send welcome email to new users.
-    
-    Args:
-        user: User object
-        request: HTTP request object (optional)
-        
-    Returns:
-        Boolean indicating if email was sent successfully
-    """
-    context = {
-        'user': user,
-        'email_title': 'Welcome to Reading App!',
-    }
-    
-    return send_template_email(
-        to_email=user.email,
-        template_name='welcome_email',
-        context=context,
-        subject=f'Welcome to {getattr(settings, "SITE_NAME", "Reading App")}!'
-    )
-
-
-def send_reading_goal_reminder(user, goal, days_left):
-    """
-    Send reading goal reminder email.
-    
-    Args:
-        user: User object
-        goal: Goal object
-        days_left: Number of days left to achieve goal
-        
-    Returns:
-        Boolean indicating if email was sent successfully
-    """
-    context = {
-        'user': user,
-        'goal': goal,
-        'days_left': days_left,
-        'email_title': 'Reading Goal Reminder',
-    }
-    
-    return send_template_email(
-        to_email=user.email,
-        template_name='goal_reminder_email',
-        context=context,
-        subject=f'Don\'t forget your reading goal - {days_left} days left!'
-    )
-
-
-# Email template validation helpers
-def validate_email_template(template_name):
-    """
-    Validate that an email template exists and can be rendered.
-    
-    Args:
-        template_name: Template name to validate
-        
-    Returns:
-        Boolean indicating if template is valid
-    """
-    try:
-        render_to_string(f'email/{template_name}.html', {})
-        return True
-    except Exception as e:
-        logger.error(f"Email template validation failed for {template_name}: {str(e)}")
-        return False
-
-
-def get_email_context_defaults():
-    """
-    Get default context variables for all emails.
-    
-    Returns:
-        Dictionary with default context variables
-    """
-    return {
-        'site_name': getattr(settings, 'SITE_NAME', 'Reading App'),
-        'domain': getattr(settings, 'SITE_DOMAIN', 'localhost:8000'),
-        'support_email': getattr(settings, 'SUPPORT_EMAIL', 'support@example.com'),
-        'company_name': getattr(settings, 'COMPANY_NAME', 'Reading App Inc.'),
-    }
-
+# Unused email helper functions removed:
+# - send_bulk_email() - Not used in production
+# - send_welcome_email() - Not used in production  
+# - send_reading_goal_reminder() - Not used in production
+# - validate_email_template() - Not used in production
+# - get_email_context_defaults() - Not used in production
+#
+# These can be implemented when needed, or restored from git history.
 
 # Example usage and documentation
 """

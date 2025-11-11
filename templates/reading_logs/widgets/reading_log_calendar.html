@@ -168,6 +168,18 @@
         }
         </style>
         <script>var reading_log_calendar = null;
+        const calendarContext = {
+            formName: "{{ form_name|escapejs }}",
+            objectId: "{{ id|escapejs }}",
+            api: {
+                list: "{% url 'calendar_logs' %}",
+                detailTemplate: "{% url 'calendar_log_detail' log_id=0 %}"
+            }
+        };
+
+        function getCalendarDetailUrl(logId) {
+            return calendarContext.api.detailTemplate.replace(/0\/$/, `${logId}/`);
+        }
 
 
 
@@ -346,60 +358,92 @@ $(document).ready(function() {
 
     $('#addEventForm').on('submit', function(e) {
         e.preventDefault();
-        var $form = $(this);
-        $.ajax({
-            url: "{% url 'manage_log' %}",
-            type: 'POST',
-            headers: { 'X-CSRFToken': document.querySelector(Selectors.CSRF_INPUT).value },
-            data: $form.serialize() + '&student={{ id }}',
-            success: function(data) {
-                if (data.status === 'success') {
-                    $('#addEventModal').modal('hide');
-                    var log = {
-                        id: data.log_id,
-                        title: $('#entryTitle').val(),
-                        start: $('#entryDate').val(),
-                        extendedProps: {
-                            author: $('#entryAuthor').val(),
-                            pages: $('#entryPages').val(),
-                            minutes: $('#entryMinutes').val(),
-                            rating: $('#entryRating').val(),
-                            comments: $('#entryComments').val(),
-                        }
-                    };
-                    var details = [];
-                    if (log.extendedProps.minutes) details.push(log.extendedProps.minutes + ' minutes');
-                    if (log.extendedProps.pages) details.push(log.extendedProps.pages + ' pages');
-                    log.title += details.length ? ' (' + details.join(', ') + ')' : '';
-                    reading_log_calendar.addEvent(log);
-                    updateStats();
-                } else {
-                    alert(data.errors);
+        var formEl = this;
+        var formData = new FormData(formEl);
+        var payload = Object.fromEntries(formData.entries());
+        if (calendarContext.formName === 'Student') {
+            payload.student_id = calendarContext.objectId;
+        }
+        fetch(calendarContext.api.list, {
+            method: 'POST',
+            headers: {
+                'Content-Type': 'application/json',
+                'X-CSRFToken': document.querySelector(Selectors.CSRF_INPUT).value,
+                'X-Requested-With': 'XMLHttpRequest'
+            },
+            body: JSON.stringify(payload)
+        })
+        .then(response => response.json())
+        .then(data => {
+            if (data.status === 'success') {
+                $('#addEventModal').modal('hide');
+                var extendedProps = {
+                    title: payload.title || '',
+                    author: payload.author || '',
+                    pages: payload.pages || 0,
+                    minutes: payload.minutes || 0,
+                    rating: payload.rating || null,
+                    comments: payload.comments || ''
+                };
+                var eventTitle = payload.title || 'Reading Entry';
+                var details = [];
+                if (extendedProps.minutes) details.push(extendedProps.minutes + ' minutes');
+                if (extendedProps.pages) details.push(extendedProps.pages + ' pages');
+                if (details.length) {
+                    eventTitle += ' (' + details.join(', ') + ')';
                 }
+                reading_log_calendar.addEvent({
+                    id: data.log_id,
+                    start: payload.date,
+                    title: eventTitle,
+                    extendedProps: extendedProps
+                });
+                updateStats();
+            } else {
+                alert(data.message || 'Unable to save reading log.');
             }
+        })
+        .catch(function(error) {
+            console.error('❌ Error creating log:', error);
+            alert('Unable to save reading log.');
         });
     });
 
     $('#delete_event_button').on('click', function(e) {
         e.preventDefault();
         var logId = $(this).data('id');
-        $.ajax({
-            url: "{% url 'manage_log' %}",
-            type: 'POST',
-            headers: { 'X-CSRFToken': document.querySelector(Selectors.CSRF_INPUT).value },
-            data: { 'id': logId, 'student': {{ id }}, 'del': true },
-            success: function(data) {
-                if (data.status === 'success') {
-                    var event = reading_log_calendar.getEventById(logId);
-                    if (event) {
-                        event.remove();
-                    }
-                    $('#addEventModal').modal('hide');
-                    updateStats();
-                } else {
-                    alert(data.message);
+        if (!logId) {
+            return;
+        }
+        var payload = {};
+        if (calendarContext.formName === 'Student') {
+            payload.student_id = calendarContext.objectId;
+        }
+        fetch(getCalendarDetailUrl(logId), {
+            method: 'DELETE',
+            headers: {
+                'Content-Type': 'application/json',
+                'X-CSRFToken': document.querySelector(Selectors.CSRF_INPUT).value,
+                'X-Requested-With': 'XMLHttpRequest'
+            },
+            body: JSON.stringify(payload)
+        })
+        .then(response => response.json())
+        .then(data => {
+            if (data.status === 'success') {
+                var event = reading_log_calendar.getEventById(logId);
+                if (event) {
+                    event.remove();
                 }
+                $('#addEventModal').modal('hide');
+                updateStats();
+            } else {
+                alert(data.message || 'Unable to delete reading log.');
             }
+        })
+        .catch(function(error) {
+            console.error('❌ Error deleting log:', error);
+            alert('Unable to delete reading log.');
         });
     });
 
@@ -447,23 +491,32 @@ $(document).ready(function() {
             selected_event_id = null;
         },
         eventDrop: function(event) {
-            var temp_data = {
-                start: event.event.startStr,
-                log_id: event.event.id,
-                csrfmiddlewaretoken: document.querySelector(Selectors.CSRF_INPUT).getAttribute('value'),
-                student: '{{ id }}',
+            var payload = {
+                date: event.event.startStr
+            };
+            if (calendarContext.formName === 'Student') {
+                payload.student_id = calendarContext.objectId;
             }
-            $.ajax({
-                type: 'PUT',
-                url: addEventForm.getAttribute('url'),
-                headers: { 'X-CSRFToken': document.querySelector(Selectors.CSRF_INPUT).value },
-                data: temp_data,
-                success: function(response) {
-                    if (response.errors) {
-                        console.log(response.errors)
-                    }
+            fetch(getCalendarDetailUrl(event.event.id), {
+                method: 'PATCH',
+                headers: {
+                    'Content-Type': 'application/json',
+                    'X-CSRFToken': document.querySelector(Selectors.CSRF_INPUT).value,
+                    'X-Requested-With': 'XMLHttpRequest'
+                },
+                body: JSON.stringify(payload)
+            })
+            .then(response => response.json())
+            .then(data => {
+                if (data.status !== 'success') {
+                    console.error('❌ Error updating log position:', data);
+                    event.revert();
                 }
             })
+            .catch(function(error) {
+                console.error('❌ Network error updating log position:', error);
+                event.revert();
+            });
         },
         datesSet: function(info) {
             updateTitle(info.view.title);
@@ -771,12 +824,14 @@ $(document).ready(function() {
             console.log('📡 Fetching logs from API:', { startISO, endISO });
             
             // Fetch fresh data from API with date range
-            const apiUrl = "{% url 'get_logs' %}?" + new URLSearchParams({
+            const params = new URLSearchParams({
                 start: startISO,
                 end: endISO,
-                id: '{{ id }}',
-                form_name: '{{ form_name }}'
+                id: calendarContext.objectId,
+                form_name: calendarContext.formName
             });
+            
+            const apiUrl = calendarContext.api.list + '?' + params.toString();
             
             fetchAndUpdateData(apiUrl, dateRange);
         } catch (error) {
@@ -789,12 +844,17 @@ $(document).ready(function() {
     // Separate function to handle the API call and data update
     function fetchAndUpdateData(apiUrl, dateRange) {
         
-        fetch(apiUrl)
+        fetch(apiUrl, {
+            headers: {
+                'X-Requested-With': 'XMLHttpRequest'
+            }
+        })
             .then(response => response.json())
             .then(data => {
                 console.log('📊 API Response:', data);
                 
                 if (data.status === 'success') {
+                    numStudents = data.num_students || 0;
                     // Clear existing calendar events
                     if (reading_log_calendar) {
                         reading_log_calendar.getEvents().forEach(function(event) {
@@ -803,7 +863,8 @@ $(document).ready(function() {
                     }
                     
                     // Process and add new events to calendar
-                    const processedLogs = data.logs.map(log => {
+                    const logsList = Array.isArray(data.logs) ? data.logs : [];
+                    const processedLogs = logsList.map(log => {
                         const title = log.title || 'Reading Entry';
                         const details = [];
                         if (log.minutes) details.push(log.minutes + ' mins');
@@ -853,10 +914,14 @@ $(document).ready(function() {
                     // Show empty state
                     populateReadingLogsTable([]);
                     updateStatusMetrics([]);
+                    numStudents = 0;
+                    updateStats();
                 }
             })
             .catch(error => {
                 console.error('❌ Network Error:', error);
+                numStudents = 0;
+                updateStats();
                 // Show empty state
                 populateReadingLogsTable([]);
                 updateStatusMetrics([]);

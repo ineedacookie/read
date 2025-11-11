@@ -1,22 +1,29 @@
 from django.urls import path
 
-from . import views
 from . import analytics_views
 from . import gamification_views
+# OPTIMIZED: Split API endpoints into focused modules
+from .api import dashboard as dashboard_api
+from .api import goals as goals_api
+from .api import insights as insights_api
+from .api import logs as log_api
 
 urlpatterns = [
-    # Phase 1: Core functionality
-    path('get_logs/', views.get_logs_by_date_range, name='get_logs'),
-    path('manage_log/', views.manage_log, name='manage_log'),
-    path('api/get_logs_by_range_and_group', views.teacher_dashboard_logs, name='get_logs_by_range_and_group'),
+    # Core functionality (calendar + legacy AJAX replacements)
+    path('api/logs/calendar/', log_api.calendar_logs, name='calendar_logs'),
+    path('api/logs/calendar/<int:log_id>/', log_api.calendar_log_detail, name='calendar_log_detail'),
     
-    # Phase 1: Student and parent APIs
-    path('api/student/quick_log/', views.student_quick_log, name='student_quick_log'),
-    path('api/student/progress/', views.student_progress, name='student_progress'),
-    path('api/parent/dashboard/', views.parent_dashboard_data, name='parent_dashboard'),
-    path('api/parent/add_log/', views.parent_add_log, name='parent_add_log'),
-    path('api/parent/edit_log/', views.parent_edit_log, name='parent_edit_log'),
-    path('api/parent/delete_log/', views.parent_delete_log, name='parent_delete_log'),
+    # OPTIMIZED: Dashboard APIs (from api/dashboard.py)
+    path('teacher-dashboard/', dashboard_api.teacher_dashboard_logs, name='teacher_dashboard_logs'),
+    path('api/get_logs_by_range_and_group', dashboard_api.teacher_dashboard_logs, name='get_logs_by_range_and_group'),  # Legacy URL
+    
+    # OPTIMIZED: Log APIs (from api/logs.py)
+    path('api/student/quick_log/', log_api.student_quick_log, name='student_quick_log'),
+    path('api/student/progress/', dashboard_api.student_progress, name='student_progress'),
+    path('api/parent/dashboard/', dashboard_api.parent_dashboard_data, name='parent_dashboard'),
+    path('api/parent/add_log/', log_api.parent_add_log, name='parent_add_log'),
+    path('api/parent/edit_log/', log_api.parent_edit_log, name='parent_edit_log'),
+    path('api/parent/delete_log/', log_api.parent_delete_log, name='parent_delete_log'),
     
     # Phase 2: Advanced Analytics APIs
     path('api/analytics/school/', analytics_views.school_analytics_api, name='school_analytics'),
@@ -33,16 +40,16 @@ urlpatterns = [
     path('api/gamification/award_badge/', gamification_views.award_custom_badge_api, name='award_custom_badge'),
     path('api/gamification/stats/', gamification_views.gamification_stats_api, name='gamification_stats'),
     
-    # Phase 3: Reading Goals Management
-    path('goals/', views.reading_goals_view, name='reading_goals'),
-    path('api/goals/', views.api_reading_goals, name='api_reading_goals'),
-    path('api/goals/bulk/', views.api_bulk_reading_goals, name='api_bulk_reading_goals'),
-    path('api/goals/individual/', views.api_individual_reading_goal, name='api_individual_reading_goal'),
+    # OPTIMIZED: Goals Management (from api/goals.py)
+    path('goals/', goals_api.reading_goals_view, name='reading_goals'),
+    path('api/goals/', goals_api.api_reading_goals, name='api_reading_goals'),
+    path('api/goals/bulk/', goals_api.api_bulk_reading_goals, name='api_bulk_reading_goals'),
+    path('api/goals/individual/', goals_api.api_individual_reading_goal, name='api_individual_reading_goal'),
     
-    # Phase 4: Classroom Insights Sharing
-    path('insights/', views.classroom_insights_view, name='classroom_insights'),
-    path('api/insights/', views.api_classroom_insights, name='api_classroom_insights'),
-    path('api/insights/comparison/', views.api_classroom_comparison, name='api_classroom_comparison'),
-    path('api/insights/share/', views.api_share_insight, name='api_share_insight'),
-    path('api/insights/helpful/', views.api_mark_helpful, name='api_mark_helpful'),
+    # OPTIMIZED: Insights (from api/insights.py)
+    path('insights/', insights_api.classroom_insights_view, name='classroom_insights'),
+    path('api/insights/', insights_api.api_classroom_insights, name='api_classroom_insights'),
+    path('api/insights/comparison/', insights_api.api_classroom_comparison, name='api_classroom_comparison'),
+    path('api/insights/share/', insights_api.api_share_insight, name='api_share_insight'),
+    path('api/insights/helpful/', insights_api.api_mark_helpful, name='api_mark_helpful'),
 ]

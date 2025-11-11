@@ -132,14 +132,13 @@ urlpatterns = [
 
 AFTER (using URL helpers - 5 lines):
 
-from read.utils.url_helpers import user_type_urls, dashboard_urls, management_urls, bulk_url_patterns
+# Note: URL helper functions have been removed as they were not used in production
+# This example shows what the pattern would have looked like
+# In production, URLs are manually defined for clarity and simplicity
 
-urlpatterns = bulk_url_patterns(
-    user_type_urls(views),
-    dashboard_urls(views),
-    management_urls(views),
-    activation_urls(views)
-)
+# Example pattern (not actual code):
+# from read.utils.url_helpers import user_type_urls, dashboard_urls
+# urlpatterns = bulk_url_patterns(user_type_urls(views), dashboard_urls(views))
 
 REDUCTION: 87% fewer lines for URL definitions
 CREATED: /read/utils/url_helpers.py with URL pattern generators

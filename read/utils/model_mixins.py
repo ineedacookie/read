@@ -224,56 +224,6 @@ class DescriptionModelMixin(models.Model):
 
 
 # Common combinations for specific use cases
-class BaseUserModel(
-    SchoolAndTimestampModelMixin, 
-    FullNameMixin, 
-    VerifiedModelMixin, 
-    ActiveModelMixin,
-    SoftDeleteModelMixin
-):
-    """
-    Base class for user-like models with common fields.
-    """
-    class Meta:
-        abstract = True
-
-
-class BaseContentModel(
-    SchoolAndTimestampModelMixin,
-    UserRelatedModelMixin,
-    ActiveModelMixin
-):
-    """
-    Base class for content models like classrooms, groups, etc.
-    """
-    class Meta:
-        abstract = True
-
-
-class BaseNamedContentModel(
-    BaseContentModel,
-    NamedModelMixin,
-    DescriptionModelMixin
-):
-    """
-    Base class for named content models with descriptions.
-    """
-    class Meta:
-        abstract = True
-
-    def __str__(self):
-        return self.name
-
-
-class BaseLogModel(SchoolAndTimestampModelMixin):
-    """
-    Base class for log-type models with timestamps and school relationship.
-    """
-    class Meta:
-        abstract = True
-        ordering = ['-created_date', '-id']
-
-
 # Validation mixins
 class SchoolConsistencyMixin:
     """
@@ -304,56 +254,6 @@ class SchoolConsistencyMixin:
             for obj in related_objects:
                 if hasattr(obj, 'school') and obj.school != self.school:
                     raise ValidationError(f"All {field_name} must be from the same school")
-
-
-# Common model managers
-class ActiveManager(models.Manager):
-    """Manager that only returns active records by default"""
-    
-    def get_queryset(self):
-        return super().get_queryset().filter(active=True)
-
-
-class SchoolFilteredManager(models.Manager):
-    """Manager that provides school-filtered querysets"""
-    
-    def for_school(self, school):
-        """Get records for a specific school"""
-        return self.filter(school=school)
-    
-    def active_for_school(self, school):
-        """Get active records for a specific school"""
-        return self.filter(school=school, active=True)
-
-
-class VerifiedManager(models.Manager):
-    """Manager that only returns verified records by default"""
-    
-    def get_queryset(self):
-        return super().get_queryset().filter(verified=True)
-
-
-# Common model properties and methods
-class MetricsMixin:
-    """
-    Mixin that provides common metric calculations for models.
-    """
-    
-    def get_related_count(self, field_name):
-        """Get count of related objects"""
-        if hasattr(self, field_name):
-            related_manager = getattr(self, field_name)
-            if hasattr(related_manager, 'count'):
-                return related_manager.count()
-        return 0
-    
-    def get_active_related_count(self, field_name):
-        """Get count of active related objects"""
-        if hasattr(self, field_name):
-            related_manager = getattr(self, field_name)
-            if hasattr(related_manager, 'filter'):
-                return related_manager.filter(active=True).count()
-        return 0
 
 
 # Combined base model classes

@@ -1,5 +1,150 @@
 {% extends "general/nav_template.html" %}
 {% load static %}
-{% block title %}read | Home{% endblock %}
+{% block title %}read | Welcome{% endblock %}
 {% block content %}
+
+<!-- Welcome Section -->
+<div class="row mb-4">
+    <div class="col-12">
+        <div class="card bg-gradient-primary text-white">
+            <div class="card-body text-center py-5">
+                <i class="fas fa-book-reader fa-3x mb-3"></i>
+                <h2>Welcome to read!</h2>
+                <p class="lead mb-0">Your reading tracking and progress platform</p>
+            </div>
+        </div>
+    </div>
+</div>
+
+<!-- Account Setup Notice -->
+<div class="row mb-4">
+    <div class="col-12">
+        <div class="alert alert-info" role="alert">
+            <h5 class="alert-heading"><i class="fas fa-info-circle me-2"></i>Account Setup Required</h5>
+            <p class="mb-0">Your account needs to be configured with a user role. Please contact your administrator or use the links below to set up your account.</p>
+        </div>
+    </div>
+</div>
+
+<!-- Getting Started -->
+<div class="row">
+    <div class="col-12">
+        <h4 class="mb-4">Getting Started</h4>
+    </div>
+    
+    <!-- For Administrators -->
+    <div class="col-md-6 mb-4">
+        <div class="card h-100">
+            <div class="card-body">
+                <div class="d-flex align-items-center mb-3">
+                    <div class="icon-circle bg-primary text-white me-3">
+                        <i class="fas fa-user-shield fa-lg"></i>
+                    </div>
+                    <h5 class="mb-0">School Administrators</h5>
+                </div>
+                <p class="text-muted">Set up and manage your school's reading program:</p>
+                <ul class="mb-3">
+                    <li>Invite and manage teachers</li>
+                    <li>Create student accounts</li>
+                    <li>Organize classrooms and reading groups</li>
+                    <li>View school-wide progress and analytics</li>
+                </ul>
+                <a href="{% url 'user_list_page' 'administrator' %}" class="btn btn-outline-primary">Administrator Dashboard</a>
+            </div>
+        </div>
+    </div>
+    
+    <!-- For Teachers -->
+    <div class="col-md-6 mb-4">
+        <div class="card h-100">
+            <div class="card-body">
+                <div class="d-flex align-items-center mb-3">
+                    <div class="icon-circle bg-success text-white me-3">
+                        <i class="fas fa-chalkboard-teacher fa-lg"></i>
+                    </div>
+                    <h5 class="mb-0">Teachers</h5>
+                </div>
+                <p class="text-muted">Manage your classrooms and student reading:</p>
+                <ul class="mb-3">
+                    <li>Create and manage classrooms</li>
+                    <li>Track student reading progress</li>
+                    <li>View reading analytics and reports</li>
+                    <li>Encourage and motivate readers</li>
+                </ul>
+                <a href="{% url 'classrooms' %}" class="btn btn-outline-success">Manage Classrooms</a>
+            </div>
+        </div>
+    </div>
+    
+    <!-- For Parents -->
+    <div class="col-md-6 mb-4">
+        <div class="card h-100">
+            <div class="card-body">
+                <div class="d-flex align-items-center mb-3">
+                    <div class="icon-circle bg-info text-white me-3">
+                        <i class="fas fa-users fa-lg"></i>
+                    </div>
+                    <h5 class="mb-0">Parents</h5>
+                </div>
+                <p class="text-muted">Support your child's reading journey:</p>
+                <ul class="mb-3">
+                    <li>View your children's reading progress</li>
+                    <li>Log reading sessions at home</li>
+                    <li>Track achievements and milestones</li>
+                    <li>Stay connected with teachers</li>
+                </ul>
+                <a href="{% url 'user_list_page' 'parent' %}" class="btn btn-outline-info">Parent Dashboard</a>
+            </div>
+        </div>
+    </div>
+    
+    <!-- For Students -->
+    <div class="col-md-6 mb-4">
+        <div class="card h-100">
+            <div class="card-body">
+                <div class="d-flex align-items-center mb-3">
+                    <div class="icon-circle bg-warning text-white me-3">
+                        <i class="fas fa-user-graduate fa-lg"></i>
+                    </div>
+                    <h5 class="mb-0">Students</h5>
+                </div>
+                <p class="text-muted">Track your reading adventure:</p>
+                <ul class="mb-3">
+                    <li>Log books you've read</li>
+                    <li>Track your reading time and pages</li>
+                    <li>Earn badges and achievements</li>
+                    <li>See your progress over time</li>
+                </ul>
+                <a href="{% url 'user_list_page' 'student' %}" class="btn btn-outline-warning">Student Dashboard</a>
+            </div>
+        </div>
+    </div>
+</div>
+
+<!-- Need Help? -->
+<div class="row mt-4">
+    <div class="col-12">
+        <div class="card">
+            <div class="card-body text-center">
+                <h5><i class="fas fa-question-circle me-2"></i>Need Help?</h5>
+                <p class="text-muted mb-3">If you're not sure which role you should have, please contact your school administrator.</p>
+                <a href="{% url 'landing_page' %}" class="btn btn-sm btn-outline-secondary">Back to Home</a>
+            </div>
+        </div>
+    </div>
+</div>
+
+{% endblock %}
+
+{% block afterScripts %}
+<style>
+.icon-circle {
+    width: 50px;
+    height: 50px;
+    border-radius: 50%;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+}
+</style>
 {% endblock %}

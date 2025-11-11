@@ -14,33 +14,46 @@
 {% block card_body %}
 <div class="row flex-between-center mb-2">
     <div class="col-auto">
-        <h5>Register</h5>
+        <h5>Get Started with Read</h5>
     </div>
     <div class="col-auto fs--1 text-700"><span class="mb-0">Have an account?</span> <span><a
             href="{% url 'login'%}">Login</a></span></div>
 </div>
+<p class="text-muted mb-4">Start tracking your students' reading progress today</p>
 <form method="post">
     {% csrf_token %}
+    
+    <!-- Personal Information -->
     <div class="mb-3">
-        <input class="form-control" autocomplete="first-name" type="text" name="first_name" maxlength="50" required="" id="id_first_name" placeholder="First name">
+        <label class="form-label" for="id_first_name">First Name</label>
+        <input class="form-control" autocomplete="given-name" type="text" name="first_name" maxlength="50" required="" id="id_first_name" placeholder="Your first name">
     </div>
     <div class="mb-3">
-        <input class="form-control" autocomplete="last-name" type="text" name="last_name" maxlength="100" required="" id="id_last_name" placeholder="Last name">
+        <label class="form-label" for="id_last_initial">Last Initial</label>
+        <input class="form-control" autocomplete="family-name" type="text" name="last_initial" maxlength="1" required="" id="id_last_initial" placeholder="S" style="text-transform: uppercase;">
+        <small class="text-muted">First letter of your last name (e.g., "S" for Smith)</small>
     </div>
+    
+    <!-- Login Credentials -->
     <div class="mb-3">
-        <input class="form-control" autocomplete="username" type="text" name="username" maxlength="150" required="" id="id_username" placeholder="Username">
+        <label class="form-label" for="id_email">Email Address</label>
+        <input class="form-control" autocomplete="email" type="email" name="email" maxlength="254" required="" id="id_email" placeholder="your.email@example.com">
+        <small class="text-muted">Use your email to log in</small>
     </div>
+    
+    <!-- Terms and Conditions -->
     <div class="mb-3">
-        <input class="form-control" autocomplete="email" type="email" name="email" maxlength="254" required="" id="id_email" placeholder="Email address">
-    </div>
-    <div class="mb-3">
+        <div class="form-check">
             <input class="form-check-input" type="checkbox" name="agree_to_terms_and_conditions" required="" id="id_agree_to_terms_and_conditions">
-            <label class="form-label" for="id_agree_to_terms_and_conditions">I accept the <a href="#!">terms </a>and <a
-                    href="#!">privacy
-                policy</a></label>
+            <label class="form-check-label" for="id_agree_to_terms_and_conditions">
+                I accept the <a href="#!">terms</a> and <a href="#!">privacy policy</a>
+            </label>
+        </div>
     </div>
+    
+    <!-- Submit Button -->
     <div class="mb-3">
-        <button class="btn btn-primary d-block w-100 mt-3" type="submit" name="submit">Register</button>
+        <button class="btn btn-primary d-block w-100 mt-3" type="submit" name="submit">Create Account</button>
     </div>
 </form>
 <div class="position-relative mt-4">

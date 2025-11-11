@@ -3,8 +3,7 @@ from django.db import models
 from users.models import CustomUser, School, ReadingGroup, Classroom
 from read.utils.model_mixins import (
     SchoolAndTimestampModelMixin,
-    SchoolConsistencyMixin,
-    BaseLogModel
+    SchoolConsistencyMixin
 )
 
 
@@ -89,16 +88,23 @@ class DailyGoal(models.Model):
         ('minutes', 'Minutes'),
     ]
 
-    school = models.ForeignKey(School, on_delete=models.CASCADE)
-    classroom = models.ForeignKey(Classroom, on_delete=models.CASCADE, null=True, blank=True)
-    reading_group = models.ForeignKey(ReadingGroup, on_delete=models.CASCADE, null=True, blank=True)
-    student = models.ForeignKey(CustomUser, on_delete=models.CASCADE, null=True, blank=True)
+    school = models.ForeignKey(School, on_delete=models.CASCADE, db_index=True)
+    classroom = models.ForeignKey(Classroom, on_delete=models.CASCADE, null=True, blank=True, db_index=True)
+    reading_group = models.ForeignKey(ReadingGroup, on_delete=models.CASCADE, null=True, blank=True, db_index=True)
+    student = models.ForeignKey(CustomUser, on_delete=models.CASCADE, null=True, blank=True, db_index=True)
     type = models.CharField(
         max_length=10,
         choices=GOAL_TYPE,
         default='pages')
     value = models.PositiveIntegerField(default=0)
     created_at = models.DateTimeField(auto_now_add=True)
+
+    class Meta:
+        indexes = [
+            models.Index(fields=['school', 'student']),  # Common query pattern
+            models.Index(fields=['school', 'classroom']),  # Classroom-level goals
+            models.Index(fields=['school', 'reading_group']),  # Reading group goals
+        ]
 
     def __str__(self):
         target = self.student or self.reading_group or self.classroom or self.school
@@ -110,13 +116,21 @@ class TotalGoal(models.Model):
     Represents a total reading goal over a date range for students.
     Can be set at school, classroom, reading group, or individual student level.
     """
-    school = models.ForeignKey(School, on_delete=models.CASCADE)
-    classroom = models.ForeignKey(Classroom, on_delete=models.CASCADE, null=True, blank=True)
-    reading_group = models.ForeignKey(ReadingGroup, on_delete=models.CASCADE, null=True, blank=True)
-    student = models.ForeignKey(CustomUser, on_delete=models.CASCADE, null=True, blank=True)
-    start = models.DateField()
-    end = models.DateField()
+    school = models.ForeignKey(School, on_delete=models.CASCADE, db_index=True)
+    classroom = models.ForeignKey(Classroom, on_delete=models.CASCADE, null=True, blank=True, db_index=True)
+    reading_group = models.ForeignKey(ReadingGroup, on_delete=models.CASCADE, null=True, blank=True, db_index=True)
+    student = models.ForeignKey(CustomUser, on_delete=models.CASCADE, null=True, blank=True, db_index=True)
+    start = models.DateField(db_index=True)
+    end = models.DateField(db_index=True)
     total = models.PositiveIntegerField(default=0)
+
+    class Meta:
+        indexes = [
+            models.Index(fields=['school', 'student', 'start', 'end']),  # Student goal queries
+            models.Index(fields=['school', 'classroom']),  # Classroom-level goals
+            models.Index(fields=['school', 'reading_group']),  # Reading group goals
+            models.Index(fields=['start', 'end']),  # Date range queries
+        ]
 
     def __str__(self):
         target = self.student or self.reading_group or self.classroom or self.school

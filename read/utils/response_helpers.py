@@ -105,45 +105,6 @@ def permission_denied_response(user_id, action_attempted=None):
     }, status=403)
 
 
-def not_found_response(resource_type="Resource", user_id=None):
-    """
-    Create a standardized not found response.
-    
-    Args:
-        resource_type: Type of resource that wasn't found
-        user_id: Optional user ID for logging
-    
-    Returns:
-        JsonResponse: Not found response
-    """
-    if user_id:
-        logger.warning(f"User {user_id} attempted to access non-existent {resource_type}")
-    
-    return JsonResponse({
-        'status': 'error',
-        'message': f'{resource_type} not found'
-    }, status=404)
-
-
-def rate_limit_response(user_id, action_type="request"):
-    """
-    Create a standardized rate limit exceeded response.
-    
-    Args:
-        user_id: User ID that exceeded rate limit
-        action_type: Type of action being rate limited
-    
-    Returns:
-        JsonResponse: Rate limit response
-    """
-    logger.warning(f"Rate limit exceeded for user {user_id} on {action_type}")
-    
-    return JsonResponse({
-        'status': 'error',
-        'message': 'Too many requests. Please wait.'
-    }, status=429)
-
-
 def server_error_response(user_id=None, error_details=None):
     """
     Create a standardized server error response.
@@ -170,26 +131,6 @@ def server_error_response(user_id=None, error_details=None):
     }, status=500)
 
 
-def method_not_allowed_response(allowed_methods=None):
-    """
-    Create a standardized method not allowed response.
-    
-    Args:
-        allowed_methods: List of allowed HTTP methods
-    
-    Returns:
-        JsonResponse: Method not allowed response
-    """
-    message = 'Method not allowed'
-    if allowed_methods:
-        message += f'. Allowed methods: {", ".join(allowed_methods)}'
-    
-    return JsonResponse({
-        'status': 'error',
-        'message': message
-    }, status=405)
-
-
 def created_response(message, resource_id=None, data=None):
     """
     Create a standardized resource created response.
@@ -214,22 +155,6 @@ def created_response(message, resource_id=None, data=None):
         response_data.update(data)
     
     return JsonResponse(response_data, status=201)
-
-
-def deleted_response(message="Resource deleted successfully"):
-    """
-    Create a standardized resource deleted response.
-    
-    Args:
-        message: Success message
-    
-    Returns:
-        JsonResponse: Deleted response
-    """
-    return JsonResponse({
-        'status': 'success',
-        'message': message
-    }, status=200)
 
 
 def paginated_response(data, page_obj, additional_data=None):
@@ -296,40 +221,6 @@ def reading_log_created_response(log_id, message="Reading log saved successfully
     return created_response(message, resource_id=log_id, data={'log_id': log_id})
 
 
-def reading_log_updated_response(log_id, message="Reading log updated successfully"):
-    """Create response for successful reading log update."""
-    return success_response(message, data={'log_id': log_id})
-
-
-def student_progress_response(stats, recent_logs, chart_data, date_range):
-    """Create response for student progress data."""
-    return dashboard_response(
-        stats=stats,
-        data={'recent_logs': recent_logs, 'chart_data': chart_data},
-        date_range=date_range
-    )
-
-
-def teacher_dashboard_response(group_totals, students, date_range, group_info):
-    """Create response for teacher dashboard data."""
-    return JsonResponse({
-        'status': 'success',
-        'group_totals': group_totals,
-        'students': students,
-        'date_range': date_range,
-        'group_info': group_info,
-        # Legacy fields for backward compatibility
-        'logs': students,
-        'pages': group_totals.get('pages', 0),
-        'minutes': group_totals.get('minutes', 0)
-    })
-
-
-def parent_dashboard_response(children_data, date_range):
-    """Create response for parent dashboard data."""
-    return JsonResponse({
-        'status': 'success',
-        'children': children_data,
-        'date_range': date_range
-    })
+# All specialized dashboard response helpers have been removed as they were unused.
+# Views now construct JsonResponse directly for better clarity and flexibility.
 

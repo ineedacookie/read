@@ -30,6 +30,7 @@ urlpatterns = [
 # Add django site authenticated urls (for login, logout, password management)
 urlpatterns += [
     path('', include('django.contrib.auth.urls')),
+    path('accounts/', include('django.contrib.auth.urls')),
 ]
 
 # Add user create app

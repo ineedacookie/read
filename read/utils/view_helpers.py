@@ -3,10 +3,11 @@ View Helper Functions
 Commonly used functions across views to reduce code duplication
 """
 
-from django.http import JsonResponse
-from django.shortcuts import get_object_or_404
+from django.core.cache import cache
 from django.core.exceptions import PermissionDenied
 from django.db.models import Q
+from django.http import JsonResponse
+from django.shortcuts import get_object_or_404
 import logging
 
 logger = logging.getLogger(__name__)
@@ -15,51 +16,21 @@ logger = logging.getLogger(__name__)
 def get_user_students(user):
     """
     Get all students accessible to the given user.
-    Returns queryset based on user type.
+    OPTIMIZED: Uses centralized permission helper for consistency.
+    
+    NOTE: This function now delegates to get_accessible_students() to eliminate
+    duplicate code and ensure consistent permission logic across the codebase.
     """
-    from users.models import CustomUser, Classroom, ReadingGroup, StudentParentRelation
-    
-    if user.user_type == 'administrator':
-        # Administrators see all students in their school
-        return CustomUser.objects.filter(
-            school=user.school,
-            user_type='student'
-        )
-    
-    elif user.user_type == 'teacher':
-        # Teachers see students in their classrooms/groups
-        student_ids = set()
-        
-        classrooms = Classroom.objects.filter(
-            school=user.school,
-            teachers=user
-        )
-        for classroom in classrooms:
-            student_ids.update(classroom.students.values_list('id', flat=True))
-        
-        groups = ReadingGroup.objects.filter(
-            school=user.school,
-            managers=user
-        )
-        for group in groups:
-            student_ids.update(group.students.values_list('id', flat=True))
-        
-        return CustomUser.objects.filter(id__in=student_ids)
-    
-    elif user.user_type == 'parent':
-        # Parents see their children
-        child_ids = StudentParentRelation.objects.filter(
-            parent=user,
-            school=user.school
-        ).values_list('student_id', flat=True)
-        
-        return CustomUser.objects.filter(id__in=child_ids)
-    
-    elif user.user_type == 'student':
-        # Students see only themselves
-        return CustomUser.objects.filter(id=user.id)
-    
-    return CustomUser.objects.none()
+    from read.utils.permission_helpers import get_accessible_students
+    return get_accessible_students(user)
+
+
+def resolve_student_access(user, student_id):
+    """
+    Return a student the user has access to, raising PermissionDenied otherwise.
+    Provides a clearer name for view code and reuses existing verification.
+    """
+    return verify_student_access(user, student_id)
 
 
 def verify_student_access(user, student_id):
@@ -80,6 +51,15 @@ def verify_student_access(user, student_id):
             f"student {student_id} without permission"
         )
         raise PermissionDenied("You don't have permission to access this student")
+
+
+def resolve_students_access(user, student_ids):
+    """
+    Filter a list of student IDs to those accessible to the user.
+    Returns a queryset of accessible student objects.
+    """
+    accessible_students = get_user_students(user).filter(id__in=student_ids, user_type='student')
+    return accessible_students
 
 
 def verify_reading_log_access(user, log_id):
@@ -146,6 +126,29 @@ def get_date_range_from_request(request, default_days=30):
     return start_date, end_date
 
 
+def get_date_range_from_params(
+    start_date_str,
+    end_date_str,
+    *,
+    default_days=30,
+    max_days_back=1095,
+    max_range_days=365
+):
+    """
+    Consolidate common date range parsing with sensible defaults.
+    Returns (start_date, end_date, used_defaults) tuple.
+    """
+    from read.utils.validation_helpers import resolve_date_range_with_default
+    
+    return resolve_date_range_with_default(
+        start_date_str,
+        end_date_str,
+        default_days=default_days,
+        max_days_back=max_days_back,
+        max_range_days=max_range_days
+    )
+
+
 def build_search_query(queryset, search_term, search_fields):
     """
     Build a search query across multiple fields.
@@ -203,6 +206,27 @@ def json_success(message="Success", data=None, status=200):
         response_data['data'] = data
     
     return JsonResponse(response_data, status=status)
+
+
+def cached_data(cache_key, timeout, compute_func):
+    """
+    Fetch data from cache or compute and store it.
+    
+    Args:
+        cache_key: Key used for caching
+        timeout: Cache TTL in seconds
+        compute_func: Callable returning the data to cache
+    
+    Returns:
+        tuple: (data, from_cache)
+    """
+    cached_value = cache.get(cache_key)
+    if cached_value is not None:
+        return cached_value, True
+    
+    data = compute_func()
+    cache.set(cache_key, data, timeout)
+    return data, False
 
 
 def json_error(message="An error occurred", errors=None, status=400):
@@ -331,4 +355,95 @@ def sanitize_user_data(user, fields=None):
         for field in fields
         if hasattr(user, field)
     }
+
+
+def paginate_response(queryset, request, serializer_class=None, per_page=25):
+    """
+    Paginate a queryset and return JSON-ready data.
+    
+    Args:
+        queryset: QuerySet to paginate
+        request: HTTP request (for page param and field selection)
+        serializer_class: Optional serializer to use for items
+        per_page: Items per page (default: 25)
+        
+    Returns:
+        dict: Paginated response with items and pagination metadata
+    """
+    from django.core.paginator import Paginator
+    from read.utils.serializers import get_requested_fields
+    
+    page_number = request.GET.get('page', 1)
+    paginator = Paginator(queryset, per_page)
+    page_obj = paginator.get_page(page_number)
+    
+    # Serialize items if serializer provided
+    if serializer_class:
+        fields = get_requested_fields(request)
+        items = serializer_class.serialize_many(page_obj.object_list, fields=fields)
+    else:
+        # Return queryset values as-is
+        items = list(page_obj.object_list.values())
+    
+    return {
+        'items': items,
+        'pagination': {
+            'page': page_obj.number,
+            'per_page': per_page,
+            'total_pages': paginator.num_pages,
+            'total_items': paginator.count,
+            'has_next': page_obj.has_next(),
+            'has_previous': page_obj.has_previous(),
+            'next_page': page_obj.next_page_number() if page_obj.has_next() else None,
+            'previous_page': page_obj.previous_page_number() if page_obj.has_previous() else None,
+        }
+    }
+
+
+def get_pagination_params(request, default_per_page=25, max_per_page=100):
+    """
+    Extract and validate pagination parameters from request.
+    
+    Args:
+        request: HTTP request object
+        default_per_page: Default items per page
+        max_per_page: Maximum items per page allowed
+        
+    Returns:
+        tuple: (page_number, per_page)
+    """
+    try:
+        page = int(request.GET.get('page', 1))
+        page = max(1, page)  # Ensure page >= 1
+    except (ValueError, TypeError):
+        page = 1
+    
+    try:
+        per_page = int(request.GET.get('per_page', default_per_page))
+        per_page = max(1, min(per_page, max_per_page))  # Clamp between 1 and max
+    except (ValueError, TypeError):
+        per_page = default_per_page
+    
+    return page, per_page
+
+
+def cached_data(cache_key, timeout, compute_func):
+    """
+    Fetch cached data or compute and store it for reuse.
+    
+    Args:
+        cache_key (str): Cache key
+        timeout (int): TTL in seconds
+        compute_func (Callable): Function to compute the value when cache miss
+    
+    Returns:
+        tuple: (data, from_cache)
+    """
+    cached_value = cache.get(cache_key)
+    if cached_value is not None:
+        return cached_value, True
+    
+    data = compute_func()
+    cache.set(cache_key, data, timeout)
+    return data, False
 

@@ -92,8 +92,11 @@ def send_email_with_link(user, request=None, type='activation'):
         'token': account_activation_token.make_token(user),
     })
     to_email = user.email
-    print(url + urlsafe_base64_encode(
-        force_bytes(user.pk)) + '/' + account_activation_token.make_token(user))
+    
+    # Log activation URL for debugging (in production, this should be removed or guarded with DEBUG check)
+    logger = logging.getLogger(__name__)
+    activation_url = url + urlsafe_base64_encode(force_bytes(user.pk)) + '/' + account_activation_token.make_token(user)
+    logger.debug(f"Activation URL generated: {activation_url}")
 
     # send_mail(
     #     mail_subject,

@@ -113,6 +113,7 @@ def verify_parent_child_relationship(parent, child):
 def verify_teacher_student_access(teacher, student):
     """
     Verify that a teacher has access to a specific student.
+    OPTIMIZED: Uses single query instead of looping through classrooms/groups.
     
     Args:
         teacher: Teacher user object
@@ -127,22 +128,10 @@ def verify_teacher_student_access(teacher, student):
     if teacher.user_type != 'teacher':
         raise PermissionDenied("User is not a teacher")
     
-    # Check if student is in any of teacher's classrooms or reading groups
-    from users.models import Classroom, ReadingGroup
+    # OPTIMIZED: Check if student is in teacher's accessible students with single query
+    accessible_students = get_accessible_students(teacher)
     
-    teacher_students = set()
-    
-    # Get students from teacher's classrooms
-    classrooms = Classroom.objects.filter(school=teacher.school, teachers=teacher)
-    for classroom in classrooms:
-        teacher_students.update(classroom.students.values_list('id', flat=True))
-    
-    # Get students from teacher's reading groups
-    reading_groups = ReadingGroup.objects.filter(school=teacher.school, managers=teacher)
-    for group in reading_groups:
-        teacher_students.update(group.students.values_list('id', flat=True))
-    
-    if student.id not in teacher_students:
+    if not accessible_students.filter(id=student.id).exists():
         logger.warning(f"Teacher {teacher.id} attempted to access non-assigned student {student.id}")
         raise PermissionDenied("Access denied - student not in your classes")
     
@@ -152,6 +141,7 @@ def verify_teacher_student_access(teacher, student):
 def get_accessible_students(user):
     """
     Get all students accessible to a user based on their role.
+    OPTIMIZED: Eliminates N+1 queries by using values_list directly.
     
     Args:
         user: Django User object
@@ -160,29 +150,40 @@ def get_accessible_students(user):
         QuerySet: Students accessible to the user
     """
     if user.user_type == 'administrator':
-        return get_user_model().objects.filter(school=user.school, user_type='student')
+        return get_user_model().objects.filter(
+            school=user.school, 
+            user_type='student'
+        ).select_related('school')
     
     elif user.user_type == 'teacher':
         from users.models import Classroom, ReadingGroup
-        student_ids = set()
+        from django.db.models import Q
         
-        # Get students from teacher's classrooms
-        classrooms = Classroom.objects.filter(school=user.school, teachers=user)
-        for classroom in classrooms:
-            student_ids.update(classroom.students.values_list('id', flat=True))
+        # OPTIMIZED: Single query gets all student IDs from classrooms
+        classroom_students = Classroom.objects.filter(
+            school=user.school,
+            teachers=user
+        ).values_list('students', flat=True)
         
-        # Get students from teacher's reading groups
-        reading_groups = ReadingGroup.objects.filter(school=user.school, managers=user)
-        for group in reading_groups:
-            student_ids.update(group.students.values_list('id', flat=True))
+        # OPTIMIZED: Single query gets all student IDs from reading groups
+        group_students = ReadingGroup.objects.filter(
+            school=user.school,
+            managers=user
+        ).values_list('students', flat=True)
         
-        return get_user_model().objects.filter(id__in=student_ids, user_type='student')
+        # Combine the two querysets efficiently
+        student_ids = set(classroom_students) | set(group_students)
+        
+        return get_user_model().objects.filter(
+            id__in=student_ids,
+            user_type='student'
+        ).select_related('school')
     
     elif user.user_type == 'parent':
-        return user.children.all()
+        return user.children.select_related('school')
     
     elif user.user_type == 'student':
-        return get_user_model().objects.filter(id=user.id)
+        return get_user_model().objects.filter(id=user.id).select_related('school')
     
     else:
         return get_user_model().objects.none()
@@ -241,24 +242,6 @@ def require_user_types(allowed_types):
     return decorator
 
 
-def require_rate_limit(action_type, max_requests=10, window_seconds=60):
-    """
-    Decorator to enforce rate limiting.
-    
-    Args:
-        action_type: Type of action being rate limited
-        max_requests: Maximum requests allowed in the window
-        window_seconds: Time window in seconds
-    """
-    def decorator(view_func):
-        @wraps(view_func)
-        def wrapper(request, *args, **kwargs):
-            check_rate_limit(request.user.id, action_type, max_requests, window_seconds)
-            return view_func(request, *args, **kwargs)
-        return wrapper
-    return decorator
-
-
 def require_same_school(resource_getter):
     """
     Decorator to ensure user and resource are in the same school.
@@ -294,22 +277,6 @@ def log_successful_action(user_id, action, resource_type=None, resource_id=None)
     logger.info(log_message)
 
 
-def log_permission_denied(user_id, attempted_action, reason=None):
-    """
-    Log permission denied attempt for security monitoring.
-    
-    Args:
-        user_id: User ID that was denied
-        attempted_action: Description of attempted action
-        reason: Optional reason for denial
-    """
-    log_message = f"Permission denied: User {user_id} attempted {attempted_action}"
-    if reason:
-        log_message += f" - {reason}"
-    
-    logger.warning(log_message)
-
-
 def log_security_event(user_id, event_type, details=None):
     """
     Log security-related events.
@@ -326,60 +293,5 @@ def log_security_event(user_id, event_type, details=None):
     logger.warning(log_message)
 
 
-# Helper functions for common access patterns
-def can_edit_reading_log(user, log):
-    """
-    Check if user can edit a specific reading log.
-    
-    Args:
-        user: Django User object
-        log: Reading log object
-    
-    Returns:
-        bool: True if user can edit the log
-    """
-    try:
-        if user.user_type == 'administrator':
-            verify_school_access(user, log)
-            return True
-        elif user.user_type == 'teacher':
-            verify_teacher_student_access(user, log.student)
-            return True
-        elif user.user_type == 'parent':
-            verify_parent_child_relationship(user, log.student)
-            return True
-        elif user.user_type == 'student':
-            return user == log.student and verify_school_access(user, log)
-        else:
-            return False
-    except PermissionDenied:
-        return False
-
-
-def can_view_student_data(user, student):
-    """
-    Check if user can view a specific student's data.
-    
-    Args:
-        user: Django User object
-        student: Student user object
-    
-    Returns:
-        bool: True if user can view the student's data
-    """
-    try:
-        if user.user_type == 'administrator':
-            verify_school_access(user, student)
-            return True
-        elif user.user_type == 'teacher':
-            verify_teacher_student_access(user, student)
-            return True
-        elif user.user_type == 'parent':
-            verify_parent_child_relationship(user, student)
-            return True
-        elif user.user_type == 'student':
-            return user == student
-        else:
-            return False
-    except PermissionDenied:
-        return False
+# Unused helper functions for access patterns have been removed.
+# Permission checks are done directly in views for clarity.

@@ -40,7 +40,7 @@ class ReadingAnalytics:
             date__range=(start_date, end_date)
         )
         
-        # Basic metrics - using centralized stats calculator
+        # OPTIMIZED: Use centralized stats calculator
         total_stats = ReadingStatsCalculator.get_detailed_stats(logs)
         
         # Reading trends by week
@@ -110,20 +110,58 @@ class ReadingAnalytics:
         # Get classroom students
         students = classroom.students.all()
         
+        # OPTIMIZED: Get all logs at once
         logs = Log.objects.filter(
             student__in=students,
             date__range=(start_date, end_date)
-        )
+        ).select_related('student', 'school')
         
-        # Individual student performance
+        # OPTIMIZED: Group logs by student in Python to avoid N+1 queries
+        logs_by_student = {}
+        for log in logs:
+            student_id = log.student_id
+            if student_id not in logs_by_student:
+                logs_by_student[student_id] = []
+            logs_by_student[student_id].append(log)
+        
+        # OPTIMIZED: Individual student performance using helper function
         student_performance = []
         for student in students:
-            student_logs = logs.filter(student=student)
-            # Using centralized stats calculator to eliminate duplication
-            stats = ReadingStatsCalculator.get_basic_stats(student_logs)
+            # Get student's logs from pre-fetched dict (no DB query)
+            student_logs_list = logs_by_student.get(student.id, [])
             
-            # Calculate reading consistency (days with logs)
-            reading_days = student_logs.values('date').distinct().count()
+            # Use helper to calculate stats consistently
+            if student_logs_list:
+                total_pages = sum(log.pages or 0 for log in student_logs_list)
+                total_minutes = sum(log.minutes or 0 for log in student_logs_list)
+                total_logs = len(student_logs_list)
+                avg_pages = total_pages / total_logs if total_logs > 0 else 0
+                avg_minutes = total_minutes / total_logs if total_logs > 0 else 0
+                ratings = [log.rating for log in student_logs_list if log.rating]
+                avg_rating = sum(ratings) / len(ratings) if ratings else 0
+                
+                stats = {
+                    'total_pages': total_pages,
+                    'total_minutes': total_minutes,
+                    'total_logs': total_logs,
+                    'avg_pages_per_session': round(avg_pages, 1),
+                    'avg_minutes_per_session': round(avg_minutes, 1),
+                    'avg_rating': round(avg_rating, 2) if avg_rating else None
+                }
+                
+                # Calculate reading consistency (days with logs) from Python list
+                reading_days = len(set(log.date for log in student_logs_list))
+            else:
+                stats = {
+                    'total_pages': 0,
+                    'total_minutes': 0,
+                    'total_logs': 0,
+                    'avg_pages_per_session': 0,
+                    'avg_minutes_per_session': 0,
+                    'avg_rating': None
+                }
+                reading_days = 0
+            
             total_days = (end_date - start_date).days + 1
             consistency_rate = (reading_days / total_days) * 100 if total_days > 0 else 0
             
@@ -315,43 +353,59 @@ class ReadingAnalytics:
         }
     
     def _calculate_goal_achievement_rates(self, student_ids, start_date, end_date):
-        """Calculate goal achievement rates for given students"""
+        """
+        Calculate goal achievement rates for given students.
+        OPTIMIZED: Batch queries all logs and goals upfront to eliminate nested loop queries.
+        """
         if not student_ids:
             return {'achievement_rate': 0, 'total_goals': 0}
+        
+        # OPTIMIZED: Batch query ALL goals for all students
+        all_goals = DailyGoal.objects.filter(student_id__in=student_ids)
+        
+        # OPTIMIZED: Batch query ALL logs in date range for all students
+        all_logs = Log.objects.filter(
+            student_id__in=student_ids,
+            date__range=(start_date, end_date)
+        ).values('student_id', 'date', 'pages', 'minutes')
+        
+        # Group logs by student_id and date for quick lookup
+        logs_by_student_date = {}
+        for log in all_logs:
+            sid = log['student_id']
+            log_date = log['date']
+            key = (sid, log_date)
+            if key not in logs_by_student_date:
+                logs_by_student_date[key] = {'pages': 0, 'minutes': 0}
+            logs_by_student_date[key]['pages'] += log['pages'] or 0
+            logs_by_student_date[key]['minutes'] += log['minutes'] or 0
         
         achieved = 0
         total_goals = 0
         
-        for student_id in student_ids:
-            goals = DailyGoal.objects.filter(student_id=student_id)
-            for goal in goals:
-                days_in_range = (end_date - max(start_date, goal.created_at.date())).days + 1
-                if days_in_range <= 0:
-                    continue
+        # Process goals (no DB queries in loop)
+        for goal in all_goals:
+            days_in_range = (end_date - max(start_date, goal.created_at.date())).days + 1
+            if days_in_range <= 0:
+                continue
+            
+            total_goals += days_in_range
+            
+            # Check each day in range using pre-fetched data
+            current_date = max(start_date, goal.created_at.date())
+            while current_date <= end_date:
+                key = (goal.student_id, current_date)
+                daily_data = logs_by_student_date.get(key, {'pages': 0, 'minutes': 0})
                 
-                total_goals += days_in_range
+                if goal.type == 'pages':
+                    daily_total = daily_data['pages']
+                else:  # minutes
+                    daily_total = daily_data['minutes']
                 
-                # Check each day in range
-                current_date = max(start_date, goal.created_at.date())
-                while current_date <= end_date:
-                    day_logs = Log.objects.filter(
-                        student_id=student_id,
-                        date=current_date
-                    )
-                    
-                    if goal.type == 'pages':
-                        daily_total = day_logs.aggregate(
-                            total=Sum('pages')
-                        )['total'] or 0
-                    else:  # minutes
-                        daily_total = day_logs.aggregate(
-                            total=Sum('minutes')
-                        )['total'] or 0
-                    
-                    if daily_total >= goal.value:
-                        achieved += 1
-                    
-                    current_date += timedelta(days=1)
+                if daily_total >= goal.value:
+                    achieved += 1
+                
+                current_date += timedelta(days=1)
         
         achievement_rate = (achieved / total_goals * 100) if total_goals > 0 else 0
         

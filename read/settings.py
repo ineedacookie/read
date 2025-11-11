@@ -35,28 +35,44 @@ ALLOWED_HOSTS = [
     'testserver',  # Required for Django test client
 ]
 
+# Security settings for production
+if not DEBUG:
+    SESSION_COOKIE_SECURE = True  # Send session cookie only over HTTPS
+    CSRF_COOKIE_SECURE = True  # Send CSRF cookie only over HTTPS
+    SECURE_SSL_REDIRECT = True  # Redirect all HTTP to HTTPS
+    SECURE_HSTS_SECONDS = 31536000  # 1 year
+    SECURE_HSTS_INCLUDE_SUBDOMAINS = True
+    SECURE_HSTS_PRELOAD = True
+    SECURE_BROWSER_XSS_FILTER = True
+    SECURE_CONTENT_TYPE_NOSNIFF = True
+    X_FRAME_OPTIONS = 'DENY'
+
 # Application definition
 
-INSTALLED_APPS = [
+DJANGO_APPS = [
     'django.contrib.admin',
     'django.contrib.auth',
     'django.contrib.contenttypes',
     'django.contrib.sessions',
     'django.contrib.messages',
     'django.contrib.staticfiles',
+]
 
-    'users',  # 2024-08-28 DG
-    'reading_logs', #2024-09-13 DG
-
+THIRD_PARTY_APPS = [
     'admin_auto_filters',
 ]
 
-# Add debug toolbar in development
-if DEBUG:
-    INSTALLED_APPS += ['debug_toolbar']
+LOCAL_APPS = [
+    'users',
+    'reading_logs',
+]
 
-MIDDLEWARE = [
-    'whitenoise.middleware.WhiteNoiseMiddleware',
+INSTALLED_APPS = DJANGO_APPS + THIRD_PARTY_APPS + LOCAL_APPS
+
+if DEBUG:
+    INSTALLED_APPS.append('debug_toolbar')
+
+DJANGO_MIDDLEWARE = [
     'django.middleware.security.SecurityMiddleware',
     'django.contrib.sessions.middleware.SessionMiddleware',
     'django.middleware.common.CommonMiddleware',
@@ -65,6 +81,12 @@ MIDDLEWARE = [
     'django.contrib.messages.middleware.MessageMiddleware',
     'django.middleware.clickjacking.XFrameOptionsMiddleware',
 ]
+
+THIRD_PARTY_MIDDLEWARE = [
+    'whitenoise.middleware.WhiteNoiseMiddleware',
+]
+
+MIDDLEWARE = THIRD_PARTY_MIDDLEWARE + DJANGO_MIDDLEWARE
 
 # Add debug toolbar middleware in development
 if DEBUG:
@@ -100,6 +122,10 @@ DATABASES = {
         'NAME': BASE_DIR / 'db.sqlite3',
     }
 }
+
+# Keep database connections open for reuse to reduce connection churn during
+# high-throughput API calls (query optimization).
+CONN_MAX_AGE = 60
 
 # Password validation
 # https://docs.djangoproject.com/en/5.1/ref/settings/#auth-password-validators
@@ -151,7 +177,7 @@ STATICFILES_STORAGE = 'whitenoise.storage.CompressedManifestStaticFilesStorage'
 
 AUTH_USER_MODEL = 'users.CustomUser'  # Added by Dax 4/9/2020
 
-LOGIN_URL = '/login/'
+LOGIN_URL = '/accounts/login/'
 LOGIN_REDIRECT_URL = '/'  # Added by Dax to redirect a user to the home page once logged in 4/10/20
 
 # TODO update this when in production
@@ -265,3 +291,4 @@ LOGGING = {
 DATA_UPLOAD_MAX_MEMORY_SIZE = 10240  # 10KB max request size
 FILE_UPLOAD_MAX_MEMORY_SIZE = 10240
 DATA_UPLOAD_MAX_NUMBER_FIELDS = 100  # Limit form fields
+

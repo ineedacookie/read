@@ -430,8 +430,8 @@ function createStudent() {
 
   // Manage parents for a student
   function manageParents(studentId, studentName) {
-     // Navigate to student profile settings tab
-     window.location.href = `/student/${studentId}/#settings`;
+     // Navigate to student profile settings tab and scroll to parent relationships
+     window.location.href = `/student/${studentId}/?tab=settings#parent-relationships`;
   }
 
 // Load current parents for student

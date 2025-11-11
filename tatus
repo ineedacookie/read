@@ -1,0 +1,63 @@
+warning: in the working copy of 'reading_logs/gamification.py', LF will be replaced by CRLF the next time Git touches it
+warning: in the working copy of 'reading_logs/gamification_views.py', LF will be replaced by CRLF the next time Git touches it
+warning: in the working copy of 'reading_logs/tests/test_apis.py', LF will be replaced by CRLF the next time Git touches it
+warning: in the working copy of 'reading_logs/tests/test_gamification.py', LF will be replaced by CRLF the next time Git touches it
+warning: in the working copy of 'reading_logs/views.py', LF will be replaced by CRLF the next time Git touches it
+warning: in the working copy of 'users/forms.py', LF will be replaced by CRLF the next time Git touches it
+warning: in the working copy of 'users/tests/test_user_creation.py', LF will be replaced by CRLF the next time Git touches it
+warning: in the working copy of 'users/views.py', LF will be replaced by CRLF the next time Git touches it
+ CODE_REVIEW_PREP.md                                |  447 [31m----[m
+ DEVELOPER_QUICK_REFERENCE.md                       |  592 [31m-----[m
+ DOCUMENTATION_INDEX.md                             |  246 [31m--[m
+ EXECUTION_PLAN_COMPLETE.md                         |  514 [31m----[m
+ EXECUTION_PLAN_FULLY_COMPLETE.md                   |  546 [31m----[m
+ EXECUTION_STATUS.md                                |  243 [31m--[m
+ FINAL_COMPLETION_CERTIFICATE.md                    |  448 [31m----[m
+ FINAL_VERIFICATION.md                              |  255 [31m--[m
+ FUNCTIONALITY_VERIFICATION.md                      |  216 [31m--[m
+ PERFORMANCE_BENCHMARK_RESULTS.md                   |  261 [31m--[m
+ PROJECT_COMPLETE_FINAL_STATUS.md                   |  266 [31m--[m
+ PROJECT_STATUS.md                                  |  224 [31m--[m
+ README.md                                          |   56 [31m-[m
+ README_OPTIMIZATION_COMPLETE.md                    |  191 [31m--[m
+ README_START_HERE.md                               |  163 [31m--[m
+ SAMPLE_DATA_README.md                              |  212 [31m--[m
+ TEST_RESULTS_SUMMARY.md                            |  196 [31m--[m
+ WEEK1_COMPLETION_SUMMARY.md                        |  201 [31m--[m
+ WEEK2_PROGRESS_SUMMARY.md                          |  160 [31m--[m
+ read/settings.py                                   |   12 [32m+[m
+ read/utils/analytics_helpers.py                    |   68 [32m+[m
+ read/utils/permission_helpers.py                   |   57 [32m+[m[31m-[m
+ read/utils/validation_helpers.py                   |    3 [32m+[m[31m-[m
+ read/utils/view_helpers.py                         |  120 [32m+[m[31m-[m
+ reading_logs/analytics.py                          |   54 [32m+[m[31m-[m
+ reading_logs/gamification.py                       |  168 [32m+[m[31m-[m
+ reading_logs/gamification_views.py                 |   70 [32m+[m[31m-[m
+ reading_logs/migrations/0001_initial.py            |  459 [32m++[m[31m--[m
+ reading_logs/models.py                             |   35 [32m+[m[31m-[m
+ reading_logs/tests/test_apis.py                    |   80 [32m+[m[31m-[m
+ reading_logs/tests/test_gamification.py            |   52 [32m+[m[31m-[m
+ reading_logs/views.py                              |  537 [32m++[m[31m--[m
+ requirements.txt                                   |  Bin [31m2266[m -> [32m2556[m bytes
+ screenshots/README.md                              |   39 [31m-[m
+ static/admin/css/vendor/select2/LICENSE-SELECT2.md |   21 [31m-[m
+ static/admin/js/vendor/select2/LICENSE.md          |   21 [31m-[m
+ static/vendors/tinymce/CHANGELOG.md                | 2696 [31m--------------------[m
+ static/vendors/tinymce/README.md                   |   71 [31m-[m
+ .../components/forms/README_date_range_picker.md   |  105 [31m-[m
+ templates/general/admin_dash.html                  |  388 [32m++[m[31m-[m
+ templates/general/fluid_template.html              |    2 [32m+[m
+ templates/general/home.html                        |  147 [32m+[m[31m-[m
+ templates/general/my_students.html                 |    4 [32m+[m[31m-[m
+ templates/general/record.html                      |   97 [32m+[m[31m-[m
+ templates/general/teacher_dash.html                |  114 [32m+[m[31m-[m
+ templates/registration/register.html               |   35 [32m+[m[31m-[m
+ tests/baseline/test_workflows.py                   |  239 [31m--[m
+ users/forms.py                                     |   29 [32m+[m[31m-[m
+ users/migrations/0001_initial.py                   |  502 [32m+++[m[31m-[m
+ users/migrations/0002_add_tracking_fields.py       |   56 [31m-[m
+ .../0003_customuser_password_change_required.py    |   18 [31m-[m
+ ...om_options_alter_customuser_options_and_more.py |  113 [31m-[m
+ users/tests/test_user_creation.py                  |  178 [32m+[m[31m-[m
+ users/views.py                                     |  115 [32m+[m[31m-[m
+ 54 files changed, 2502 insertions(+), 9640 deletions(-)

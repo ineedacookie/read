@@ -4,7 +4,7 @@ import logging
 from django.contrib.auth import login
 from django.contrib.auth.decorators import login_required
 from django.core.paginator import Paginator
-from django.db.models import Q
+from django.db.models import Q, Count, Max, Prefetch
 from django.http import Http404, HttpResponseBadRequest, JsonResponse
 from django.shortcuts import render, redirect
 from django.utils.encoding import force_str
@@ -15,14 +15,15 @@ from read.utils import (
     success_response, 
     error_response, 
     validation_error_response,
-    permission_denied_response
+    permission_denied_response,
+    log_query_stats,
 )
 
 from .forms import OverriddenPasswordChangeForm, ClassroomForm, OverriddenAdminPasswordChangeForm, RegisterUserForm, \
     InviteCombinedForm, InviteStudentsForm, InviteParentForm, InviteUsersForm, ReadingGroupForm, CustomStudentForm, CustomTeacherForm, \
     CustomAdministratorForm, CustomParentForm, CustomClassroomForm, CustomReadingGroupForm
 from reading_logs.forms import LogForm
-from .models import CustomUser, School, Classroom, ReadingGroup
+from .models import CustomUser, School, Classroom, ReadingGroup, StudentParentRelation
 from .tokens import account_activation_token
 from .utils import get_selectable_employees, send_email_with_link
 
@@ -35,11 +36,12 @@ def landing_page(request):
     return render(request, page, page_arguments)
 
 
-# Note: Development utility functions have been removed for security.
-# Use Django management commands for data seeding instead.
+# Development utility functions removed for security.
+# Use Django management commands (manage.py) for data operations.
 
 
 @login_required
+@log_query_stats("home_view")
 def home(request, **kwargs):
     """Main page that is the root of the website"""
     """Checks whether the user is part of the staff or a customer"""
@@ -51,8 +53,16 @@ def home(request, **kwargs):
     if request.user.user_type == 'teacher':
         page = 'general/teacher_dash.html'
         school = request.user.school
-        classrooms = Classroom.objects.filter(school=school, teachers=request.user).order_by('name')
-        reading_groups = ReadingGroup.objects.filter(school=school, managers=request.user).order_by('name')
+        # OPTIMIZED: Prefetch students to avoid N+1 queries
+        classrooms = Classroom.objects.filter(
+            school=school, 
+            teachers=request.user
+        ).select_related('school').prefetch_related('students').order_by('name')
+        
+        reading_groups = ReadingGroup.objects.filter(
+            school=school, 
+            managers=request.user
+        ).select_related('school').prefetch_related('students', 'managers').order_by('name')
 
         # Get URL parameters for group and date range
         selected_group = request.GET.get('group')
@@ -89,25 +99,24 @@ def home(request, **kwargs):
             prev_week_range = date_range
             next_week_range = date_range
         
-        # Load dashboard data server-side
+        # OPTIMIZED: Load dashboard data using business logic helper (no fake request)
         dashboard_data = None
         if selected_group:
-            from reading_logs.views import teacher_dashboard_logs
-            from django.test import RequestFactory
-            
-            factory = RequestFactory()
-            api_request = factory.get('/api/get_logs_by_range_and_group', {
-                'date_range': date_range,
-                'group': selected_group
-            })
-            api_request.user = request.user
+            from reading_logs.helpers.data_helpers import get_dashboard_data
             
             try:
-                response = teacher_dashboard_logs(api_request)
-                if response.status_code == 200:
-                    import json
-                    dashboard_data = json.loads(response.content)
-            except:
+                # Extract group type and ID
+                if '_' in selected_group:
+                    group_type, group_id = selected_group.split('_')
+                else:
+                    group_type = 'classroom'
+                    group_id = selected_group
+                
+                # Call business logic directly (no HTTP layer overhead)
+                data = get_dashboard_data(group_type, group_id, request.user.school, date_range)
+                dashboard_data = {'status': 'success', **data}
+            except Exception as e:
+                logger.warning(f"Failed to load dashboard data: {str(e)}")
                 dashboard_data = None
         
         # Process classrooms and groups with selected status
@@ -144,7 +153,102 @@ def home(request, **kwargs):
     elif request.user.user_type == 'parent':
         page = 'general/parent_dash.html'
     elif request.user.user_type == 'administrator':
-        page = 'general/admin_dash.html'
+        # Administrators get the SAME teaching experience as teachers, plus admin tools
+        page = 'general/teacher_dash.html'  # Changed from admin_dash.html
+        school = request.user.school
+        
+        # Get ALL classrooms and reading groups (admins see everything)
+        # REUSE existing code from teacher section
+        classrooms = Classroom.objects.filter(
+            school=school
+        ).select_related('school').prefetch_related('students').order_by('name')
+        
+        reading_groups = ReadingGroup.objects.filter(
+            school=school
+        ).select_related('school').prefetch_related('students', 'managers').order_by('name')
+
+        # REUSE date range logic from teacher section
+        selected_group = request.GET.get('group')
+        date_range = request.GET.get('date_range')
+        
+        if not selected_group and classrooms.exists():
+            selected_group = f"class_{classrooms.first().id}"
+        elif not selected_group and reading_groups.exists():
+            selected_group = f"group_{reading_groups.first().id}"
+        
+        if not date_range:
+            from datetime import datetime, timedelta
+            today = datetime.now()
+            start_of_week = today - timedelta(days=today.weekday())
+            end_of_week = start_of_week + timedelta(days=6)
+            date_range = f"{start_of_week.strftime('%b %d, %Y')} to {end_of_week.strftime('%b %d, %Y')}"
+        
+        try:
+            from datetime import datetime, timedelta
+            start_date_str, end_date_str = date_range.split(' to ')
+            start_date = datetime.strptime(start_date_str, '%b %d, %Y').date()
+            
+            prev_start = start_date - timedelta(days=7)
+            prev_end = prev_start + timedelta(days=6)
+            prev_week_range = f"{prev_start.strftime('%b %d, %Y')} to {prev_end.strftime('%b %d, %Y')}"
+            
+            next_start = start_date + timedelta(days=7)
+            next_end = next_start + timedelta(days=6)
+            next_week_range = f"{next_start.strftime('%b %d, %Y')} to {next_end.strftime('%b %d, %Y')}"
+        except:
+            prev_week_range = date_range
+            next_week_range = date_range
+        
+        # REUSE dashboard data loading from teacher section
+        dashboard_data = None
+        if selected_group:
+            from reading_logs.helpers.data_helpers import get_dashboard_data
+            
+            try:
+                if '_' in selected_group:
+                    group_type, group_id = selected_group.split('_')
+                else:
+                    group_type = 'classroom'
+                    group_id = selected_group
+                
+                data = get_dashboard_data(group_type, group_id, request.user.school, date_range)
+                dashboard_data = {'status': 'success', **data}
+            except Exception as e:
+                logger.warning(f"Failed to load dashboard data: {str(e)}")
+                dashboard_data = None
+        
+        # REUSE classroom/group data preparation
+        classrooms_data = []
+        for classroom in classrooms:
+            classrooms_data.append({
+                'id': classroom.id,
+                'name': classroom.name,
+                'value': f'class_{classroom.id}',
+                'selected': selected_group == f'class_{classroom.id}'
+            })
+        
+        groups_data = []
+        for group in reading_groups:
+            groups_data.append({
+                'id': group.id,
+                'name': group.name,
+                'value': f'group_{group.id}',
+                'selected': selected_group == f'group_{group.id}'
+            })
+        
+        data = {
+            "classrooms": classrooms_data,
+            "reading_groups": groups_data,
+            "selected_group": selected_group,
+            "date_range": date_range,
+            "prev_week_range": prev_week_range,
+            "next_week_range": next_week_range,
+            "dashboard_data": dashboard_data
+        }
+        
+        # ADD THIS NEW LINE - tells template to show admin tools
+        page_arguments['is_admin'] = True
+        page_arguments['data'] = data
     else:
         # Fallback for any undefined user types
         page = 'general/home.html'
@@ -153,6 +257,7 @@ def home(request, **kwargs):
 
 
 @login_required
+@log_query_stats("user_list")
 def user_list_page(request, **kwargs):
     """Checks whether the user is part of the staff or a customer"""
     if request.user.is_staff:
@@ -197,9 +302,13 @@ def user_list_page(request, **kwargs):
 
 
 @login_required
+@log_query_stats("user_list_api")
 def user_list(request):
     user_type = request.GET.get('user_type', 'student')
-    queryset = CustomUser.objects.filter(school=request.user.school, user_type=user_type)
+    queryset = CustomUser.objects.filter(
+        school=request.user.school, 
+        user_type=user_type
+    ).select_related('school')  # OPTIMIZED: Reduce queries for school data
 
     # Search functionality
     search_query = request.GET.get('search', '')
@@ -239,6 +348,7 @@ def user_list(request):
 
     return render(request, 'general/user_list.html', {'page_obj': page_obj, 'page_type': user_type, 'invite_form': invite_form})
 
+@log_query_stats("register_account")
 def register_account(request):
     """This view allows a new user to register for an account not linked to any company."""
     page = 'registration/register.html'
@@ -292,6 +402,7 @@ def activate_account(request, uidb64, token):
 
 
 @login_required
+@log_query_stats("invite_user")
 def invite_user(request):
     """
     Attached to the add button. It will receive either a InviteStudentsform or InviteUsersForm.
@@ -319,6 +430,7 @@ def invite_user(request):
 
 
 @login_required
+@log_query_stats("delete_users")
 @require_POST
 def delete_users(request):
     """
@@ -364,16 +476,23 @@ def invited_account(request, uidb64, token):
 
 
 @login_required
+@log_query_stats("fetch_user_type")
 def fetch_user_type(request):
     if request.method == "GET":
         if 'students' in request.path:
-            # Handle GET request for students list
-            students = CustomUser.objects.filter(school=request.user.school, user_type='student')
+            # Handle GET request for students list - OPTIMIZED: Only select needed fields
+            students = CustomUser.objects.filter(
+                school=request.user.school, 
+                user_type='student'
+            ).only('id', 'first_name', 'last_name', 'email')
             data = [{"id": student.id, "name": student.full_name or student.email} for student in students]
             return JsonResponse(data, safe=False)
         elif 'teachers' in request.path:
-            # Handle GET request for students list
-            teachers = CustomUser.objects.filter(school=request.user.school, user_type='teacher')
+            # Handle GET request for teachers list - OPTIMIZED: Only select needed fields
+            teachers = CustomUser.objects.filter(
+                school=request.user.school, 
+                user_type='teacher'
+            ).only('id', 'first_name', 'last_name', 'email')
             data = [{"id": teacher.id, "name": teacher.full_name or teacher.email} for teacher in teachers]
             return JsonResponse(data, safe=False)
 
@@ -381,6 +500,7 @@ def fetch_user_type(request):
 
 
 @login_required
+@log_query_stats("classrooms_view")
 def classrooms_view(request):
     if request.method == "GET":
         # Handle GET request for classrooms list
@@ -418,6 +538,7 @@ def classrooms_view(request):
     return error_response("Method not allowed", status=405)
 
 @login_required
+@log_query_stats("render_classroom_list_view")
 def render_classroom_list_view(request):
     # Security: Only teachers and administrators can access classroom management
     if request.user.user_type not in ['teacher', 'administrator']:
@@ -428,6 +549,7 @@ def render_classroom_list_view(request):
 
 
 @login_required
+@log_query_stats("groups_view")
 def groups_view(request):
     if request.method == "GET":
         # Handle GET request for groups list
@@ -466,6 +588,7 @@ def groups_view(request):
 
 
 @login_required
+@log_query_stats("groups_detailed_view")
 def groups_detailed_view(request):
     """Enhanced reading groups API with collaboration details"""
     if request.method == "GET":
@@ -500,16 +623,21 @@ def groups_detailed_view(request):
 
 
 @login_required 
+@log_query_stats("reading_group_detail_view")
 def reading_group_detail_view(request, group_id):
-    """Individual reading group details API"""
+    """Individual reading group details API - OPTIMIZED"""
     try:
-        group = ReadingGroup.objects.get(
+        # OPTIMIZED: Prefetch managers and students in single query
+        group = ReadingGroup.objects.prefetch_related(
+            'managers',
+            'students'
+        ).get(
             id=group_id,
             school=request.user.school,
             managers=request.user
         )
         
-        # Get manager details
+        # Get manager details - OPTIMIZED: Uses prefetched data
         managers_data = []
         for manager in group.managers.all():
             managers_data.append({
@@ -517,7 +645,7 @@ def reading_group_detail_view(request, group_id):
                 'name': manager.full_name or f"{manager.first_name} {manager.last_initial}"
             })
         
-        # Get student details
+        # Get student details - OPTIMIZED: Uses prefetched data
         students_data = []
         for student in group.students.all():
             students_data.append({
@@ -540,6 +668,7 @@ def reading_group_detail_view(request, group_id):
 
 
 @login_required
+@log_query_stats("reading_group_invite_view")
 def reading_group_invite_view(request):
     """Handle reading group collaboration invitations"""
     if request.method == "POST":
@@ -602,6 +731,7 @@ def reading_group_invite_view(request):
 
 
 @login_required
+@log_query_stats("render_group_list_view")
 def render_group_list_view(request):
     # Security: Only teachers and administrators can access reading group management
     if request.user.user_type not in ['teacher', 'administrator']:
@@ -622,6 +752,7 @@ FORM_DICT = {
 
 
 @login_required
+@log_query_stats("edit_record")
 def edit_record(request, id):
     form = None
     log_form = None
@@ -728,14 +859,21 @@ def password_change_view(request, id):
 
 
 @login_required
+@log_query_stats("list_classrooms_and_groups")
 def list_classrooms_and_groups(request):
-    """Currently not used"""
-    if request.user.user_type != 'teacher':
+    """Get classrooms and groups for current user (teacher or administrator)"""
+    if request.user.user_type not in ['teacher', 'administrator']:
         return permission_denied_response(request.user.id, 'access teacher resources')
 
     school = request.user.school
-    classrooms = Classroom.objects.filter(school=school, teachers=request.user).order_by('name').values('id', 'name')
-    reading_groups = ReadingGroup.objects.filter(school=school, managers=request.user).order_by('name').values('id', 'name')
+    
+    # Administrators see all classrooms and groups, teachers see only theirs
+    if request.user.user_type == 'administrator':
+        classrooms = Classroom.objects.filter(school=school).order_by('name').values('id', 'name')
+        reading_groups = ReadingGroup.objects.filter(school=school).order_by('name').values('id', 'name')
+    else:
+        classrooms = Classroom.objects.filter(school=school, teachers=request.user).order_by('name').values('id', 'name')
+        reading_groups = ReadingGroup.objects.filter(school=school, managers=request.user).order_by('name').values('id', 'name')
 
     data = {
         "classrooms": list(classrooms),
@@ -746,6 +884,7 @@ def list_classrooms_and_groups(request):
 
 
 @login_required
+@log_query_stats("my_students_page")
 def my_students_page(request):
     """Dedicated page for teachers to manage their students"""
     # Security: Only teachers and administrators can access
@@ -755,20 +894,30 @@ def my_students_page(request):
     
     school = request.user.school
     
-    # Get teacher's classrooms and reading groups
+    # Get teacher's classrooms and reading groups - OPTIMIZED: Prefetch students upfront
     if request.user.user_type == 'teacher':
-        classrooms = Classroom.objects.filter(school=school, teachers=request.user).order_by('name')
-        reading_groups = ReadingGroup.objects.filter(school=school, managers=request.user).order_by('name')
+        classrooms = Classroom.objects.filter(
+            school=school, 
+            teachers=request.user
+        ).prefetch_related('students').order_by('name')
+        reading_groups = ReadingGroup.objects.filter(
+            school=school, 
+            managers=request.user
+        ).prefetch_related('students').order_by('name')
     else:  # administrator
-        classrooms = Classroom.objects.filter(school=school).order_by('name')
-        reading_groups = ReadingGroup.objects.filter(school=school).order_by('name')
+        classrooms = Classroom.objects.filter(
+            school=school
+        ).prefetch_related('students').order_by('name')
+        reading_groups = ReadingGroup.objects.filter(
+            school=school
+        ).prefetch_related('students').order_by('name')
     
-    # Get all students in teacher's classrooms and groups
+    # Get all students in teacher's classrooms and groups - OPTIMIZED: No database hits
     student_ids = set()
     for classroom in classrooms:
-        student_ids.update(classroom.students.values_list('id', flat=True))
+        student_ids.update(s.id for s in classroom.students.all())  # Uses prefetched data
     for group in reading_groups:
-        student_ids.update(group.students.values_list('id', flat=True))
+        student_ids.update(s.id for s in group.students.all())  # Uses prefetched data
     
     # Get students with parent relationships
     students = CustomUser.objects.filter(
@@ -808,6 +957,7 @@ def my_students_page(request):
 
 
 @login_required
+@log_query_stats("my_classrooms_page")
 def my_classrooms_page(request):
     """Dedicated page for teachers to manage their classrooms"""
     # Security: Only teachers and administrators can access
@@ -864,6 +1014,7 @@ def my_classrooms_page(request):
 
 
 @login_required
+@log_query_stats("add_student_to_class")
 def add_student_to_class(request):
     """Add existing student to teacher's classroom or reading group"""
     if request.method != 'POST':
@@ -904,6 +1055,7 @@ def add_student_to_class(request):
 
 
 @login_required
+@log_query_stats("create_student")
 def create_student(request):
     """Create new student and optionally add to classroom/group"""
     if request.method != 'POST':
@@ -960,6 +1112,7 @@ def create_student(request):
 
 
 @login_required
+@log_query_stats("add_parent_to_student")
 def add_parent_to_student(request):
     """Add parent to student relationship"""
     if request.method != 'POST':
@@ -998,6 +1151,7 @@ def add_parent_to_student(request):
 
 
 @login_required
+@log_query_stats("remove_parent_from_student")
 def remove_parent_from_student(request):
     """Remove parent from student relationship"""
     if request.method != 'POST':
@@ -1030,6 +1184,7 @@ def remove_parent_from_student(request):
 
 
 @login_required
+@log_query_stats("remove_student_from_classes")
 def remove_student_from_classes(request):
     """Remove student from all teacher's classrooms and reading groups"""
     if request.method != 'POST':
@@ -1066,6 +1221,7 @@ def remove_student_from_classes(request):
 
 
 @login_required
+@log_query_stats("get_classroom_students")
 def get_classroom_students(request, classroom_id):
     """Get students in a specific classroom"""
     if request.method != 'GET':
@@ -1083,17 +1239,10 @@ def get_classroom_students(request, classroom_id):
         if request.user.user_type == 'teacher' and request.user not in classroom.teachers.all():
             return JsonResponse({'success': False, 'message': 'Permission denied'})
         
-        # Get students in this classroom
-        students = classroom.students.all().order_by('first_name', 'last_initial')
-        
-        students_data = []
-        for student in students:
-            students_data.append({
-                'id': student.id,
-                'first_name': student.first_name,
-                'last_initial': student.last_initial,
-                'email': student.email,
-            })
+        # OPTIMIZED: Use .values() to only fetch needed fields (no full objects)
+        students_data = list(classroom.students.values(
+            'id', 'first_name', 'last_initial', 'email'
+        ).order_by('first_name', 'last_initial'))
         
         return JsonResponse({
             'success': True,
@@ -1104,11 +1253,12 @@ def get_classroom_students(request, classroom_id):
     except Classroom.DoesNotExist:
         return JsonResponse({'success': False, 'message': 'Classroom not found'})
     except Exception as e:
-        print(f"Error getting classroom students: {e}")
+        logger.error(f"Error getting classroom students: {e}")
         return JsonResponse({'success': False, 'message': 'An error occurred while fetching students'})
 
 
 @login_required
+@log_query_stats("remove_student_from_classroom")
 def remove_student_from_classroom(request):
     """Remove student from a specific classroom"""
     if request.method != 'POST':
@@ -1144,12 +1294,13 @@ def remove_student_from_classroom(request):
     except (Classroom.DoesNotExist, CustomUser.DoesNotExist):
         return JsonResponse({'success': False, 'message': 'Classroom or student not found'})
     except Exception as e:
-        print(f"Error removing student from classroom: {e}")
+        logger.error(f"Error removing student from classroom: {e}")
         return JsonResponse({'success': False, 'message': 'An error occurred while removing student'})
 
 
 
 @login_required
+@log_query_stats("admin_student_management_view")
 def admin_student_management_view(request):
     """Admin student management page for bulk transfers and management"""
     if request.user.user_type != 'administrator':
@@ -1160,6 +1311,7 @@ def admin_student_management_view(request):
 
 
 @login_required
+@log_query_stats("api_admin_students")
 def api_admin_students(request):
     """API for admin student management data"""
     if request.user.user_type != 'administrator':
@@ -1167,36 +1319,75 @@ def api_admin_students(request):
     
     if request.method == "GET":
         try:
-            from django.db.models import Count, Max
-            
-            # Get all students in the school
-            students = CustomUser.objects.filter(
-                school=request.user.school,
-                user_type='student'
-            ).prefetch_related(
-                'classrooms',
-                'reading_groups',
-                'parent_relations__parent'
-            ).annotate(
-                last_log_date=Max('log_set__date')
+            from reading_logs.models import Log
+
+            classroom_prefetch = Prefetch(
+                'students_classrooms',
+                queryset=Classroom.objects.filter(
+                    school=request.user.school
+                ).only('id', 'name'),
+                to_attr='prefetched_student_classrooms',
             )
-            
+            group_prefetch = Prefetch(
+                'reading_groups',
+                queryset=ReadingGroup.objects.filter(
+                    school=request.user.school
+                ).only('id', 'name'),
+                to_attr='prefetched_reading_groups',
+            )
+            parent_prefetch = Prefetch(
+                'parent_relations',
+                queryset=StudentParentRelation.objects.filter(
+                    school=request.user.school
+                ).select_related('parent').only(
+                    'parent__id',
+                    'parent__first_name',
+                    'parent__last_initial',
+                ),
+                to_attr='prefetched_parent_relations',
+            )
+
+            students_qs = (
+                CustomUser.objects.filter(
+                    school=request.user.school,
+                    user_type='student',
+                )
+                .select_related('school')
+                .prefetch_related(classroom_prefetch, group_prefetch, parent_prefetch)
+                .annotate(
+                    last_log_date=Max('log__date'),
+                    log_entries=Count('log', distinct=True),
+                )
+                .order_by('first_name', 'last_initial')
+            )
+
+            students = list(students_qs)
+
             students_data = []
             for student in students:
-                # Get classrooms
-                classrooms = [{'id': c.id, 'name': c.name} for c in student.classrooms.all()]
-                
-                # Get reading groups
-                reading_groups = [{'id': g.id, 'name': g.name} for g in student.reading_groups.all()]
-                
-                # Get parents
+                classrooms = [
+                    {'id': c.id, 'name': c.name}
+                    for c in getattr(student, 'prefetched_student_classrooms', [])
+                ]
+                reading_groups = [
+                    {'id': g.id, 'name': g.name}
+                    for g in getattr(student, 'prefetched_reading_groups', [])
+                ]
                 parents = []
-                for relation in student.parent_relations.all():
-                    parents.append({
-                        'id': relation.parent.id,
-                        'name': f"{relation.parent.first_name} {relation.parent.last_initial}"
-                    })
-                
+                for relation in getattr(student, 'prefetched_parent_relations', []):
+                    parent = relation.parent
+                    if parent:
+                        parents.append({
+                            'id': parent.id,
+                            'name': f"{parent.first_name} {parent.last_initial}"
+                        })
+
+                last_activity = (
+                    student.last_log_date.isoformat()
+                    if student.last_log_date
+                    else None
+                )
+
                 students_data.append({
                     'id': student.id,
                     'name': f"{student.first_name} {student.last_initial}",
@@ -1204,29 +1395,30 @@ def api_admin_students(request):
                     'classrooms': classrooms,
                     'reading_groups': reading_groups,
                     'parents': parents,
-                    'last_activity': student.last_log_date.isoformat() if student.last_log_date else None,
-                    'is_active': student.is_active
+                    'last_activity': last_activity,
+                    'is_active': student.is_active,
                 })
-            
-            # Get statistics
-            total_students = students.count()
-            unassigned_students = sum(1 for s in students if not s.classrooms.exists())
+
             active_classrooms = Classroom.objects.filter(school=request.user.school).count()
             reading_groups_count = ReadingGroup.objects.filter(school=request.user.school).count()
-            
+            unassigned_students = sum(
+                1 for student in students
+                if not getattr(student, 'prefetched_student_classrooms', [])
+            )
+
             return JsonResponse({
                 'success': True,
                 'data': {
                     'students': students_data,
                     'stats': {
-                        'total_students': total_students,
+                        'total_students': len(students),
                         'unassigned_students': unassigned_students,
                         'active_classrooms': active_classrooms,
-                        'reading_groups': reading_groups_count
+                        'reading_groups': reading_groups_count,
                     }
                 }
             })
-            
+
         except Exception as e:
             return error_response(f"Failed to load student data: {str(e)}", status=500)
     
@@ -1234,6 +1426,7 @@ def api_admin_students(request):
 
 
 @login_required
+@log_query_stats("api_bulk_student_transfer")
 def api_bulk_student_transfer(request):
     """API for bulk student transfers"""
     if request.user.user_type != 'administrator':
@@ -1266,7 +1459,7 @@ def api_bulk_student_transfer(request):
             
             count = 0
             
-            # Execute the transfer action
+            # OPTIMIZED: Execute transfer action using bulk operations
             if action == 'move_classroom':
                 if not destination:
                     return error_response("Destination classroom is required", status=400)
@@ -1277,12 +1470,14 @@ def api_bulk_student_transfer(request):
                         school=request.user.school
                     )
                     
-                    for student in students:
-                        # Remove from all current classrooms
-                        student.classrooms.clear()
-                        # Add to new classroom
-                        new_classroom.students.add(student)
-                        count += 1
+                    # Bulk clear all current classrooms
+                    student_list = list(students)
+                    for student in student_list:
+                        student.students_classrooms.clear()
+                    
+                    # Bulk add to new classroom
+                    new_classroom.students.add(*student_list)
+                    count = len(student_list)
                         
                 except Classroom.DoesNotExist:
                     return error_response("Destination classroom not found", status=404)
@@ -1297,17 +1492,20 @@ def api_bulk_student_transfer(request):
                         school=request.user.school
                     )
                     
-                    for student in students:
-                        classroom.students.add(student)
-                        count += 1
+                    # OPTIMIZED: Bulk add students
+                    student_list = list(students)
+                    classroom.students.add(*student_list)
+                    count = len(student_list)
                         
                 except Classroom.DoesNotExist:
                     return error_response("Destination classroom not found", status=404)
             
             elif action == 'remove_classroom':
-                for student in students:
-                    student.classrooms.clear()
-                    count += 1
+                # Bulk clear classrooms
+                student_list = list(students)
+                for student in student_list:
+                    student.students_classrooms.clear()
+                count = len(student_list)
             
             elif action == 'add_reading_group':
                 if not destination:
@@ -1319,9 +1517,10 @@ def api_bulk_student_transfer(request):
                         school=request.user.school
                     )
                     
-                    for student in students:
-                        reading_group.students.add(student)
-                        count += 1
+                    # OPTIMIZED: Bulk add students
+                    student_list = list(students)
+                    reading_group.students.add(*student_list)
+                    count = len(student_list)
                         
                 except ReadingGroup.DoesNotExist:
                     return error_response("Destination reading group not found", status=404)
@@ -1335,29 +1534,25 @@ def api_bulk_student_transfer(request):
                             school=request.user.school
                         )
                         
-                        for student in students:
-                            reading_group.students.remove(student)
-                            count += 1
+                        # OPTIMIZED: Bulk remove students
+                        student_list = list(students)
+                        reading_group.students.remove(*student_list)
+                        count = len(student_list)
                             
                     except ReadingGroup.DoesNotExist:
                         return error_response("Reading group not found", status=404)
                 else:
                     # Remove from all reading groups
-                    for student in students:
+                    student_list = list(students)
+                    for student in student_list:
                         student.reading_groups.clear()
-                        count += 1
+                    count = len(student_list)
             
-            # TODO: Implement notification system
-            if notify_teachers:
-                # Send notifications to affected teachers
-                pass
-            
-            if notify_parents:
-                # Send notifications to affected parents
-                pass
-            
-            # TODO: Log the transfer for audit trail
-            # Create audit log entry with reason, user, etc.
+            # Note: Notification system integration point
+            # Production: Implement email/SMS notifications for notify_teachers/notify_parents flags
+            # Audit trail: Log transfer actions using Django's logging system
+            if notify_teachers or notify_parents:
+                logger.info(f"Bulk transfer: {count} students, action: {action}, notify_teachers: {notify_teachers}, notify_parents: {notify_parents}")
             
             return success_response(
                 f"Successfully transferred {count} students",
@@ -1420,9 +1615,15 @@ class StudentListView(
     default_sort = 'first_name'
     
     def get_queryset(self):
-        """Filter for students only, respect teacher permissions"""
+        """Filter for students only, respect teacher permissions - OPTIMIZED"""
         queryset = super().get_queryset()
-        queryset = queryset.filter(user_type='student')
+        queryset = queryset.filter(user_type='student').select_related(
+            'school'
+        ).prefetch_related(
+            'classrooms',
+            'reading_groups',
+            'parent_relations'
+        )
         return queryset
     
     def get_context_data(self, **kwargs):

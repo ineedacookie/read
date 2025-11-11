@@ -34,39 +34,25 @@
                 <!-- Role-specific navigation only - no general dashboard -->
 
                 {% if user.user_type == 'administrator' %}
-                    <!-- Administrator sees everything -->
+                    <!-- Administrators: Teaching features first, admin features at bottom -->
                     <li class="nav-item">
-                        <a class="nav-link" href="{% url 'home' %}student/">
+                        <a class="nav-link" href="{% url 'home' %}">
                             <div class="d-flex align-items-center"><span class="nav-link-icon"><span
-                                    class="fas fa-graduation-cap"></span></span><span class="nav-link-text ps-1">Students</span>
+                                    class="fas fa-home"></span></span><span class="nav-link-text ps-1">My Dashboard</span>
                             </div>
                         </a>
                     </li>
                     <li class="nav-item">
-                        <a class="nav-link" href="{% url 'home' %}teacher/">
+                        <a class="nav-link" href="{% url 'my_students' %}">
                             <div class="d-flex align-items-center"><span class="nav-link-icon"><span
-                                    class="fas fa-chalkboard-teacher"></span></span><span class="nav-link-text ps-1">Teachers</span>
+                                    class="fas fa-graduation-cap"></span></span><span class="nav-link-text ps-1">My Students</span>
                             </div>
                         </a>
                     </li>
                     <li class="nav-item">
-                        <a class="nav-link" href="{% url 'home' %}parent/">
+                        <a class="nav-link" href="{% url 'my_classrooms' %}">
                             <div class="d-flex align-items-center"><span class="nav-link-icon"><span
-                                    class="fas fa-users"></span></span><span class="nav-link-text ps-1">Parents</span>
-                            </div>
-                        </a>
-                    </li>
-                    <li class="nav-item">
-                        <a class="nav-link" href="{% url 'home' %}administrator/">
-                            <div class="d-flex align-items-center"><span class="nav-link-icon"><span
-                                    class="fas fa-user-tie"></span></span><span class="nav-link-text ps-1">Administrators</span>
-                            </div>
-                        </a>
-                    </li>
-                    <li class="nav-item">
-                        <a class="nav-link" href="{% url 'classrooms' %}">
-                            <div class="d-flex align-items-center"><span class="nav-link-icon"><span
-                                    class="fas fa-school"></span></span><span class="nav-link-text ps-1">Classrooms</span>
+                                    class="fas fa-door-open"></span></span><span class="nav-link-text ps-1">My Classrooms</span>
                             </div>
                         </a>
                     </li>
@@ -78,9 +64,9 @@
                         </a>
                     </li>
                     <li class="nav-item">
-                        <a class="nav-link" href="{% url 'admin_student_management' %}">
+                        <a class="nav-link" href="{% url 'reading_goals' %}">
                             <div class="d-flex align-items-center"><span class="nav-link-icon"><span
-                                    class="fas fa-users-cog"></span></span><span class="nav-link-text ps-1">Student Management</span>
+                                    class="fas fa-bullseye"></span></span><span class="nav-link-text ps-1">Reading Goals</span>
                             </div>
                         </a>
                     </li>
@@ -91,6 +77,38 @@
                             </div>
                         </a>
                     </li>
+                    
+                    <!-- Divider before admin tools -->
+                    <li class="nav-item">
+                        <hr class="navbar-divider my-3"/>
+                        <div class="d-flex align-items-center px-3 mb-2">
+                            <span class="navbar-vertical-label text-uppercase text-muted">Admin Tools</span>
+                        </div>
+                    </li>
+                    
+                    <li class="nav-item">
+                        <a class="nav-link" href="{% url 'user_list_page' 'teacher' %}">
+                            <div class="d-flex align-items-center"><span class="nav-link-icon"><span
+                                    class="fas fa-chalkboard-teacher"></span></span><span class="nav-link-text ps-1">Manage Teachers</span>
+                            </div>
+                        </a>
+                    </li>
+                    <li class="nav-item">
+                        <a class="nav-link" href="{% url 'user_list_page' 'parent' %}">
+                            <div class="d-flex align-items-center"><span class="nav-link-icon"><span
+                                    class="fas fa-users"></span></span><span class="nav-link-text ps-1">Manage Parents</span>
+                            </div>
+                        </a>
+                    </li>
+                    <li class="nav-item">
+                        <a class="nav-link" href="{% url 'admin_student_management' %}">
+                            <div class="d-flex align-items-center"><span class="nav-link-icon"><span
+                                    class="fas fa-users-cog"></span></span><span class="nav-link-text ps-1">Bulk Student Actions</span>
+                            </div>
+                        </a>
+                    </li>
+                    <!-- Advanced Settings removed - administrators should use Django admin (/io_admin/) directly -->
+                    <!-- Regular users don't need advanced settings access -->
 
                 {% elif user.user_type == 'teacher' %}
                     <!-- Teachers see dashboard, students and reading groups -->

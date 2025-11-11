@@ -1,3 +1,8 @@
+<!-- 
+DEPRECATED: This template is no longer used.
+Administrators now use teacher_dash.html (unified experience).
+Keeping this file for reference only - can be deleted in future cleanup.
+-->
 {% extends "general/nav_template.html" %}
 {% load static %}
 {% block title %}read | Administrator Dashboard{% endblock %}
@@ -6,10 +11,169 @@
 <!-- Welcome Header -->
 <div class="row mb-4">
     <div class="col-12">
-        <div class="card bg-gradient-primary text-white">
+        <div class="d-flex justify-content-between align-items-center mb-3">
+            <div>
+                <h2 class="mb-1"><i class="fas fa-user-shield me-2"></i>Administrator Dashboard</h2>
+                <p class="text-muted mb-0">Welcome, {{ user.first_name }}! Full access to manage and teach your school.</p>
+            </div>
+            <div class="d-flex gap-2">
+                <button class="btn btn-outline-secondary btn-sm" id="refresh-dashboard" title="Refresh Data">
+                    <i class="fas fa-sync-alt"></i>
+                </button>
+                <button class="btn btn-outline-info btn-sm" id="export-data" title="Export Report">
+                    <i class="fas fa-download"></i> Export
+                </button>
+            </div>
+        </div>
+    </div>
+</div>
+
+<!-- First-Time Setup Guide (shows when school has no students/teachers) -->
+<div class="row mb-4" id="onboarding-section">
+    <div class="col-12">
+        <div class="alert alert-info alert-dismissible fade show" role="alert">
+            <h5 class="alert-heading"><i class="fas fa-rocket me-2"></i>Get Started with Your Reading Program</h5>
+            <p>As an administrator, you have full control over your school. Here's how to get started:</p>
+            <ol class="mb-3">
+                <li><strong>Create your first classroom</strong> - Organize students into groups</li>
+                <li><strong>Add students</strong> - Invite or create student accounts</li>
+                <li><strong>Start teaching</strong> - Track reading progress and view analytics</li>
+                <li><strong>Invite teachers</strong> - Add other teachers to help manage classrooms (optional)</li>
+            </ol>
+            <div class="d-flex gap-2 flex-wrap">
+                <a href="{% url 'classrooms' %}" class="btn btn-primary btn-sm">
+                    <i class="fas fa-plus me-1"></i>Create First Classroom
+                </a>
+                <a href="{% url 'my_students' %}" class="btn btn-success btn-sm">
+                    <i class="fas fa-user-plus me-1"></i>Add Students
+                </a>
+                <button type="button" class="btn btn-outline-light btn-sm" data-bs-dismiss="alert">
+                    <i class="fas fa-times me-1"></i>Dismiss
+                </button>
+            </div>
+        </div>
+    </div>
+</div>
+
+<!-- Teaching Controls (if classrooms exist) -->
+<div class="row mb-4" id="teaching-controls" style="display: none;">
+    <div class="col-12">
+        <div class="card">
             <div class="card-body">
-                <h3><i class="fas fa-user-shield me-2"></i>Administrator Dashboard</h3>
-                <p class="mb-0">Manage your school's reading program and monitor progress across all classrooms.</p>
+                <h5 class="mb-3">📚 View Classroom Reading Analytics</h5>
+                <div class="row g-3">
+                    {% include "components/forms/date_range_picker.html" with id="dashboard_range" label="📅 Time Period" callback_function="loadDashboardData" %}
+                    <div class="col-md-6">
+                        <label class="form-label fw-bold mb-2">👥 Classroom/Group</label>
+                        <select class="form-select js-choice" id="Classroom_Group" name="Classroom_Group"
+                                data-options='{"removeItemButton":false,"placeholder":true,"placeholderValue":"Select a classroom or group"}'>
+                            {% if data %}
+                            {% for classroom in data.classrooms %}
+                            <option value="class_{{ classroom.id }}" {% if classroom.selected %}selected{% endif %}>
+                                🏫 {{ classroom.name }}
+                            </option>
+                            {% endfor %}
+                            {% for reading_group in data.reading_groups %}
+                            <option value="group_{{ reading_group.id }}" {% if reading_group.selected %}selected{% endif %}>
+                                📖 {{ reading_group.name }}
+                            </option>
+                            {% endfor %}
+                            {% endif %}
+                        </select>
+                    </div>
+                </div>
+            </div>
+        </div>
+    </div>
+</div>
+
+<!-- Reading Analytics (hidden until classroom selected) -->
+<div class="row mb-4" id="reading-analytics" style="display: none;">
+    <div class="col-lg-3 col-md-6 mb-3">
+        <div class="card h-100">
+            <div class="card-body">
+                <div class="d-flex justify-content-between">
+                    <div>
+                        <div class="d-flex align-items-center mb-2">
+                            <i class="fas fa-users text-primary me-2"></i>
+                            <h6 class="mb-0 text-muted">Active Readers</h6>
+                        </div>
+                        <h3 class="mb-0 fw-bold" id="active-readers-count">-</h3>
+                        <small class="text-muted" id="total-students-badge">of - students</small>
+                    </div>
+                </div>
+            </div>
+        </div>
+    </div>
+    
+    <div class="col-lg-3 col-md-6 mb-3">
+        <div class="card h-100">
+            <div class="card-body">
+                <div class="d-flex justify-content-between">
+                    <div>
+                        <div class="d-flex align-items-center mb-2">
+                            <i class="fas fa-book text-success me-2"></i>
+                            <h6 class="mb-0 text-muted">Total Pages</h6>
+                        </div>
+                        <h3 class="mb-0 fw-bold" id="total-pages-metric">-</h3>
+                        <small class="text-muted" id="avg-pages-metric">- avg per student</small>
+                    </div>
+                </div>
+            </div>
+        </div>
+    </div>
+    
+    <div class="col-lg-3 col-md-6 mb-3">
+        <div class="card h-100">
+            <div class="card-body">
+                <div class="d-flex justify-content-between">
+                    <div>
+                        <div class="d-flex align-items-center mb-2">
+                            <i class="fas fa-clock text-warning me-2"></i>
+                            <h6 class="mb-0 text-muted">Reading Time</h6>
+                        </div>
+                        <h3 class="mb-0 fw-bold" id="total-minutes-metric">-</h3>
+                        <small class="text-muted" id="avg-minutes-metric">- avg per student</small>
+                    </div>
+                </div>
+            </div>
+        </div>
+    </div>
+    
+    <div class="col-lg-3 col-md-6 mb-3">
+        <div class="card h-100">
+            <div class="card-body">
+                <div class="d-flex justify-content-between">
+                    <div>
+                        <div class="d-flex align-items-center mb-2">
+                            <i class="fas fa-file-alt text-info me-2"></i>
+                            <h6 class="mb-0 text-muted">Reading Logs</h6>
+                        </div>
+                        <h3 class="mb-0 fw-bold" id="total-logs-metric">-</h3>
+                        <small class="text-muted">total entries</small>
+                    </div>
+                </div>
+            </div>
+        </div>
+    </div>
+</div>
+
+<!-- Student Progress Table (hidden until classroom selected) -->
+<div class="row mb-4" id="student-progress-section" style="display: none;">
+    <div class="col-12">
+        <div class="card">
+            <div class="card-header">
+                <h5 class="mb-0"><i class="fas fa-chart-line me-2"></i>Student Progress</h5>
+            </div>
+            <div class="card-body">
+                <div id="student-progress-table">
+                    <div class="text-center py-5">
+                        <div class="spinner-border text-primary" role="status">
+                            <span class="visually-hidden">Loading...</span>
+                        </div>
+                        <p class="mt-3 text-muted">Loading student progress...</p>
+                    </div>
+                </div>
             </div>
         </div>
     </div>
@@ -18,41 +182,41 @@
 <!-- Quick Actions -->
 <div class="row mb-4">
     <div class="col-12">
-        <h5 class="mb-3">Quick Actions</h5>
+        <h5 class="mb-3"><i class="fas fa-bolt me-2"></i>Quick Actions</h5>
     </div>
     <div class="col-md-3 mb-3">
-        <a href="{% url 'user_list_page' 'student' %}" class="card text-decoration-none h-100">
-            <div class="card-body text-center">
-                <i class="fas fa-user-graduate fa-2x text-primary mb-2"></i>
-                <h6>Manage Students</h6>
-                <small class="text-muted">Add, edit, and organize students</small>
-            </div>
-        </a>
-    </div>
-    <div class="col-md-3 mb-3">
-        <a href="{% url 'user_list_page' 'teacher' %}" class="card text-decoration-none h-100">
-            <div class="card-body text-center">
-                <i class="fas fa-chalkboard-teacher fa-2x text-success mb-2"></i>
-                <h6>Manage Teachers</h6>
-                <small class="text-muted">Oversee teaching staff</small>
-            </div>
-        </a>
-    </div>
-    <div class="col-md-3 mb-3">
-        <a href="{% url 'classrooms' %}" class="card text-decoration-none h-100">
+        <a href="{% url 'classrooms' %}" class="card text-decoration-none h-100 hover-shadow">
             <div class="card-body text-center">
                 <i class="fas fa-door-open fa-2x text-info mb-2"></i>
-                <h6>Manage Classrooms</h6>
-                <small class="text-muted">Organize classroom structure</small>
+                <h6 class="mb-1">My Classrooms</h6>
+                <small class="text-muted">Create and manage classrooms</small>
             </div>
         </a>
     </div>
     <div class="col-md-3 mb-3">
-        <a href="{% url 'reading_groups' %}" class="card text-decoration-none h-100">
+        <a href="{% url 'my_students' %}" class="card text-decoration-none h-100 hover-shadow">
+            <div class="card-body text-center">
+                <i class="fas fa-user-graduate fa-2x text-primary mb-2"></i>
+                <h6 class="mb-1">My Students</h6>
+                <small class="text-muted">Add and track student progress</small>
+            </div>
+        </a>
+    </div>
+    <div class="col-md-3 mb-3">
+        <a href="{% url 'reading_groups' %}" class="card text-decoration-none h-100 hover-shadow">
             <div class="card-body text-center">
                 <i class="fas fa-users fa-2x text-warning mb-2"></i>
-                <h6>Reading Groups</h6>
-                <small class="text-muted">Manage reading groups</small>
+                <h6 class="mb-1">Reading Groups</h6>
+                <small class="text-muted">Organize reading groups</small>
+            </div>
+        </a>
+    </div>
+    <div class="col-md-3 mb-3">
+        <a href="{% url 'user_list_page' 'teacher' %}" class="card text-decoration-none h-100 hover-shadow">
+            <div class="card-body text-center">
+                <i class="fas fa-chalkboard-teacher fa-2x text-success mb-2"></i>
+                <h6 class="mb-1">Invite Teachers</h6>
+                <small class="text-muted">Add other teachers (optional)</small>
             </div>
         </a>
     </div>
@@ -150,17 +314,37 @@
 {% endblock %}
 
 {% block afterScripts %}
+<style>
+.hover-shadow {
+    transition: all 0.3s ease;
+}
+.hover-shadow:hover {
+    transform: translateY(-2px);
+    box-shadow: 0 4px 12px rgba(0,0,0,0.15);
+}
+</style>
 <script>
 document.addEventListener('DOMContentLoaded', function() {
     // Load school statistics
     loadSchoolStats();
+    
+    // Setup classroom selector change handler
+    const classroomSelect = document.getElementById('Classroom_Group');
+    if (classroomSelect) {
+        classroomSelect.addEventListener('change', loadDashboardData);
+    }
+    
+    // Setup refresh button
+    const refreshBtn = document.getElementById('refresh-dashboard');
+    if (refreshBtn) {
+        refreshBtn.addEventListener('click', loadDashboardData);
+    }
 });
 
 function loadSchoolStats() {
-    // For now, we'll use placeholder data
-    // In Phase 2, we'll add real API endpoints for admin statistics
+    // Load real data from existing APIs
     
-    // Simulate loading delay
+    // Show loading state briefly while fetching
     setTimeout(() => {
         document.getElementById('total-students').textContent = '...';
         document.getElementById('total-teachers').textContent = '...';
@@ -185,7 +369,17 @@ function loadUserCount(userType, elementId) {
     .then(response => response.json())
     .then(data => {
         if (data.users) {
-            document.getElementById(elementId).textContent = data.users.length;
+            const count = data.users.length;
+            document.getElementById(elementId).textContent = count;
+            
+            // Auto-hide onboarding and show teaching controls if there are students
+            if (userType === 'student' && count > 0) {
+                const onboarding = document.getElementById('onboarding-section');
+                if (onboarding) {
+                    onboarding.style.display = 'none';
+                }
+                // Don't auto-show teaching controls - let them select a classroom first
+            }
         }
     })
     .catch(error => {
@@ -199,7 +393,20 @@ function loadClassroomCount() {
     .then(response => response.json())
     .then(data => {
         if (Array.isArray(data)) {
-            document.getElementById('total-classrooms').textContent = data.length;
+            const count = data.length;
+            document.getElementById('total-classrooms').textContent = count;
+            
+            // Show teaching controls if there are classrooms
+            if (count > 0) {
+                const onboarding = document.getElementById('onboarding-section');
+                if (onboarding) {
+                    onboarding.style.display = 'none';
+                }
+                const teachingControls = document.getElementById('teaching-controls');
+                if (teachingControls) {
+                    teachingControls.style.display = 'block';
+                }
+            }
         }
     })
     .catch(error => {
@@ -220,6 +427,142 @@ function loadGroupCount() {
         console.error('Error loading group count:', error);
         document.getElementById('total-groups').textContent = 'Error';
     });
+}
+
+function loadDashboardData() {
+    // Get date range from picker component
+    let dateRange = null;
+    if (typeof getDateRangeValue === 'function') {
+        dateRange = getDateRangeValue('dashboard_range');
+    }
+    
+    const groupValue = document.getElementById('Classroom_Group')?.value;
+    
+    if (!dateRange || !groupValue) {
+        console.log('Date range or classroom not selected yet');
+        return;
+    }
+    
+    console.log('Loading dashboard data:', { dateRange, groupValue });
+    
+    // Show analytics sections
+    document.getElementById('reading-analytics').style.display = 'flex';
+    document.getElementById('student-progress-section').style.display = 'block';
+    
+    // Fetch data from teacher dashboard API
+    fetch(`/api/get_logs_by_range_and_group/?date_range=${encodeURIComponent(dateRange)}&group=${encodeURIComponent(groupValue)}`, {
+        credentials: 'same-origin',
+        headers: {
+            'X-Requested-With': 'XMLHttpRequest'
+        }
+    })
+    .then(response => {
+        if (!response.ok) {
+            throw new Error(`HTTP ${response.status}`);
+        }
+        return response.json();
+    })
+    .then(data => {
+        if (!data) return;
+        
+        // Update metrics
+        updateDashboardMetrics(data);
+        
+        // Update student progress table
+        updateStudentProgressTable(data);
+    })
+    .catch(error => {
+        console.error('Error loading dashboard data:', error);
+        showError('Failed to load classroom analytics. Please try again.');
+    });
+}
+
+function updateDashboardMetrics(data) {
+    // Active readers
+    const activeReaders = data.summary?.active_students || 0;
+    const totalStudents = data.summary?.total_students || 0;
+    document.getElementById('active-readers-count').textContent = activeReaders;
+    document.getElementById('total-students-badge').textContent = `of ${totalStudents} students`;
+    
+    // Total pages
+    const totalPages = data.summary?.total_pages || 0;
+    const avgPages = totalStudents > 0 ? Math.round(totalPages / totalStudents) : 0;
+    document.getElementById('total-pages-metric').textContent = totalPages.toLocaleString();
+    document.getElementById('avg-pages-metric').textContent = `${avgPages} avg per student`;
+    
+    // Reading time
+    const totalMinutes = data.summary?.total_minutes || 0;
+    const avgMinutes = totalStudents > 0 ? Math.round(totalMinutes / totalStudents) : 0;
+    const hours = Math.floor(totalMinutes / 60);
+    const mins = totalMinutes % 60;
+    document.getElementById('total-minutes-metric').textContent = `${hours}h ${mins}m`;
+    document.getElementById('avg-minutes-metric').textContent = `${avgMinutes}m avg per student`;
+    
+    // Total logs
+    const totalLogs = data.logs?.length || 0;
+    document.getElementById('total-logs-metric').textContent = totalLogs;
+}
+
+function updateStudentProgressTable(data) {
+    const tableContainer = document.getElementById('student-progress-table');
+    
+    if (!data.student_progress || data.student_progress.length === 0) {
+        tableContainer.innerHTML = `
+            <div class="text-center py-5">
+                <i class="fas fa-inbox fa-3x text-muted mb-3"></i>
+                <p class="text-muted">No reading data for this period</p>
+                <small>Students will appear here once they start logging reading</small>
+            </div>
+        `;
+        return;
+    }
+    
+    let tableHTML = `
+        <div class="table-responsive">
+            <table class="table table-hover">
+                <thead>
+                    <tr>
+                        <th>Student</th>
+                        <th class="text-end">Pages</th>
+                        <th class="text-end">Time</th>
+                        <th class="text-end">Logs</th>
+                        <th class="text-end">Avg/Day</th>
+                    </tr>
+                </thead>
+                <tbody>
+    `;
+    
+    data.student_progress.forEach(student => {
+        const name = student.name || 'Unknown';
+        const pages = student.pages || 0;
+        const minutes = student.minutes || 0;
+        const logs = student.logs || 0;
+        const avgPages = student.avg_pages_per_day || 0;
+        
+        tableHTML += `
+            <tr>
+                <td><strong>${name}</strong></td>
+                <td class="text-end">${pages.toLocaleString()}</td>
+                <td class="text-end">${Math.floor(minutes / 60)}h ${minutes % 60}m</td>
+                <td class="text-end">${logs}</td>
+                <td class="text-end">${Math.round(avgPages)} pages/day</td>
+            </tr>
+        `;
+    });
+    
+    tableHTML += `
+                </tbody>
+            </table>
+        </div>
+    `;
+    
+    tableContainer.innerHTML = tableHTML;
+}
+
+function showError(message) {
+    // Simple error display
+    console.error(message);
+    alert(message);
 }
 </script>
 {% endblock %}
